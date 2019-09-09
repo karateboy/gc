@@ -18,7 +18,7 @@ export default {
    */
   baseUrl: {
     dev: 'http://localhost:9000/',
-    pro: ''
+    pro: 'http://localhost:9000/'
   },
   /**
    * @description 默认打开的首页的路由name值，默认为home
