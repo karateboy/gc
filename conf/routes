@@ -3,7 +3,7 @@
 # ~~~~
 
 # Home page
-GET      /                                                                     controllers.Assets.at(path="/public", file="index.html")
+GET      /                                                                     controllers.Assets.at(path="/public/dist", file="index.html")
 
 # Map static resources from the /public folder to the /assets URL path
 GET      /static/*file                                                         controllers.Assets.versioned(path="/public/static", file: Asset)
