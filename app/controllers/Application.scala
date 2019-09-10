@@ -88,7 +88,7 @@ object Application extends Controller {
     for (users <- userF) yield Ok(Json.toJson(users))
   }
 
-  def adminOnly[A, B <: controllers.Security.UserInfo](permited: Future[Result])(implicit request: play.api.mvc.Security.AuthenticatedRequest[A, B]) = {
+  def adminOnly[A, B <: UserInfo](permited: Future[Result])(implicit request: play.api.mvc.Security.AuthenticatedRequest[A, B]) = {
     val userInfoOpt = Security.getUserinfo(request)
     if (userInfoOpt.isEmpty)
       Future {

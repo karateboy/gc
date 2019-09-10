@@ -10,9 +10,13 @@ GET      /static/*file                                                         c
 GET      /html/*file                                                           controllers.Assets.at(path="/public/html", file)
 GET      /dist/*file                                                           controllers.Assets.at(path="/public/dist", file)
 
+POST     /logout                                                               controllers.Login.logout
+POST     /login                                                                controllers.Login.authenticate
+GET      /getUserInfo                                                          controllers.Login.getUserInfo
+
+# old api
 GET      /logout                                                               controllers.Login.logout
 POST     /authenticate                                                         controllers.Login.authenticate
-GET      /testAuthenticated                                                    controllers.Login.testAuthenticated
 
 POST     /User                                                                 controllers.Application.newUser
 GET      /User                                                                 controllers.Application.getAllUsers

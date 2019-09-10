@@ -35,7 +35,7 @@ object User {
     f.onSuccess({
       case count =>
         if (count == 0) {
-          val defaultUser = User("sales@wecc.com.tw", "wecc5379716", "環保局", "0920660136")
+          val defaultUser = User("user", "abc123", "名洋科技", "0955577328")
           Logger.info("Create default user:" + defaultUser.toString())
           newUser(defaultUser)
         }
