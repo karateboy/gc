@@ -37,13 +37,6 @@ GET      /HistoryReport/:monitor/:monitorType/:tabType/:start/:end             c
 GET      /Alarm                                                                controllers.Query.alarm
 GET      /AlarmReport/:monitors/:monitorTypes/:start/:end                      controllers.Query.alarmReport(monitors, monitorTypes, start, end)
 
-
-GET      /WindRose                                                             controllers.Query.windRose
-GET      /JSON/WindRose/:monitors/:monitorType/:nWay/:start/:end               controllers.Query.windRoseReport(monitors, monitorType, nWay:Int, start:Long, end:Long, outputTypeStr="html")
-GET      /Excel/WindRose/:monitors/:monitorType/:nWay/:start/:end              controllers.Query.windRoseReport(monitors, monitorType, nWay:Int, start:Long, end:Long, outputTypeStr="excel")
-
-
-GET      /MonitorTypeConfig                                                    controllers.Application.monitorTypeConfig
 POST     /SaveMonitorTypeConfig                                                controllers.Application.saveMonitorTypeConfig
 POST     /SaveMonitorConfig                                                    controllers.Application.saveMonitorConfig
 

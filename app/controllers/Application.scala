@@ -122,11 +122,6 @@ object Application extends Controller {
     Ok(s"匯入 $path")
   }
 
-  def monitorTypeConfig = Security.Authenticated {
-    implicit request =>
-      Ok(views.html.monitorTypeConfig())
-  }
-
   case class EditData(id: String, data: String)
   def saveMonitorTypeConfig() = Security.Authenticated {
     implicit request =>

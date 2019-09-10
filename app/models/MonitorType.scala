@@ -12,8 +12,7 @@ import org.mongodb.scala.model._
 case class MonitorType(_id: String, desp: String, unit: String, order: Int, prec: Int = 2,
                        std_law:      Option[Double] = None,
                        std_internal: Option[Double] = None,
-                       level1:       Option[Double] = None, level2: Option[Double] = None,
-                       level3: Option[Double] = None, level4: Option[Double] = None, itemID: Option[Int] = None) {
+                       itemID:       Option[Int]    = None) {
   def getItemIdUpdates = {
 
     Updates.combine(
@@ -45,30 +44,6 @@ object MonitorType extends Enumeration {
     MonitorType(_id = desp, desp = desp, unit = unit, order = epaOrder, itemID = Some(itemID))
   }
 
-  val epaMonitorTypes = Seq(
-    epaMonitorType("溫度", "℃", 14),
-    epaMonitorType("甲烷", "ppm", 31),
-    epaMonitorType("一氧化碳", "ppm", 2),
-    epaMonitorType("二氧化碳", "ppm", 36),
-    epaMonitorType("非甲烷碳氫化合物", "ppm", 9),
-    epaMonitorType("一氧化氮", "ppb", 6),
-    epaMonitorType("二氧化氮", "ppb", 7),
-    epaMonitorType("氮氧化物", "ppb", 5),
-    epaMonitorType("臭氧", "ppb", 3),
-    epaMonitorType("酸雨", "pH", 21),
-    epaMonitorType("PM10", "μg/m3", 4),
-    epaMonitorType("PM2.5", "μg/m3", 33),
-    epaMonitorType("導電度", "μmho/cm", 22),
-    epaMonitorType("降雨強度", "㎜", 32),
-    epaMonitorType("降雨量", "㎜", 23),
-    epaMonitorType("相對濕度", "percent", 38),
-    epaMonitorType("二氧化硫", "ppb", 1),
-    epaMonitorType("總碳氫化合物", "ppm", 8),
-    epaMonitorType("小時風向值", "小時風向值", 144),
-    epaMonitorType("風向", "degrees", 11),
-    epaMonitorType("風速", "m/sec", 10),
-    epaMonitorType("小時風速值", "m/sec", 143))
-
   lazy val WIN_SPEED = MonitorType.withName("風速")
   lazy val WIN_DIRECTION = MonitorType.withName("風向")
   def init(colNames: Seq[String]) = {
@@ -82,37 +57,6 @@ object MonitorType extends Enumeration {
       Some(f.mapTo[Unit])
     } else
       None
-
-    for (set <- SysConfig.get(SysConfig.SET_MT_ITEM_ID)) {
-      if (!set.asBoolean().getValue) {
-        Logger.info("Init EPA MonitorType ItemID")
-        for (ret <- initMonitorTypeItemID) {
-          Logger.info(s"EPA MonitorType ItemID is set ${ret.getInsertedCount}/${ret.getModifiedCount}")
-          refreshMtv
-          SysConfig.set(SysConfig.SET_MT_ITEM_ID, BsonBoolean(true))
-        }
-      }
-    }
-  }
-
-  def initMonitorTypeItemID = {
-    val updateModels =
-      for (mt <- epaMonitorTypes) yield {
-        val updates = Updates.combine(
-          Updates.setOnInsert("desp", mt.desp),
-          Updates.setOnInsert("unit", mt.unit),
-          Updates.set("order", mt.order),
-          Updates.setOnInsert("prec", mt.prec),
-          Updates.set("itemID", mt.itemID.get))
-
-        UpdateOneModel(
-          Filters.eq("_id", mt._id),
-          updates, UpdateOptions().upsert(true))
-      }
-
-    val f2 = collection.bulkWrite(updateModels, BulkWriteOptions().ordered(false)).toFuture()
-    f2.onFailure(errorHandler)
-    f2
   }
 
   def BFName(mt: MonitorType.Value) = {
@@ -285,6 +229,5 @@ object MonitorType extends Enumeration {
     val (overInternal, overLaw) = overStd(mt, v)
     MonitorStatus.getCssClassStr(r.status, overInternal, overLaw)
   }
-  
-  
+
 }
