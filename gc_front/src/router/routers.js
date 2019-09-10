@@ -16,8 +16,135 @@ import parentView from '@/components/parent-view'
  *  beforeCloseName: (-) 设置该字段，则在关闭当前tab页时会去'@/router/before-close.js'里寻找该字段名对应的方法，作为关闭前的钩子函数
  * }
  */
-
 export default [
+  {
+    path: '/login',
+    name: 'login',
+    meta: {
+      title: 'Login - 登录',
+      hideInMenu: true
+    },
+    component: () => import('@/view/login/login.vue')
+  },
+  {
+    path: '/',
+    name: '_home',
+    redirect: '/home',
+    component: Main,
+    meta: {
+      hideInMenu: true,
+      notCache: true
+    },
+    children: [
+      {
+        path: '/home',
+        name: 'home',
+        meta: {
+          hideInMenu: true,
+          title: '首頁',
+          notCache: true,
+          icon: 'md-home'
+        },
+        component: () => import('@/view/single-page/home')
+      }
+    ]
+  },
+  {
+    path: '/data_query',
+    name: 'data_query',
+    meta: {
+      icon: 'md-stats',
+      title: '資料查詢'
+    },
+    component: Main,
+    children: [
+      {
+        path: 'realtime_data',
+        name: 'realtime_data',
+        meta: {
+          icon: 'md-trending-up',
+          title: '即時資料'
+        },
+        component: () => import('@/view/single-page/home')
+      },
+      {
+        path: 'history_data',
+        name: 'history_data',
+        meta: {
+          icon: 'md-eye',
+          title: '歷史資料'
+        },
+        component: () => import('@/view/historyData/historyData')
+      },
+      {
+        path: 'history_trend',
+        name: 'history_trend',
+        meta: {
+          icon: 'md-trending-down',
+          title: '歷史趨勢'
+        },
+        component: () => import('@/view/historyTrend/historyTrend')
+      },
+      {
+        path: 'report',
+        name: 'report',
+        meta: {
+          icon: 'md-book',
+          title: '歷史資料'
+        },
+        component: () => import('@/view/historyData/historyData')
+      }
+    ]
+  },
+  {
+    path: '/config',
+    name: 'config',
+    meta: {
+      icon: 'md-settings',
+      title: '設定',
+      showAlways: true
+    },
+    component: Main,
+    children: [
+      {
+        path: 'plc_config',
+        name: 'plc_config',
+        meta: {
+          icon: 'md-laptop',
+          title: 'PLC設定'
+        },
+        component: () => import('@/view/single-page/home')
+      }
+    ]
+  },
+  {
+    path: '/401',
+    name: 'error_401',
+    meta: {
+      hideInMenu: true
+    },
+    component: () => import('@/view/error-page/401.vue')
+  },
+  {
+    path: '/500',
+    name: 'error_500',
+    meta: {
+      hideInMenu: true
+    },
+    component: () => import('@/view/error-page/500.vue')
+  },
+  {
+    path: '*',
+    name: 'error_404',
+    meta: {
+      hideInMenu: true
+    },
+    component: () => import('@/view/error-page/404.vue')
+  }
+
+]
+
+export const original = [
   {
     path: '/login',
     name: 'login',

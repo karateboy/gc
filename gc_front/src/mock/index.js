@@ -1,5 +1,4 @@
-import Mock from 'mockjs'
-import { login, logout, getUserInfo } from './login'
+/* import { login, logout, getUserInfo } from './login'
 import { getTableData, getDragList, uploadImage, getOrgData, getTreeSelectData } from './data'
 import { getMessageInit, getContentByMsgId, hasRead, removeReaded, restoreTrash, messageCount } from './user'
 
@@ -24,5 +23,5 @@ Mock.mock(/\/message\/restore/, restoreTrash)
 Mock.mock(/\/message\/count/, messageCount)
 Mock.mock(/\/get_org_data/, getOrgData)
 Mock.mock(/\/get_tree_select_data/, getTreeSelectData)
-
+ */
 export default Mock

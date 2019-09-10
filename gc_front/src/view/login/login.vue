@@ -26,20 +26,17 @@ export default {
     ...mapActions(["handleLogin", "getUserInfo"]),
     handleSubmit({ userName, password }) {
       this.handleLogin({ userName, password }).then(
-        ret => {
-          console.log(ret);
-          const resp = ret.data;
-          if (resp.ok) {
-            this.getUserInfo().then(res => {
-              this.$router.push({
-                name: this.$config.homeName
-              });
+        res => {
+          this.getUserInfo().then(res => {
+            this.$router.push({
+              name: this.$config.homeName
             });
-          } else {
-            this.$Message.error(resp.msg);
-          }
+          });
         },
-        err => {}
+        err => {
+          console.log(err);
+          this.$Message.error(err);
+        }
       );
     }
   }

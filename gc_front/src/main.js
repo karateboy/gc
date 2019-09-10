@@ -16,11 +16,11 @@ import TreeTable from 'tree-table-vue'
 import VOrgTree from 'v-org-tree'
 import 'v-org-tree/dist/v-org-tree.css'
 import axios from 'axios'
-// 实际打包时应该不引入mock
-/* eslint-disable */
-if (process.env.NODE_ENV !== 'production') require('@/mock')
 
+
+axios.defaults.baseURL = process.env.NODE_ENV === 'development' ? config.baseUrl.dev : config.baseUrl.pro;
 axios.defaults.withCredentials = true
+
 
 Vue.use(iView, {
   i18n: (key, value) => i18n.t(key, value)
