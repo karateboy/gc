@@ -18,20 +18,23 @@ case class User(_id: String, password: String, name: String, phone: String, grou
 object User {
   import scala.concurrent._
   import scala.concurrent.duration._
+  import org.mongodb.scala.bson.codecs.Macros._
+  import org.mongodb.scala.bson.codecs.DEFAULT_CODEC_REGISTRY
+  import org.bson.codecs.configuration.CodecRegistries.{ fromRegistries, fromProviders }
 
-  val ColName = "users"
-  val collection = MongoDB.database.getCollection(ColName)
+  val codecRegistry = fromRegistries(fromProviders(classOf[User]), DEFAULT_CODEC_REGISTRY)
+
+  val COLNAME = "users"
+  val collection = MongoDB.database.getCollection[User](COLNAME).withCodecRegistry(codecRegistry)
   implicit val userRead = Json.reads[User]
   implicit val userWrite = Json.writes[User]
   
-  def toDocument(user: User) = Document(Json.toJson(user).toString())
-
   def init(colNames: Seq[String]) {
-    if (!colNames.contains(ColName)) {
-      val f = MongoDB.database.createCollection(ColName).toFuture()
+    if (!colNames.contains(COLNAME)) {
+      val f = MongoDB.database.createCollection(COLNAME).toFuture()
       f.onFailure(errorHandler)
     }
-    val f = collection.count().toFuture()
+    val f = collection.countDocuments().toFuture()
     f.onSuccess({
       case count =>
         if (count == 0) {
@@ -43,19 +46,8 @@ object User {
     f.onFailure(errorHandler)
   }
 
-  def toUser(doc: Document) = {
-    val ret = Json.parse(doc.toJson()).validate[User]
-
-    ret.fold(error => {
-      Logger.error(JsError.toJson(error).toString())
-      throw new Exception(JsError.toJson(error).toString)
-    },
-      usr => usr)
-
-  }
-
   def newUser(user: User) = {
-    collection.insertOne(toDocument(user)).toFuture()
+    collection.insertOne(user).toFuture()
   }
 
   import org.mongodb.scala.model.Filters._
@@ -64,7 +56,7 @@ object User {
   }
 
   def updateUser(user: User) = {
-    val f = collection.replaceOne(equal("_id", user._id), toDocument(user)).toFuture()
+    val f = collection.replaceOne(equal("_id", user._id), user).toFuture()
     f
   }
 
@@ -75,12 +67,12 @@ object User {
       yield if (ret.length == 0)
       None
     else
-      Some(toUser(ret(0)))
+      Some(ret.head)
   }
 
   def getAllUsersFuture() = {
     val f = collection.find().toFuture()
     f.onFailure { errorHandler }
-    for (ret <- f) yield ret.map { toUser }
+    for (ret <- f) yield ret
   }
 }

@@ -4,7 +4,6 @@ import akka.actor._
 import play.api.Play.current
 import play.api.libs.concurrent.Akka
 import com.github.nscala_time.time.Imports._
-import play.api.Play.current
 import Alarm._
 import ModelHelper._
 import play.api.libs.json._

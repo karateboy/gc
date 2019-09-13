@@ -124,7 +124,7 @@ object MonitorType extends Enumeration {
   import org.mongodb.scala.model._
 
   def upsertMonitorType(mt: MonitorType) = {
-    val f = collection.replaceOne(equal("_id", mt._id), mt, UpdateOptions().upsert(true)).toFuture()
+    val f = collection.replaceOne(equal("_id", mt._id), mt, ReplaceOptions().upsert(true)).toFuture()
     waitReadyResult(f)
     true
   }

@@ -35,37 +35,14 @@ object Monitor extends Enumeration {
   val codecRegistry = fromRegistries(fromProviders(classOf[Monitor]), DEFAULT_CODEC_REGISTRY)
   val collection = MongoDB.database.getCollection[Monitor](colName).withCodecRegistry(codecRegistry)
 
-  def monitorId(selector: Int, name: String) = s"${selector}#${name}"
+  def monitorId(selector: Int) = s"${selector}"
 
   def buildMonitor(selector: Int, dp_no: String) = {
     assert(!dp_no.isEmpty)
 
-    Monitor(monitorId(selector, dp_no), "", dp_no)
+    Monitor(monitorId(selector), "", dp_no)
   }
 
-  val districtMap = Map(
-    1 -> "基隆市",
-    2 -> "臺北市",
-    3 -> "新北市",
-    4 -> "桃園市",
-    5 -> "新竹市",
-    6 -> "新竹縣",
-    7 -> "苗栗縣",
-    8 -> "臺中市",
-    9 -> "彰化縣",
-    10 -> "南投縣",
-    11 -> "雲林縣",
-    12 -> "嘉義市",
-    13 -> "嘉義縣",
-    14 -> "臺南市",
-    15 -> "高雄市",
-    16 -> "屏東縣",
-    17 -> "臺東縣",
-    18 -> "花蓮縣",
-    19 -> "宜蘭縣",
-    20 -> "連江縣",
-    21 -> "金門縣",
-    22 -> "澎湖縣")
 
   def init(colNames: Seq[String]) = {
     if (!colNames.contains(colName)) {
@@ -131,24 +108,13 @@ object Monitor extends Enumeration {
       monitor.indParkName == indPark
     })
 
-  def getMonitorValueByName(selector: Int, dp_no: String) = {
+  def getMonitorValueByName(selector: Int) = {
     try {
-      val id = monitorId(selector, dp_no)
+      val id = monitorId(selector)
       Monitor.withName(id)
     } catch {
       case _: NoSuchElementException =>
-        newMonitor(buildMonitor(selector, dp_no))
-    }
-  }
-
-  def getMonitorValueBySiteIdName(selector: Int, siteID:Int, name: String = "") = {
-    try {
-      val id = monitorId(selector, siteID.toString())
-      Monitor.withName(id)
-    } catch {
-      case _: NoSuchElementException =>
-        val monitor = Monitor(_id = monitorId(1, siteID.toString()), "", dp_no = name)
-        newMonitor(monitor)
+        newMonitor(buildMonitor(selector, s"#${selector}"))
     }
   }
   
@@ -183,7 +149,7 @@ object Monitor extends Enumeration {
   }
 
   def upsert(m: Monitor) = {
-    val f = collection.replaceOne(Filters.equal("_id", m._id), m, UpdateOptions().upsert(true)).toFuture()
+    val f = collection.replaceOne(Filters.equal("_id", m._id), m, ReplaceOptions().upsert(true)).toFuture()
     f.onFailure(errorHandler)
     f
   }

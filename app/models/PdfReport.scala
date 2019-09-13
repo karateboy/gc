@@ -4,7 +4,7 @@ import org.mongodb.scala.model.Indexes._
 import org.mongodb.scala.bson._
 import MongoDB._
 
-case class PdfReport(_id:ObjectId, )
+case class PdfReport(_id: ObjectId, fileName:String, content: Array[Byte])
 object PdfReport {
   import org.mongodb.scala.bson.codecs.Macros._
   import org.mongodb.scala.bson.codecs.DEFAULT_CODEC_REGISTRY
@@ -12,7 +12,7 @@ object PdfReport {
 
   val codecRegistry = fromRegistries(fromProviders(classOf[PdfReport]), DEFAULT_CODEC_REGISTRY)
 
-  val COLNAME = "PdfReport" 
+  val COLNAME = "PdfReport"
   val collection = MongoDB.database.getCollection[PdfReport](COLNAME).withCodecRegistry(codecRegistry)
 
 }

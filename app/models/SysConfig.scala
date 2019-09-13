@@ -48,8 +48,7 @@ object SysConfig extends Enumeration {
   }
 
   def upsert(_id: SysConfig.Value, doc: Document) = {
-    val uo = new UpdateOptions().upsert(true)
-    val f = collection.replaceOne(Filters.equal("_id", _id.toString()), doc, uo).toFuture()
+    val f = collection.replaceOne(Filters.equal("_id", _id.toString()), doc, ReplaceOptions().upsert(true)).toFuture()
     f.onFailure(errorHandler)
     f
   }

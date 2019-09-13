@@ -11,15 +11,12 @@ libraryDependencies ++= Seq(
   ws,
   filters,
   specs2 % Test,
-  "com.github.nscala-time" %% "nscala-time" % "2.16.0",
-  "org.mongodb.scala" %% "mongo-scala-driver" % "2.2.0",
-  "com.google.maps" % "google-maps-services" % "0.2.2",
-   "commons-io" % "commons-io" % "2.5"
+  "com.github.nscala-time" %% "nscala-time" % "2.22.0",
+  "org.mongodb.scala" %% "mongo-scala-driver" % "2.7.0",
+   "commons-io" % "commons-io" % "2.6"
 )
 
-libraryDependencies += "org.scalikejdbc" %% "scalikejdbc"                  % "2.5.2"
-libraryDependencies += "org.scalikejdbc" %% "scalikejdbc-config"           % "2.5.2"
-libraryDependencies += "org.scalikejdbc" %% "scalikejdbc-play-initializer" % "2.5.1"
+libraryDependencies += "com.github.tototoshi" %% "scala-csv" % "1.3.6"
 
 mappings in Universal ++=
 (baseDirectory.value / "report_template" * "*" get) map

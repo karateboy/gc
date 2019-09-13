@@ -11,6 +11,7 @@ object Global extends GlobalSettings {
     Logger.info("Application has started")
     super.onStart(app)
     MongoDB.init()
+    GcAgent.startup()
   }
 
   override def onStop(app: Application) {

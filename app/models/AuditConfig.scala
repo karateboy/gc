@@ -64,7 +64,7 @@ object AuditConfig {
   import org.mongodb.scala.model._
 
   def upsert(_id: String, textile: AuditConfig) = {
-    val f = collection.replaceOne(Filters.eq("_id", _id), textile, UpdateOptions().upsert(true)).toFuture()
+    val f = collection.replaceOne(Filters.eq("_id", _id), textile, ReplaceOptions().upsert(true)).toFuture()
     f.onFailure {
       errorHandler
     }
