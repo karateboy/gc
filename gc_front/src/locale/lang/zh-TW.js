@@ -1,4 +1,12 @@
 export default {
+  // App String start
+  data_query: '資料查詢',
+  realtime_data: '即時資料',
+  history_data: '歷史資料查詢',
+  history_trend: '歷史趨勢圖',
+  config: '設定',
+  mtype_config: '測項設定',
+  // App String end
   home: '首頁',
   login: '登錄',
   components: '组件',

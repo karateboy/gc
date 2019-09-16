@@ -104,7 +104,7 @@ object Alarm {
     val start: BsonDateTime = ar.time - 30.minutes
     val end: BsonDateTime = ar.time
 
-    val countObserver = collection.count(and(gte("time", start), lt("time", end),
+    val countObserver = collection.countDocuments(and(gte("time", start), lt("time", end),
       equal("monitor", ar.monitor.toString), equal("monitorType", ar.monitorType.toString), equal("desc", ar.desc)))
 
     countObserver.subscribe(

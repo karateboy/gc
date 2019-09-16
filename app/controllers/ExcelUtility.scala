@@ -48,13 +48,13 @@ object ExcelUtility {
 
     style.setFont(font)
     style.setDataFormat(format.getFormat(format_str))
-    style.setBorderBottom(CellStyle.BORDER_THIN);
+    style.setBorderBottom(BorderStyle.THIN);
     style.setBottomBorderColor(IndexedColors.BLACK.getIndex());
-    style.setBorderLeft(CellStyle.BORDER_THIN);
+    style.setBorderLeft(BorderStyle.THIN);
     style.setLeftBorderColor(IndexedColors.BLACK.getIndex());
-    style.setBorderRight(CellStyle.BORDER_THIN);
+    style.setBorderRight(BorderStyle.THIN);
     style.setRightBorderColor(IndexedColors.BLACK.getIndex());
-    style.setBorderTop(CellStyle.BORDER_THIN);
+    style.setBorderTop(BorderStyle.THIN);
     style.setTopBorderColor(IndexedColors.BLACK.getIndex());
     style
   }

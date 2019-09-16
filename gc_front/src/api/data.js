@@ -1,5 +1,29 @@
 import axios from '@/libs/api.request'
 
+export const getMonitors = () => {
+  return axios.request({
+    url: 'monitors',
+    method: 'get'
+  })
+}
+
+export const getMonitorTypes = () => {
+  return axios.request({
+    url: 'monitor_types',
+    method: 'get'
+  })
+}
+
+export const getHistoryData = ({ monitor, monitorTypes, start, end }) => {
+  return axios.request({
+    url: 'history_data',
+    method: 'get',
+    params: {
+      monitor, monitorTypes, start, end
+    }
+  })
+}
+
 export const getTableData = () => {
   return axios.request({
     url: 'get_table_data',
@@ -17,14 +41,6 @@ export const getDragList = () => {
 export const errorReq = () => {
   return axios.request({
     url: 'error_url',
-    method: 'post'
-  })
-}
-
-export const saveErrorLogger = info => {
-  return axios.request({
-    url: 'save_error_logger',
-    data: info,
     method: 'post'
   })
 }

@@ -14,6 +14,8 @@ import play.api.libs.json._
 import com.github.nscala_time.time.Imports._
 import Highchart._
 import models._
+import scala.concurrent.ExecutionContext.Implicits.global
+import models.ObjectIdUtil._
 
 case class Stat(
   avg:        Option[Double],
@@ -688,6 +690,44 @@ object Query extends Controller {
       Ok(views.html.history())
   }
 
+  import java.util.Date
+  import org.mongodb.scala.bson._
+  case class CellData(v: String, cellClassName: String)
+  case class RowData(date: Long, cellData: Seq[CellData], pdfReport: ObjectId)
+  case class DataTab(columnNames: Seq[String], rows: Seq[RowData])
+  def historyData(monitorStr: String, monitorTypeStr: String, startLong: Long, endLong: Long) = Security.Authenticated.async {
+    implicit request =>
+      import scala.collection.JavaConverters._
+      val monitor = Monitor.withName(monitorStr)
+      val monitorTypeStrArray = java.net.URLDecoder.decode(monitorTypeStr, "UTF-8").split(',')
+      val monitorTypes = monitorTypeStrArray.map { MonitorType.withName }
+      val (start, end) = (new DateTime(startLong), new DateTime(endLong))
+
+      implicit val cdWrite = Json.writes[CellData]
+      implicit val rdWrite = Json.writes[RowData]
+      implicit val dtWrite = Json.writes[DataTab]
+
+      for (recordList <- Record.getRecordListFuture(Record.MinCollection)(monitor, start, end)) yield {
+        val rows = recordList map {
+          r =>
+            val mtCellData = monitorTypes.toSeq map { mt =>
+              val mtDataOpt = r.mtDataList.find(mtdt => mtdt.mtName == mt.toString())
+              if (mtDataOpt.isDefined) {
+                val mtData = mtDataOpt.get
+                CellData(mtData.value.toString(), "")
+              } else {
+                CellData("-", "")
+              }
+            }
+
+            RowData(r.time, mtCellData, r.pdfReport)
+        }
+        val columnNames = monitorTypes.toSeq map { MonitorType.map(_).desp }
+
+        Ok(Json.toJson(DataTab(columnNames, rows)))
+      }
+  }
+
   def historyReport(monitorStr: String, monitorTypeStr: String, tabTypeStr: String,
                     startLong: Long, endLong: Long) = Security.Authenticated {
     implicit request =>
@@ -812,9 +852,7 @@ object Query extends Controller {
   import Record._
   case class QueryParam(dataType: String, monitors: Seq[String], monitorTypes: Seq[String], start: Long, end: Long)
 
-  case class CellData(v: String, cellClassName: String)
-  case class RowData(date: Date, cellData: Seq[CellData])
-  case class DataTab(columnNames: Seq[String], rows: Seq[RowData])
+  /*
   def queryData() = Security.Authenticated.async(BodyParsers.parse.json) {
     implicit request =>
       implicit val read = Json.reads[QueryParam]
@@ -872,13 +910,13 @@ object Query extends Controller {
                       CellData(MonitorType.format(mt, Some(record.value)), MonitorType.getCssClassStr(mt, record))
                     }
                   }
-                RowData(time.toDate, cellData)
+                RowData(time.getMillis, cellData)
               }
             Ok(Json.toJson(DataTab(columnNames, rows)))
           }
         })
   }
-
+*/
   def alarmData() = Security.Authenticated.async(BodyParsers.parse.json) {
     implicit request =>
       implicit val read = Json.reads[QueryParam]
@@ -912,11 +950,20 @@ object Query extends Controller {
                   CellData(Monitor.map(alarm.monitor).dp_no, ""),
                   CellData(MonitorType.map(alarm.monitorType).desp, ""),
                   CellData(alarm.desc, ""))
-                RowData(alarm.time.toDate, cellData)
+                RowData(alarm.time.getMillis, cellData, null)
               }
             Ok(Json.toJson(DataTab(columnNames, rows)))
           }
         })
   }
 
+  def pdfReport(id: String) = Security.Authenticated.async {
+    import org.mongodb.scala.bson._
+
+    val f = PdfReport.getPdf(new ObjectId(id))
+    for (ret <- f) yield {
+      Ok(ret.content).as("application/pdf")
+    }
+
+  }
 }

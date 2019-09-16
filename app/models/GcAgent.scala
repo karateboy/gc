@@ -6,6 +6,8 @@ import play.api.Play.current
 import play.api.libs.concurrent.Akka
 import scala.concurrent.ExecutionContext.Implicits.global
 import ModelHelper._
+import org.mongodb.scala.bson._
+import org.mongodb.scala.model._
 
 object GcAgent {
   case object ParseReport
@@ -49,80 +51,99 @@ class GcAgent extends Actor {
     val pdfReportFile =
       reportDir.listFiles().toList.filter(_.getName.toLowerCase.endsWith("pdf")).head
 
-    val pdfObjId = new ObjectId()
-    val pdfReport = PdfReport(pdfObjId, pdfReportFile.getName,
+    val pdfReportId = new ObjectId()
+    val pdfReport = PdfReport(pdfReportId, pdfReportFile.getName,
       Files.readAllBytes(Paths.get(pdfReportFile.getAbsolutePath)))
 
     val f1 = PdfReport.collection.insertOne(pdfReport).toFuture()
     f1.onFailure(errorHandler)
+    waitReadyResult(f1)
 
-    val reports = reportDir.listFiles().toList.filter(f => {
-      val name = f.getName.toLowerCase
-      name.startsWith("report") && name.endsWith("csv")
-    })
+
     import com.github.nscala_time.time.Imports._
-    import java.time.LocalDateTime
-    import java.time.format._
-    
+
     val monitor = Monitor.getMonitorValueByName(Selector.get)
-    val mDate: DateTime = {
-      val report00 = reportDir.listFiles().toList.filter(p => p.getName.toLowerCase().startsWith("report00")).head
-      Logger.info(s"read ${report00.getName}")
 
+    def insertRecord() = {
       val lines =
-        Files.readAllLines(Paths.get(report00.getAbsolutePath), StandardCharsets.UTF_16LE).asScala
-      val injectionLine = lines.filter(row => row.contains("Injection Date")).head
-      Logger.info(injectionLine)
-      val mDate = injectionLine.substring(18, 37)      
-      Logger.info("parse " + mDate)
-      //10-Jun-19, 05:08:35
-      //val ldt = LocalDateTime.parse(mDate, DateTimeFormatter.p)
-      import java.util.Locale
-      DateTime.parse(mDate, DateTimeFormat.forPattern("d-MMM-CC, HH:mm:ss").withLocale(Locale.US))
-    }
+        Files.readAllLines(Paths.get(reportDir.getAbsolutePath + "/Report.txt"), StandardCharsets.UTF_16LE).asScala
 
-    //    def insertRecord() = {
-    //      import scala.collection.mutable.Map
-    //      val recordMap = Map.empty[Monitor.Value, Map[DateTime, Map[MonitorType.Value, (Double, String)]]]
-    //      //val mDate = DateTime.parse(s"${date.text} ${time.text}", DateTimeFormat.forPattern("YYYY-MM-dd HHmmss"))
-    //
-    //      val monitorType = MonitorType.getMonitorTypeValueByName(desp.text.trim(), unit.text.trim())
-    //      val timeMap = recordMap.getOrElseUpdate(monitor, Map.empty[DateTime, Map[MonitorType.Value, (Double, String)]])
-    //      val mtMap = timeMap.getOrElseUpdate(mDate, Map.empty[MonitorType.Value, (Double, String)])
-    //      val mtValue = try {
-    //        value.text.toDouble
-    //      } catch {
-    //        case _: NumberFormatException =>
-    //          0.0
-    //      }
-    //
-    //      mtMap.put(monitorType, (mtValue, status.text.trim))
-    //
-    //    }
-    //
-    /*
-    val lines =
-      try {
-        Files.readAllLines(Paths.get(f.getAbsolutePath), StandardCharsets.ISO_8859_1).asScala
-      } catch {
-        case ex: Throwable =>
-          Logger.error("failed to read all lines", ex)
-          Seq.empty[String]
+      val mDate = {
+        val mDates =
+          for (line <- lines if (line.startsWith("Injection Date"))) yield {
+            import java.util.Locale
+            val pattern = line.split(":", 2)(1).trim()
+            val splitPoint = pattern.indexOf("M")
+            val pattern1 = pattern.take(splitPoint + 1)
+            DateTime.parse(pattern1, DateTimeFormat.forPattern("M/d/YYYY h:m:s a").withLocale(Locale.US))
+          }
+        mDates.head
       }
 
-    if (lines.isEmpty) {
-      false
-    } else {
-      def recordParser(unparsed: scala.collection.Seq[String]): List[DateTime] = {
-        ???
+      def getRecordLines(inputLines: Seq[String]): Seq[String] = {
+        val head = inputLines.dropWhile(!_.startsWith("-------")).drop(1)
+        val ret = head.takeWhile(!_.startsWith("Totals"))
+        val remain = head.dropWhile(!_.startsWith("Totals"))
+        if (remain.isEmpty)
+          ret
+        else
+          ret ++ getRecordLines(remain)
       }
 
-      val records = recordParser(lines)
-      Logger.info(s"record = ${records.length}")
-      true
+      import scala.collection.mutable.Map
+      val recordMap = Map.empty[Monitor.Value, Map[DateTime, Map[MonitorType.Value, (Double, String)]]]
+      val timeMap = recordMap.getOrElseUpdate(monitor, Map.empty[DateTime, Map[MonitorType.Value, (Double, String)]])
+
+      val rLines = getRecordLines(lines)
+      for (rec <- rLines) {
+        try {
+          val retTime = rec.substring(0, 7).trim()
+          val recType = rec.substring(8, 14).trim()
+          val area = rec.substring(15, 25).trim()
+          //val aa = rec.substring(26, 36).trim().toDouble
+          val ppm = rec.substring(37, 47).trim()
+          val grp = rec.substring(48, 50).trim()
+          val name = rec.substring(51).trim()
+          val monitorType = MonitorType.getMonitorTypeValueByName(name, "")
+          val mtMap = timeMap.getOrElseUpdate(mDate, Map.empty[MonitorType.Value, (Double, String)])
+
+          val mtValue = try {
+            rec.substring(26, 36).trim().toDouble
+          } catch {
+            case _: NumberFormatException =>
+              0.0
+          }
+
+          mtMap.put(monitorType, (mtValue, MonitorStatus.NormalStat))
+        } catch {
+          case ex: Exception => {
+            Logger.warn("skip invalid record")
+          }
+        }
+
+        val updateModels =
+          for {
+            monitorMap <- recordMap
+            monitor = monitorMap._1
+            timeMaps = monitorMap._2
+            dateTime <- timeMaps.keys.toList.sorted
+            mtMaps = timeMaps(dateTime) if !mtMaps.isEmpty
+            doc = Record.toDocument(monitor, dateTime, mtMaps.toList, pdfReportId)
+            updateList = doc.toList.map(kv => Updates.set(kv._1, kv._2)) if !updateList.isEmpty
+          } yield {
+            UpdateOneModel(
+              Filters.eq("_id", doc("_id")),
+              Updates.combine(updateList: _*), UpdateOptions().upsert(true))
+          }
+
+        val collection = MongoDB.database.getCollection(Record.MinCollection)
+        val f2 = collection.bulkWrite(updateModels.toList, BulkWriteOptions().ordered(false)).toFuture()
+        f2.onFailure(errorHandler)
+        waitReadyResult(f2)
+      }//End of process report.txt
     }
-    *
-    */
+
+    insertRecord
     true
   }
 

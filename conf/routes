@@ -14,10 +14,15 @@ POST     /logout                                                               c
 POST     /login                                                                controllers.Login.authenticate
 GET      /getUserInfo                                                          controllers.Login.getUserInfo
 
-# old api
 GET      /logout                                                               controllers.Login.logout
 POST     /authenticate                                                         controllers.Login.authenticate
 
+GET      /monitors                                                             controllers.Application.monitorList
+GET      /monitor_types                                                        controllers.Application.monitorTypeList
+GET      /history_data                                                         controllers.Query.historyData(monitor:String, monitorTypes: String, start: Long, end: Long)
+GET      /pdfReport/:id                                                        controllers.Query.pdfReport(id:String)
+						
+# old api
 POST     /User                                                                 controllers.Application.newUser
 GET      /User                                                                 controllers.Application.getAllUsers
 PUT      /User/:id                                                             controllers.Application.updateUser(id)
@@ -83,8 +88,8 @@ GET      /MenuRight                                                            c
 GET      /Record/:monitor/:monitorType/:start/:end                             controllers.Query.recordList(monitor, monitorType, start:Long, end:Long)
 PUT      /Record/:monitor/:monitorType                                         controllers.Query.updateRecord(monitor, monitorType)
 
-POST     /QueryRecord                                                          controllers.Query.queryData()
-POST     /QueryAlarm                                                           controllers.Query.alarmData()		 
+#POST     /QueryRecord                                                          controllers.Query.queryData()
+#POST     /QueryAlarm                                                           controllers.Query.alarmData()		 
 #GET		/WindRose				controllers.Query.windRose
 #GET		/MonitorTypeRose		controllers.Query.monitorTypeRose
 #GET		/WindRoseReport/:monitor/:monitorType/:nWays/:start/:end	controllers.Query.windRoseReport(monitor, monitorType, nWays:Int, start, end)
@@ -92,9 +97,6 @@ POST     /QueryAlarm                                                           c
 #import Data
 GET      /importEpaXLS                                                         controllers.Application.importEpa103
 
-POST     /MinData                                                              controllers.Application.receiveMinData
-POST     /HourData                                                             controllers.Application.receiveHourData
-POST     /Calibration                                                          controllers.Application.receiveCalibration
 # websockets
 GET      /MinMonthlyReportSocket                                               controllers.Report.getMinMonthlySocket
 

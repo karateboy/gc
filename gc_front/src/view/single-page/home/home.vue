@@ -14,16 +14,6 @@
           <chart-pie style="height: 300px;" :value="pieData" text="用户访问来源"></chart-pie>
         </Card>
       </i-col>
-      <i-col :md="24" :lg="16" style="margin-bottom: 20px;">
-        <Card shadow>
-          <chart-bar style="height: 300px;" :value="barData" text="每周用户活跃量"/>
-        </Card>
-      </i-col>
-    </Row>
-    <Row>
-      <Card shadow>
-        <example style="height: 310px;"/>
-      </Card>
     </Row>
   </div>
 </template>

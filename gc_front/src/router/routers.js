@@ -50,7 +50,7 @@ export default [
     ]
   },
   {
-    path: '/data_query',
+    path: '',
     name: 'data_query',
     meta: {
       icon: 'md-stats',
@@ -84,15 +84,6 @@ export default [
           title: '歷史趨勢'
         },
         component: () => import('@/view/historyTrend/historyTrend')
-      },
-      {
-        path: 'report',
-        name: 'report',
-        meta: {
-          icon: 'md-book',
-          title: '歷史資料'
-        },
-        component: () => import('@/view/historyData/historyData')
       }
     ]
   },
@@ -107,11 +98,11 @@ export default [
     component: Main,
     children: [
       {
-        path: 'plc_config',
-        name: 'plc_config',
+        path: 'mtype_config',
+        name: 'mtype_config',
         meta: {
           icon: 'md-laptop',
-          title: 'PLC設定'
+          title: '測項設定'
         },
         component: () => import('@/view/single-page/home')
       }

@@ -167,31 +167,15 @@ object Application extends Controller {
       }
   }
 
-  def monitorTypeList = Security.Authenticated.async {
+  def monitorTypeList = Security.Authenticated {
     implicit request =>
-      val userOptF = User.getUserByIdFuture(request.user.id)
-      for {
-        userOpt <- userOptF if userOpt.isDefined
-        groupInfo = Group.getGroupInfo(userOpt.get.groupId)
-      } yield {
-        val mtList = groupInfo.privilege.allowedMonitorTypes.map { MonitorType.map }
-
-        Ok(Json.toJson(mtList))
-      }
+      Ok(Json.toJson(MonitorType.map.values.toSeq))
   }
 
-  def monitorList = Security.Authenticated.async {
+  def monitorList = Security.Authenticated {
     implicit request =>
-      val userOptF = User.getUserByIdFuture(request.user.id)
-      for {
-        userOpt <- userOptF if userOpt.isDefined
-        groupInfo = Group.getGroupInfo(userOpt.get.groupId)
-      } yield {
 
-        val mList =
-          groupInfo.privilege.allowedMonitors.map { Monitor.map }
-        Ok(Json.toJson(mList))
-      }
+      Ok(Json.toJson(Monitor.map.values.toSeq))
   }
 
   def indParkList = Security.Authenticated.async {
@@ -329,150 +313,11 @@ object Application extends Controller {
       }
   }
 
-  case class SipRecord(monitorId: String, monitorTypeId: String, time: Long, value: Double, status: String)
-  case class SipCalibration(monitorId: String, monitorTypeId: String, startTime: Long, endTime: Long,
-                            span: Double, zero_std: Double, zero_val: Double, span_std: Double, span_val: Double)
-
-  implicit val sipRecordReads = Json.reads[SipRecord]
-  implicit val sipCalibrationReads = Json.reads[SipCalibration]
-
-  def receiveHourData = receiveMonitorData(Record.HourCollection)
-  def receiveMinData = receiveMonitorData(Record.MinCollection)
-
-  def receiveMonitorData(collectionName: String) = Action.async(BodyParsers.parse.json) {
-    implicit request =>
-      val recordsResult = request.body.validate[Seq[SipRecord]]
-
-      recordsResult.fold(
-        error => {
-          Logger.error(JsError.toJson(error).toString())
-          Future { BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString())) }
-        },
-        records => {
-          import scala.collection.mutable.Map
-          def checkRecordMap(recordMap: Map[Monitor.Value, Map[DateTime, Map[MonitorType.Value, (Double, String)]]]) = {
-            for {
-              monitorMap <- recordMap
-              monitor = monitorMap._1
-              timeMaps = monitorMap._2
-              dateTime <- timeMaps.keys.toList.sorted
-              mtMaps = timeMaps(dateTime) if (!mtMaps.isEmpty)
-            } {
-              for (mt <- mtMaps.keys) {
-                val mtCase = MonitorType.map(mt)
-                var alarmed = false
-                if (mtCase.std_law.isDefined) {
-                  val record = mtMaps(mt)
-                  if (MonitorStatusFilter.isMatched(MonitorStatusFilter.ValidData, record._2)) {
-                    if (record._1 >= mtCase.std_law.get) {
-                      Alarm.log(monitor, mt,
-                        s"${dateTime.toString("YYYY-MM-dd HH:mm")}測值${MonitorType.format(mt, Some(record._1))}超過超高警報值${MonitorType.format(mt, mtCase.std_law)}")
-                      alarmed = true
-                    }
-                  }
-                }
-
-                if (mtCase.std_internal.isDefined && !alarmed) {
-                  val record = mtMaps(mt)
-                  if (MonitorStatusFilter.isMatched(MonitorStatusFilter.ValidData, record._2)) {
-                    if (record._1 >= mtCase.std_internal.get) {
-                      Alarm.log(monitor, mt, s"${dateTime.toString("YYYY-MM-dd HH:mm")}測值${MonitorType.format(mt, Some(record._1))}超過警報值${MonitorType.format(mt, mtCase.std_internal)}")
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          val recordMap = Map.empty[Monitor.Value, Map[DateTime, Map[MonitorType.Value, (Double, String)]]]
-          for (record <- records) {
-            try {
-              val mDate = new DateTime(record.time)
-              val monitor = Monitor.withName(record.monitorId)
-              val monitorType = MonitorType.getMonitorTypeValueByName(record.monitorTypeId, "ppb")
-              val timeMap = recordMap.getOrElseUpdate(monitor, Map.empty[DateTime, Map[MonitorType.Value, (Double, String)]])
-              val mtMap = timeMap.getOrElseUpdate(mDate, Map.empty[MonitorType.Value, (Double, String)])
-              mtMap.put(monitorType, (record.value, record.status))
-            } catch {
-              case ex: Throwable =>
-                Logger.error("skip invalid record ", ex)
-            }
-          }
-
-          val f =
-            for {
-              monitorMap <- recordMap
-              monitor = monitorMap._1
-              timeMaps = monitorMap._2
-              dateTime <- timeMaps.keys.toList.sorted
-              mtMaps = timeMaps(dateTime) if (!mtMaps.isEmpty)
-            } yield {
-              Record.upsertRecord(Record.toDocument(monitor, dateTime, mtMaps.toList))(collectionName)
-            }
-
-          val retF = Future.sequence(f.toList)
-
-          if (collectionName == Record.HourCollection) {
-            checkRecordMap(recordMap)
-            AutoAudit.audit(recordMap, true)
-          }
-
-          val requestF =
-            for (result <- retF) yield {
-              Ok(Json.obj("Ok" -> true))
-            }
-
-          requestF.recover({
-            case _: Throwable =>
-              Logger.info("recover from upsert data error...")
-              Ok(Json.obj("Ok" -> false))
-          })
-        })
-
-  }
-
-  def receiveCalibration = Action.async(BodyParsers.parse.json) {
-    implicit request =>
-      val recordsResult = request.body.validate[Seq[SipCalibration]]
-
-      recordsResult.fold(
-        error => {
-          Logger.error(JsError.toJson(error).toString())
-          Future { BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString())) }
-        },
-        records => {
-          import scala.collection.mutable.Map
-          val calibrations =
-            for (record <- records) yield {
-              val startTime = new DateTime(record.startTime)
-              val endTime = new DateTime(record.endTime)
-              val monitor = Monitor.withName(record.monitorId)
-              val monitorType = MonitorType.getMonitorTypeValueByName(record.monitorTypeId, "ppb")
-
-              Calibration(monitor, monitorType, startTime, endTime,
-                Some(record.span), Some(record.zero_std), Some(record.zero_val), Some(record.span_std),
-                Some(record.span_val))
-            }
-
-          val retF = Calibration.insert(calibrations)
-          val requestF =
-            for (result <- retF) yield {
-              Ok(Json.obj("Ok" -> true))
-            }
-
-          requestF.recover({
-            case _: Throwable =>
-              Logger.info("recover from upsert hour error...")
-              Ok(Json.obj("Ok" -> false))
-          })
-        })
-  }
-
   def testAlarm = Security.Authenticated {
     Alarm.log(Monitor.withName("台塑六輕工業園區#彰化縣大城站"), MonitorType.withName("PM10"), "測試警報")
     Ok("")
   }
-  
+
   def defaultAuditConfig = Security.Authenticated {
     AuditConfig.defaultConfig("default")
     Ok(Json.toJson(AuditConfig.defaultConfig("default")))

@@ -3,8 +3,10 @@ import play.api._
 import com.github.nscala_time.time.Imports._
 import models.ModelHelper._
 import models._
+import models.ObjectIdUtil._
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.mongodb.scala._
+import org.mongodb.scala.bson._
 
 case class Record(monitor: Monitor.Value, time: DateTime, value: Double, status: String)
 case class Record2(value: Double, status: String)
@@ -56,10 +58,11 @@ object Record {
     Document("time" -> bdt, "monitor" -> monitor.toString)
   }
 
-  def toDocument(monitor: Monitor.Value, dt: DateTime, dataList: List[(MonitorType.Value, (Double, String))]) = {
+  def toDocument(monitor: Monitor.Value, dt: DateTime,
+                 dataList: List[(MonitorType.Value, (Double, String))], pdfReport: ObjectId) = {
     import org.mongodb.scala.bson._
     val bdt: BsonDateTime = dt
-    var doc = Document("_id" -> getDocKey(monitor, dt), "time" -> bdt, "monitor" -> monitor.toString)
+    var doc = Document("_id" -> getDocKey(monitor, dt), "time" -> bdt, "monitor" -> monitor.toString, "pdfReport" -> pdfReport)
     for {
       data <- dataList
       mt = data._1
@@ -194,6 +197,7 @@ object Record {
       timeMap
     }
   }
+
   def resetAuditedRecord(colName: String)(mtList: List[MonitorType.Value], monitor: Monitor.Value, startTime: DateTime, endTime: DateTime) = {
     import org.mongodb.scala.bson._
     import org.mongodb.scala.model._
@@ -267,7 +271,7 @@ object Record {
   }
 
   case class MtRecord(mtName: String, value: Double, status: String)
-  case class RecordList(time: Long, mtDataList: Seq[MtRecord])
+  case class RecordList(time: Long, mtDataList: Seq[MtRecord], pdfReport:ObjectId)
 
   implicit val mtRecordWrite = Json.writes[MtRecord]
   implicit val recordListWrite = Json.writes[RecordList]
@@ -282,7 +286,7 @@ object Record {
 
     val mtList = MonitorType.activeMtvList
     val col = MongoDB.database.getCollection(colName)
-    val projFields = "time" :: mtList.map { MonitorType.BFName(_) }
+    val projFields = "time" :: "pdfReport"::mtList.map { MonitorType.BFName(_) }
     val proj = include(projFields: _*)
     val f = col.find(and(equal("monitor", monitor.toString), gte("time", startTime.toDate()), lt("time", endTime.toDate()))).projection(proj).sort(ascending("time")).toFuture()
 
@@ -305,7 +309,47 @@ object Record {
           } yield {
             MtRecord(mtBFName, v.asDouble().doubleValue(), s.asString().getValue)
           }
-        RecordList(time.getMillis, mtDataList)
+        val pdfReport = doc.get("pdfReport").get.asObjectId().getValue
+        RecordList(time.getMillis, mtDataList, pdfReport)
+      }
+    }
+  }
+
+  def getRecordList2Future(colName: String)(monitor: Monitor.Value, startTime: DateTime, endTime: DateTime) = {
+    import org.mongodb.scala.bson._
+    import org.mongodb.scala.model.Filters._
+    import org.mongodb.scala.model.Projections._
+    import org.mongodb.scala.model.Sorts._
+    import scala.concurrent._
+    import scala.concurrent.duration._
+
+    val mtList = MonitorType.activeMtvList
+    val col = MongoDB.database.getCollection(colName)
+    val projFields = "time" :: "pdfReport"::mtList.map { MonitorType.BFName(_) }
+    val proj = include(projFields: _*)
+    val f = col.find(and(equal("monitor", monitor.toString), gte("time", startTime.toDate()), lt("time", endTime.toDate()))).projection(proj).sort(ascending("time")).toFuture()
+
+    for {
+      docs <- f
+    } yield {
+      for {
+        doc <- docs
+        time = doc("time").asDateTime()
+      } yield {
+        val mtDataList =
+          for {
+            mt <- mtList
+            mtBFName = MonitorType.BFName(mt)
+
+            mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument()
+            mtDoc = mtDocOpt.get.asDocument()
+            v = mtDoc.get("v") if v.isDouble()
+            s = mtDoc.get("s") if s.isString()
+          } yield {
+            MtRecord(mtBFName, v.asDouble().doubleValue(), s.asString().getValue)
+          }
+        val pdfReport = doc.get("pdfReport").get.asObjectId().getValue  
+        RecordList(time.getMillis, mtDataList, pdfReport)
       }
     }
   }
@@ -349,7 +393,7 @@ object Record {
         }
       }
     for (pairs <- Future.sequence(futureList)) yield {
-      pairs.flatMap(x=>x).toMap
+      pairs.flatMap(x => x).toMap
     }
   }
 

@@ -17,6 +17,8 @@ libraryDependencies ++= Seq(
 )
 
 libraryDependencies += "com.github.tototoshi" %% "scala-csv" % "1.3.6"
+libraryDependencies += "org.apache.poi" % "poi" % "4.1.0"
+libraryDependencies += "org.apache.poi" % "poi-ooxml" % "4.1.0"
 
 mappings in Universal ++=
 (baseDirectory.value / "report_template" * "*" get) map
