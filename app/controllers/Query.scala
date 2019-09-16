@@ -123,14 +123,8 @@ object Query extends Controller {
           period_start <- getPeriods(start, end, period)
           records = periodSlice(period_start, period_start + period) if records.length > 0
         } yield {
-          if (mt == MonitorType.WIN_DIRECTION) {
-            val windDir = records
-            val windSpeed = Record.getRecordMap(Record.HourCollection)(List(MonitorType.WIN_SPEED), monitor, period_start, period_start + period)(mt)
-            period_start -> windAvg(windSpeed, windDir)
-          } else {
-            val values = records.map { r => r.value }
-            period_start -> values.sum / values.length
-          }
+          val values = records.map { r => r.value }
+          period_start -> values.sum / values.length
         }
       }
 
@@ -151,14 +145,8 @@ object Query extends Controller {
           period_start <- getPeriods(start, end, period)
           records = periodSlice(period_start, period_start + period) if records.length > 0
         } yield {
-          if (mt == MonitorType.WIN_DIRECTION) {
-            val windDir = records
-            val windSpeed = Record.getRecordMap(Record.HourCollection)(List(MonitorType.WIN_SPEED), monitor, period_start, period_start + period)(mt)
-            windAvg(windSpeed, windDir)
-          } else {
-            val values = records.map { r => r.value }
-            values.sum / values.length
-          }
+          val values = records.map { r => r.value }
+          values.sum / values.length
         }
       }
     val sorted = data.sorted
@@ -190,10 +178,6 @@ object Query extends Controller {
 
   def getPeriodStatReportMap(recordListMap: Map[MonitorType.Value, Seq[Record]], period: Period, statusFilter: List[String] = List("010"))(start: DateTime, end: DateTime) = {
     val mTypes = recordListMap.keys.toList
-    if (mTypes.contains(MonitorType.WIN_DIRECTION)) {
-      if (!mTypes.contains(MonitorType.WIN_SPEED))
-        throw new Exception("風速和風向必須同時查詢")
-    }
 
     if (period.getHours == 1) {
       throw new Exception("小時區間無Stat報表")
@@ -218,11 +202,7 @@ object Query extends Controller {
         } else
           0
 
-        val avg = if (mt == MonitorType.WIN_DIRECTION) {
-          val windDir = records
-          val windSpeed = periodSlice(recordListMap(MonitorType.WIN_SPEED), period_start, period_start + period)
-          windAvg(windSpeed, windDir)
-        } else {
+        val avg = {
           sum / total
         }
         Stat(
@@ -255,7 +235,6 @@ object Query extends Controller {
   def trendHelper(monitors: Array[Monitor.Value], monitorTypes: Array[MonitorType.Value], tabType: TableType.Value,
                   reportUnit: ReportUnit.Value, start: DateTime, end: DateTime)(statusFilter: MonitorStatusFilter.Value) = {
 
-    val windMtv = MonitorType.WIN_DIRECTION
     val period: Period =
       reportUnit match {
         case ReportUnit.Min =>
@@ -304,11 +283,8 @@ object Query extends Controller {
             Seq(Some(time.getMillis.toDouble), None)
         }
       } yield {
-        if (monitorTypes.length > 1 && monitorTypes.contains(windMtv)) {
-          if (mt != windMtv)
-            seqData(s"${Monitor.map(m).dp_no}_${MonitorType.map(mt).desp}", timeData)
-          else
-            seqData(s"${Monitor.map(m).dp_no}_${MonitorType.map(mt).desp}", timeData, 1, Some("scatter"))
+        if (monitorTypes.length > 1) {
+          seqData(s"${Monitor.map(m).dp_no}_${MonitorType.map(mt).desp}", timeData)
         } else {
           seqData(s"${Monitor.map(m).dp_no}_${MonitorType.map(mt).desp}", timeData)
         }
@@ -364,17 +340,6 @@ object Query extends Controller {
         XAxis(None)
     }
 
-    val windMtCase = MonitorType.map(windMtv)
-    val windYaxis = YAxis(None, AxisTitle(Some(Some(s"${windMtCase.desp} (${windMtCase.unit})"))), None,
-      opposite = true,
-      floor = Some(0),
-      ceiling = Some(360),
-      min = Some(0),
-      max = Some(360),
-      tickInterval = Some(45),
-      gridLineWidth = Some(1),
-      gridLineColor = Some("#00D800"))
-
     val chart =
       if (monitorTypes.length == 1) {
         val mt = monitorTypes(0)
@@ -384,33 +349,13 @@ object Query extends Controller {
           Map("type" -> "line"),
           Map("text" -> title),
           xAxis,
-          if (!monitorTypes.contains(windMtv))
-            Seq(YAxis(None, AxisTitle(Some(Some(s"${mtCase.desp} (${mtCase.unit})"))), getAxisLines(mt)))
-          else
-            Seq(windYaxis),
+
+          Seq(YAxis(None, AxisTitle(Some(Some(s"${mtCase.desp} (${mtCase.unit})"))), getAxisLines(mt))),
           series,
           Some(downloadFileName))
       } else {
         val yAxis =
-          if (monitorTypes.contains(windMtv)) {
-            if (monitorTypes.length == 2) {
-              val mt = monitorTypes.filter { _ != windMtv }(0)
-              val mtCase = MonitorType.map(monitorTypes.filter { MonitorType.WIN_DIRECTION != _ }(0))
-              Seq(
-                YAxis(
-                  None,
-                  AxisTitle(Some(Some(s"${mtCase.desp} (${mtCase.unit})"))),
-                  getAxisLines(mt),
-                  gridLineWidth = Some(0)),
-                windYaxis)
-            } else {
-              Seq(
-                YAxis(None, AxisTitle(Some(None)), None, gridLineWidth = Some(0)),
-                windYaxis)
-            }
-          } else {
-            Seq(YAxis(None, AxisTitle(Some(None)), None))
-          }
+          Seq(YAxis(None, AxisTitle(Some(None)), None))
 
         HighchartData(
           Map("type" -> "line"),
@@ -427,7 +372,6 @@ object Query extends Controller {
   def boxHelper(monitors: Array[Monitor.Value], monitorTypes: Array[MonitorType.Value], tabType: TableType.Value,
                 reportUnit: ReportUnit.Value, start: DateTime, end: DateTime)(statusFilter: MonitorStatusFilter.Value) = {
 
-    val windMtv = MonitorType.WIN_DIRECTION
     val period: Period =
       reportUnit match {
         case ReportUnit.Min =>
@@ -521,17 +465,6 @@ object Query extends Controller {
       XAxis(Some(names))
     }
 
-    val windMtCase = MonitorType.map(windMtv)
-    val windYaxis = YAxis(None, AxisTitle(Some(Some(s"${windMtCase.desp} (${windMtCase.unit})"))), None,
-      opposite = true,
-      floor = Some(0),
-      ceiling = Some(360),
-      min = Some(0),
-      max = Some(360),
-      tickInterval = Some(45),
-      gridLineWidth = Some(1),
-      gridLineColor = Some("#00D800"))
-
     val chart =
       if (monitorTypes.length == 1) {
         val mt = monitorTypes(0)
@@ -541,31 +474,12 @@ object Query extends Controller {
           Map("type" -> "boxplot"),
           Map("text" -> title),
           xAxis,
-          if (!monitorTypes.contains(windMtv))
-            Seq(YAxis(None, AxisTitle(Some(Some(s"${mtCase.desp} (${mtCase.unit})"))), getAxisLines(mt)))
-          else
-            Seq(windYaxis),
+          Seq(YAxis(None, AxisTitle(Some(Some(s"${mtCase.desp} (${mtCase.unit})"))), getAxisLines(mt))),
           series,
           Some(downloadFileName))
       } else {
         val yAxis =
-          if (monitorTypes.contains(windMtv)) {
-            if (monitorTypes.length == 2) {
-              val mt = monitorTypes.filter { _ != windMtv }(0)
-              val mtCase = MonitorType.map(monitorTypes.filter { MonitorType.WIN_DIRECTION != _ }(0))
-              Seq(
-                YAxis(
-                  None,
-                  AxisTitle(Some(Some(s"${mtCase.desp} (${mtCase.unit})"))),
-                  getAxisLines(mt),
-                  gridLineWidth = Some(0)),
-                windYaxis)
-            } else {
-              Seq(
-                YAxis(None, AxisTitle(Some(None)), None, gridLineWidth = Some(0)),
-                windYaxis)
-            }
-          } else {
+          {
             Seq(YAxis(None, AxisTitle(Some(None)), None))
           }
 
@@ -631,6 +545,21 @@ object Query extends Controller {
       } else {
         Results.Ok(Json.toJson(chart))
       }
+  }
+
+  def historyTrendChart2(monitorStr: String, monitorTypeStr: String, startLong: Long, endLong: Long) = Security.Authenticated {
+    implicit request =>
+      import scala.collection.JavaConverters._
+      val monitorStrArray = java.net.URLDecoder.decode(monitorStr, "UTF-8").split(':')
+      val monitors = monitorStrArray.map { Monitor.withName }
+
+      val monitorTypeStrArray = java.net.URLDecoder.decode(monitorTypeStr, "UTF-8").split(':')
+      val monitorTypes = monitorTypeStrArray.map { MonitorType.withName }
+      val reportUnit = ReportUnit.TenMin
+      val statusFilter = MonitorStatusFilter.ValidData
+      val (tabType, start, end) = (TableType.min, new DateTime(startLong), new DateTime(endLong))
+      val chart = trendHelper(monitors, monitorTypes, tabType, reportUnit, start, end)(statusFilter)
+      Results.Ok(Json.toJson(chart))
   }
 
   def historyBoxPlot(monitorStr: String, monitorTypeStr: String, reportUnitStr: String,

@@ -236,16 +236,6 @@ object Application extends Controller {
     Ok(views.html.dataManagement())
   }
 
-  def recalculateHour(startStr: String, endStr: String) = Security.Authenticated {
-    val start = DateTime.parse(startStr, DateTimeFormat.forPattern("YYYY-MM-dd HH:mm"))
-    val end = DateTime.parse(endStr, DateTimeFormat.forPattern("YYYY-MM-dd HH:mm"))
-
-    for (hour <- Query.getPeriods(start, end, 1.hour)) {
-      DataCollectManager.recalculateHourData(hour, false)(MonitorType.mtvList)
-    }
-    Ok(Json.obj("ok" -> true))
-  }
-
   def auditConfig = Security.Authenticated {
     Ok(views.html.auditConfig())
   }

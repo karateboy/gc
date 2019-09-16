@@ -44,8 +44,6 @@ object MonitorType extends Enumeration {
     MonitorType(_id = desp, desp = desp, unit = unit, order = epaOrder, itemID = Some(itemID))
   }
 
-  lazy val WIN_SPEED = MonitorType.withName("風速")
-  lazy val WIN_DIRECTION = MonitorType.withName("風向")
   def init(colNames: Seq[String]) = {
     if (!colNames.contains(ColName)) {
       val f = MongoDB.database.createCollection(ColName).toFuture()

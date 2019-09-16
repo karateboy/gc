@@ -21,6 +21,7 @@ GET      /monitors                                                             c
 GET      /monitor_types                                                        controllers.Application.monitorTypeList
 GET      /history_data                                                         controllers.Query.historyData(monitor:String, monitorTypes: String, start: Long, end: Long)
 GET      /pdfReport/:id                                                        controllers.Query.pdfReport(id:String)
+GET      /history_trend                                                        controllers.Query.historyTrendChart2(monitors: String, monitorTypes: String, start: Long, end: Long)
 						
 # old api
 POST     /User                                                                 controllers.Application.newUser
@@ -51,29 +52,13 @@ GET      /ManualAuditHistory/:start/:end                                       c
 
 #Data Management
 GET      /DataManagement                                                       controllers.Application.dataManagement
-GET      /Recalculate/:start/:end                                              controllers.Application.recalculateHour(start, end)
+
 
 #Realtime
 GET      /MonitorTypeStatusList                                                controllers.Realtime.MonitorTypeStatusList()
 GET      /RealtimeStatus                                                       controllers.Realtime.realtimeStatus()
 GET      /RealtimeStatusContent                                                controllers.Realtime.realtimeStatusContent()
 GET      /RealtimeData                                                         controllers.Realtime.realtimeData()
-
-#Report
-GET      /Report                                                               controllers.Report.monitorReport()
-GET      /monitorReport/:monitor/:reportType/:reportDate                       controllers.Report.getMonitorReport(monitor, reportType, reportDate:Long, outputTypeStr="html")
-GET      /PDF/monitorReport/:monitor/:reportType/:reportDate                   controllers.Report.getMonitorReport(monitor, reportType, reportDate:Long, outputTypeStr="pdf")
-GET      /Excel/monitorReport/:monitor/:reportType/:reportDate                 controllers.Report.getMonitorReport(monitor, reportType, reportDate:Long, outputTypeStr="excel")
-GET      /JSON/monitorReport/:monitor/:reportType/:reportDate                  controllers.Report.getMonitorReport(monitor, reportType, reportDate:Long, outputTypeStr="json")
-
-GET      /MonitorMonthlyHourReport                                             controllers.Report.monitorMonthlyHourReport
-GET      /MonthlyHourReport/:monitor/:monitorType/:reportDate                  controllers.Report.monthlyHourReport(monitor, monitorType, reportDate:Long, outputTypeStr="html")
-GET      /JSON/MonthlyHourReport/:monitor/:monitorType/:reportDate             controllers.Report.monthlyHourReport(monitor, monitorType, reportDate:Long, outputTypeStr="json")
-
-GET      /Audit                                                                controllers.Report.audit
-GET      /AuditReport/:monitor/:monitorType/:start/:end                        controllers.Report.auditReport(monitor, monitorType, start:Long, end:Long, outputTypeStr="html")
-GET      /ReauditReport/:monitor/:monitorType/:start/:end                      controllers.Report.reauditReport(monitor, monitorType, start:Long, end:Long)
-GET      /JSON/AuditReport/:monitor/:monitorType/:start/:end                   controllers.Report.auditReport(monitor, monitorType, start:Long, end:Long, outputTypeStr="json")
 
 #JSON
 GET      /MonitorType                                                          controllers.Application.monitorTypeList
@@ -97,8 +82,6 @@ PUT      /Record/:monitor/:monitorType                                         c
 #import Data
 GET      /importEpaXLS                                                         controllers.Application.importEpa103
 
-# websockets
-GET      /MinMonthlyReportSocket                                               controllers.Report.getMinMonthlySocket
 
 #AUDIT
 GET      /AuditConfigPage                                                      controllers.Application.auditConfig

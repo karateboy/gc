@@ -24,6 +24,26 @@ export const getHistoryData = ({ monitor, monitorTypes, start, end }) => {
   })
 }
 
+export const getHistoryTrend = ({ monitors, monitorTypes, start, end }) => {
+  return axios.request({
+    url: 'history_trend',
+    method: 'get',
+    params: {
+      monitors, monitorTypes, start, end
+    }
+  })
+}
+
+export const getHistoryTrendBoxPlot = ({ monitors, monitorTypes, start, end }) => {
+  return axios.request({
+    url: 'history_trend_boxplot',
+    method: 'post',
+    params: {
+      monitors, monitorTypes, start, end
+    }
+  })
+}
+
 export const getTableData = () => {
   return axios.request({
     url: 'get_table_data',

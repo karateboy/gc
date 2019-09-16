@@ -1,43 +1,37 @@
 <template>
   <div>
     <Row>
-      <Col>
-        <Card>
-          <Form :model="formItem" :label-width="80">
-            <FormItem label="選擇器">
-              <Select v-model="formItem.monitor" filterable>
-                <Option
-                  v-for="item in monitorList"
-                  :value="item._id"
-                  :key="item._id"
-                >{{ item.dp_no }}</Option>
-              </Select>
-            </FormItem>
-            <FormItem label="測項">
-              <Select v-model="formItem.monitorTypes" filterable multiple>
-                <Option
-                  v-for="item in monitorTypeList"
-                  :value="item._id"
-                  :key="item._id"
-                >{{ item.desp }}</Option>
-              </Select>
-            </FormItem>
-            <FormItem label="資料區間">
-              <DatePicker
-                type="datetimerange"
-                format="yyyy-MM-dd HH:mm"
-                placeholder="選擇資料區間"
-                style="width: 300px"
-                v-model="formItem.dateRange"
-              ></DatePicker>
-            </FormItem>
-            <FormItem>
-              <Button type="primary" @click="query">查詢</Button>
-              <Button style="margin-left: 8px">取消</Button>
-            </FormItem>
-          </Form>
-        </Card>
-      </Col>
+      <Card>
+        <Form :model="formItem" :label-width="80">
+          <FormItem label="選擇器">
+            <Select v-model="formItem.monitor" filterable>
+              <Option v-for="item in monitorList" :value="item._id" :key="item._id">{{ item.dp_no }}</Option>
+            </Select>
+          </FormItem>
+          <FormItem label="測項">
+            <Select v-model="formItem.monitorTypes" filterable multiple>
+              <Option
+                v-for="item in monitorTypeList"
+                :value="item._id"
+                :key="item._id"
+              >{{ item.desp }}</Option>
+            </Select>
+          </FormItem>
+          <FormItem label="資料區間">
+            <DatePicker
+              type="datetimerange"
+              format="yyyy-MM-dd HH:mm"
+              placeholder="選擇資料區間"
+              style="width: 300px"
+              v-model="formItem.dateRange"
+            ></DatePicker>
+          </FormItem>
+          <FormItem>
+            <Button type="primary" @click="query">查詢</Button>
+            <Button style="margin-left: 8px">取消</Button>
+          </FormItem>
+        </Form>
+      </Card>
     </Row>
     <Row>
       <Card v-if="display">
@@ -62,8 +56,11 @@
 </style>
 <script>
 import moment from "moment";
-import config from '@/config'
-const baseUrl = process.env.NODE_ENV === 'development' ? config.baseUrl.dev : config.baseUrl.pro
+import config from "@/config";
+const baseUrl =
+  process.env.NODE_ENV === "development"
+    ? config.baseUrl.dev
+    : config.baseUrl.pro;
 
 import { getMonitors, getMonitorTypes, getHistoryData } from "@/api/data";
 export default {
@@ -154,10 +151,9 @@ export default {
               let key = `col${c}`;
               rowData[key] = row.cellData[c].v;
               rowData.cellClassName[key] = row.cellData[c].cellClassName;
-              if(baseUrl.length != 0)
+              if (baseUrl.length != 0)
                 rowData.pdfUrl = `${baseUrl}pdfReport/${row.pdfReport}`;
-              else
-                rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
+              else rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
             }
             this.rows.push(rowData);
           }
@@ -166,9 +162,9 @@ export default {
           alert(err);
         });
     },
-    showPdfReport(idx) {   
-      let url =  this.rows[idx].pdfUrl;
-      window.open(url);   
+    showPdfReport(idx) {
+      let url = this.rows[idx].pdfUrl;
+      window.open(url);
     }
   }
 };

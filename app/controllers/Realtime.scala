@@ -24,37 +24,40 @@ object Realtime extends Controller {
 
       implicit val mtsWrite = Json.writes[MonitorTypeStatus]
 
-      val result =
-        for (dataMap <- DataCollectManager.getLatestData()) yield {
-          val list =
-            for {
-              mt <- MonitorType.realtimeMtvList
-              recordOpt = dataMap.get(mt)
-            } yield {
-              val mCase = map(mt)
-
-              if (recordOpt.isDefined) {
-                val record = recordOpt.get
-                val duration = new Duration(record.time, DateTime.now())
-                val (overInternal, overLaw) = overStd(mt, record.value)
-                val status = if (duration.getStandardSeconds <= overTimeLimit)
-                  MonitorStatus.map(record.status).desp
-                else
-                  "通訊中斷"
-
-                MonitorTypeStatus(mCase.desp, format(mt, Some(record.value)), mCase.unit, "",
-                  MonitorStatus.map(record.status).desp,
-                  MonitorStatus.getCssClassStr(record.status, overInternal, overLaw), mCase.order)
-              } else {
-                MonitorTypeStatus(mCase.desp, format(mt, None), mCase.unit, "",
-                  "通訊中斷",
-                  "abnormal_status", mCase.order)
-              }
-            }
-          Ok(Json.toJson(list))
-        }
-
-      result
+      Future {
+        Ok("")
+      }
+//      val result =
+//        for (dataMap <- DataCollectManager.getLatestData()) yield {
+//          val list =
+//            for {
+//              mt <- MonitorType.realtimeMtvList
+//              recordOpt = dataMap.get(mt)
+//            } yield {
+//              val mCase = map(mt)
+//
+//              if (recordOpt.isDefined) {
+//                val record = recordOpt.get
+//                val duration = new Duration(record.time, DateTime.now())
+//                val (overInternal, overLaw) = overStd(mt, record.value)
+//                val status = if (duration.getStandardSeconds <= overTimeLimit)
+//                  MonitorStatus.map(record.status).desp
+//                else
+//                  "通訊中斷"
+//
+//                MonitorTypeStatus(mCase.desp, format(mt, Some(record.value)), mCase.unit, "",
+//                  MonitorStatus.map(record.status).desp,
+//                  MonitorStatus.getCssClassStr(record.status, overInternal, overLaw), mCase.order)
+//              } else {
+//                MonitorTypeStatus(mCase.desp, format(mt, None), mCase.unit, "",
+//                  "通訊中斷",
+//                  "abnormal_status", mCase.order)
+//              }
+//            }
+//          Ok(Json.toJson(list))
+//        }
+//
+//      result
   }
 
   def realtimeStatus = Security.Authenticated {
@@ -127,39 +130,6 @@ object Realtime extends Controller {
   }
 
   case class WindInfo(windDir: Double, windSpeed: Double)
-  def getRealtimeMonitorStatusWeatherPair() = {
-    val recordMapFuture = Record.getLatestRecordMapFuture(Record.HourCollection)
-
-    for (recordMap <- recordMapFuture) yield {
-      val statusMap =
-        recordMap map {
-          pair =>
-            val monitor = pair._1
-            val mtRecordMap = pair._2._2
-            val mtStatusMap = mtRecordMap map {
-              p => p._1 -> p._2.status
-            }
-            monitor -> mtStatusMap
-        }
-      val weatherMap =
-        recordMap map {
-          pair =>
-            val monitor = pair._1
-            val mtRecordMap = pair._2._2
-            val windSpeed = if (mtRecordMap.contains(MonitorType.WIN_SPEED))
-              mtRecordMap(MonitorType.WIN_SPEED).value
-            else
-              0
-
-            val windDir = if (mtRecordMap.contains(MonitorType.WIN_DIRECTION))
-              mtRecordMap(MonitorType.WIN_DIRECTION).value
-            else
-              0
-            monitor -> WindInfo(windDir, windSpeed)
-        }
-      (statusMap, weatherMap)
-    }
-  }
 
   case class MonitorInfo(id: String, status: Int, winDir: Double, winSpeed: Double, statusStr: String, lat: Double, lng: Double)
 
