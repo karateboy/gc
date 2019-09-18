@@ -64,11 +64,25 @@ object Realtime extends Controller {
     Ok(views.html.realtimeStatusA(""))
   }
 
+  def realtimeMonitorTypeValues() = Security.Authenticated.async {
+    implicit request =>
+      val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection)
+      
+      for(records <- latestRecord) yield {
+        if(records.isEmpty)
+          NoContent
+        else{
+          val recordList = records.head
+          Ok(Json.toJson(recordList))
+        }
+      }
+    
+  }
   def realtimeStatusContent() = Security.Authenticated.async {
     implicit request =>
       import MonitorType._
       val user = request.user
-      val latestRecordMap = Record.getLatestRecordMapFuture(Record.HourCollection)
+      val latestRecordMap = Record.getLatestRecordMapFuture(Record.MinCollection)
 
       for {
         userOpt <- User.getUserByIdFuture(user.id) if userOpt.isDefined
@@ -78,6 +92,7 @@ object Realtime extends Controller {
         Ok(views.html.realtimeStatus(map, groupInfo.privilege))
       }
   }
+  
 
   case class CellData(v: String, cellClassName: String)
   case class RowData(cellData: Seq[CellData])

@@ -34,6 +34,14 @@ export const getHistoryTrend = ({ monitors, monitorTypes, start, end }) => {
   })
 }
 
+export const getRealtimeData = () => {
+  return axios.request({
+    url: 'realtime_data',
+    method: 'get',
+    params: {}
+  })
+}
+
 export const getHistoryTrendBoxPlot = ({ monitors, monitorTypes, start, end }) => {
   return axios.request({
     url: 'history_trend_boxplot',
