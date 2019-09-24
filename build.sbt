@@ -11,14 +11,16 @@ libraryDependencies ++= Seq(
   ws,
   filters,
   specs2 % Test,
-  "com.github.nscala-time" %% "nscala-time" % "2.22.0",
-  "org.mongodb.scala" %% "mongo-scala-driver" % "2.7.0",
    "commons-io" % "commons-io" % "2.6"
 )
 
 libraryDependencies += "com.github.tototoshi" %% "scala-csv" % "1.3.6"
 libraryDependencies += "org.apache.poi" % "poi" % "4.1.0"
 libraryDependencies += "org.apache.poi" % "poi-ooxml" % "4.1.0"
+libraryDependencies += "org.scream3r" % "jssc" % "2.8.0"
+libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "2.22.0"
+libraryDependencies += "org.mongodb.scala" %% "mongo-scala-driver" % "2.7.0"
+
 
 mappings in Universal ++=
 (baseDirectory.value / "report_template" * "*" get) map

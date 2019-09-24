@@ -12,9 +12,9 @@ import org.mongodb.scala.model._
 object GcAgent {
   case object ParseReport
 
-  val inputPath = Play.current.configuration.getString("inputPath").getOrElse("C:/gc/")
+  val inputPath = Play.current.configuration.getString("inputDir").getOrElse("C:/gc/")
 
-  Logger.info(s"inputPath =$inputPath")
+  Logger.info(s"inputDir =$inputPath")
 
   var receiver: ActorRef = _
   def startup() = {
