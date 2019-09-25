@@ -104,6 +104,9 @@ class GcAgent extends Actor {
           val ppm = rec.substring(37, 47).trim()
           val grp = rec.substring(48, 50).trim()
           val name = rec.substring(51).trim()
+          assert(!name.contains(" "))
+          assert(!name.contains("|"))
+          assert(!name.isEmpty())
           val monitorType = MonitorType.getMonitorTypeValueByName(name, "")
           val mtMap = timeMap.getOrElseUpdate(mDate, Map.empty[MonitorType.Value, (Double, String)])
 
@@ -147,7 +150,7 @@ class GcAgent extends Actor {
     true
   }
 
-  def listDirs(files_path: String) = {
+  def listDirs(files_path: String):List[File] = {
     //import java.io.FileFilter
     val path = new java.io.File(files_path)
     if (path.exists() && path.isDirectory()) {
@@ -159,8 +162,16 @@ class GcAgent extends Actor {
         dfa.isArchive()
       }
 
-      val allFiles = new java.io.File(files_path).listFiles().toList
-      allFiles.filter(p => p != null && p.isDirectory() && !isArchive(p))
+      val allFileAndDirs = new java.io.File(files_path).listFiles().toList
+      val dirs = allFileAndDirs.filter(p => p != null && p.isDirectory() && !isArchive(p))
+      val resultDirs = dirs.filter(p => p.getName.endsWith(".D"))
+      val diveDirs = dirs.filter(p => !p.getName.endsWith(".D"))
+      if(diveDirs.isEmpty)
+        resultDirs
+      else{
+        val deepDir = diveDirs flatMap(dir =>listDirs(dir.getAbsolutePath))
+        resultDirs ++ deepDir
+      }        
     } else {
       Logger.warn(s"invalid input path ${files_path}")
       List.empty[File]
@@ -190,8 +201,8 @@ class GcAgent extends Actor {
             setArchive(dir)
         } catch {
           case ex: Throwable =>
-            Logger.info(s"${dir.getName} is not ready...", ex)
-            0
+            Logger.warn(s"${dir.getName} is not ready...")
+            setArchive(dir)
         }
       }
   }

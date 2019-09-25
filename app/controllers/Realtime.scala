@@ -8,7 +8,7 @@ import play.api.data._
 import play.api.data.Forms._
 import play.api.libs.ws._
 import play.api.libs.ws.ning.NingAsyncHttpClientConfigBuilder
-import scala.concurrent.Future
+import scala.concurrent._
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json._
 import com.github.nscala_time.time.Imports._
@@ -27,37 +27,37 @@ object Realtime extends Controller {
       Future {
         Ok("")
       }
-//      val result =
-//        for (dataMap <- DataCollectManager.getLatestData()) yield {
-//          val list =
-//            for {
-//              mt <- MonitorType.realtimeMtvList
-//              recordOpt = dataMap.get(mt)
-//            } yield {
-//              val mCase = map(mt)
-//
-//              if (recordOpt.isDefined) {
-//                val record = recordOpt.get
-//                val duration = new Duration(record.time, DateTime.now())
-//                val (overInternal, overLaw) = overStd(mt, record.value)
-//                val status = if (duration.getStandardSeconds <= overTimeLimit)
-//                  MonitorStatus.map(record.status).desp
-//                else
-//                  "通訊中斷"
-//
-//                MonitorTypeStatus(mCase.desp, format(mt, Some(record.value)), mCase.unit, "",
-//                  MonitorStatus.map(record.status).desp,
-//                  MonitorStatus.getCssClassStr(record.status, overInternal, overLaw), mCase.order)
-//              } else {
-//                MonitorTypeStatus(mCase.desp, format(mt, None), mCase.unit, "",
-//                  "通訊中斷",
-//                  "abnormal_status", mCase.order)
-//              }
-//            }
-//          Ok(Json.toJson(list))
-//        }
-//
-//      result
+    //      val result =
+    //        for (dataMap <- DataCollectManager.getLatestData()) yield {
+    //          val list =
+    //            for {
+    //              mt <- MonitorType.realtimeMtvList
+    //              recordOpt = dataMap.get(mt)
+    //            } yield {
+    //              val mCase = map(mt)
+    //
+    //              if (recordOpt.isDefined) {
+    //                val record = recordOpt.get
+    //                val duration = new Duration(record.time, DateTime.now())
+    //                val (overInternal, overLaw) = overStd(mt, record.value)
+    //                val status = if (duration.getStandardSeconds <= overTimeLimit)
+    //                  MonitorStatus.map(record.status).desp
+    //                else
+    //                  "通訊中斷"
+    //
+    //                MonitorTypeStatus(mCase.desp, format(mt, Some(record.value)), mCase.unit, "",
+    //                  MonitorStatus.map(record.status).desp,
+    //                  MonitorStatus.getCssClassStr(record.status, overInternal, overLaw), mCase.order)
+    //              } else {
+    //                MonitorTypeStatus(mCase.desp, format(mt, None), mCase.unit, "",
+    //                  "通訊中斷",
+    //                  "abnormal_status", mCase.order)
+    //              }
+    //            }
+    //          Ok(Json.toJson(list))
+    //        }
+    //
+    //      result
   }
 
   def realtimeStatus = Security.Authenticated {
@@ -67,16 +67,18 @@ object Realtime extends Controller {
   def realtimeMonitorTypeValues() = Security.Authenticated.async {
     implicit request =>
       val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection)
-      
-      for(records <- latestRecord) yield {
-        if(records.isEmpty)
-          NoContent
-        else{
+
+      for (records <- latestRecord) yield {
+        if (records.isEmpty) {
+          import org.mongodb.scala.bson._
+          val emptyRecordList = Record.RecordList(DateTime.now().getMillis, Seq.empty[Record.MtRecord], new ObjectId())
+          Ok(Json.toJson(emptyRecordList))
+        } else {
           val recordList = records.head
           Ok(Json.toJson(recordList))
         }
       }
-    
+
   }
   def realtimeStatusContent() = Security.Authenticated.async {
     implicit request =>
@@ -92,7 +94,6 @@ object Realtime extends Controller {
         Ok(views.html.realtimeStatus(map, groupInfo.privilege))
       }
   }
-  
 
   case class CellData(v: String, cellClassName: String)
   case class RowData(cellData: Seq[CellData])
@@ -144,65 +145,21 @@ object Realtime extends Controller {
       }
   }
 
-  case class WindInfo(windDir: Double, windSpeed: Double)
-
-  case class MonitorInfo(id: String, status: Int, winDir: Double, winSpeed: Double, statusStr: String, lat: Double, lng: Double)
-
-  implicit val monitorInfoWrite = Json.writes[MonitorInfo]
-
-  /*
-  def realtimeMap = Security.Authenticated.async {
+  def getCurrentMonitor() = Security.Authenticated {
     implicit request =>
-      val statusWeatherPairFuture = getRealtimeMonitorStatusWeatherPair
-      val myMonitorListFuture = Privilege.myMonitorList(request.user.id)
+      val m = Monitor.withName(Monitor.monitorId(Selector.get))
+      Ok(Json.toJson(Monitor.map(m)))
+  }
 
-      def getStatusIndex(statusMap: Map[MonitorType.Value, String]): (Int, String) = {
-        val statusBuilder = new StringBuilder
+  def setCurrentMonitor(id: Int) = Security.Authenticated.async {
+    implicit request =>
+      Logger.info(s"Selector set to ${id}")
+      Selector.set(id)
+      import java.util.Timer
 
-        val statusIndexes = statusMap.map { mt_status =>
-          val status = mt_status._2
-          if (MonitorStatus.isValid(status))
-            0
-          else if (MonitorStatus.isCalbration(status)) {
-            statusBuilder.append(s"${MonitorType.map(mt_status._1).desp}:${MonitorStatus.map(status).desp}<br/>")
-            1
-          } else if (MonitorStatus.isMaintenance(status)) {
-            statusBuilder.append(s"${MonitorType.map(mt_status._1).desp}:${MonitorStatus.map(status).desp}<br/>")
-            2
-          } else {
-            statusBuilder.append(s"${MonitorType.map(mt_status._1).desp}:${MonitorStatus.map(status).desp}<br/>")
-            4
-          }
-        }
-
-        if (statusIndexes.size == 0)
-          (0, "")
-        else
-          (statusIndexes.max, statusBuilder.toString())
+      Future {
+        blocking { Thread.sleep(1500) }
+        Ok("")
       }
-
-      for {
-        statusWeatherPair <- statusWeatherPairFuture
-        myMonitorList <- myMonitorListFuture
-        statusMap = statusWeatherPair._1
-        weatherMap = statusWeatherPair._2
-      } yield {
-        val mapInfos =
-          for {
-            m <- myMonitorList
-            mCase = Monitor.map(m)
-            lat <- mCase.lat
-            lng <- mCase.lng
-            weather = weatherMap.getOrElse(m, WindInfo(0, 0))
-            status = statusMap(m)
-          } yield {
-            val (statusIndex, statusStr) = getStatusIndex(status)
-            MonitorInfo(mCase.dp_no, statusIndex, weather.windDir, weather.windSpeed, statusStr, lat, lng)
-          }
-
-        Ok(Json.toJson(mapInfos))
-
-      }
-  }*/
-
+  }
 }

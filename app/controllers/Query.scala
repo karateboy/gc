@@ -14,6 +14,7 @@ import play.api.libs.json._
 import com.github.nscala_time.time.Imports._
 import Highchart._
 import models._
+import models.ModelHelper._
 import scala.concurrent.ExecutionContext.Implicits.global
 import models.ObjectIdUtil._
 
@@ -369,6 +370,96 @@ object Query extends Controller {
     chart
   }
 
+  def trendHelper2(monitors: Array[Monitor.Value], monitorTypes: Array[MonitorType.Value], tabType: TableType.Value,
+                   start: DateTime, end: DateTime)(statusFilter: MonitorStatusFilter.Value) = {
+
+    val recordMapF = Record.getMonitorRecordMapF(TableType.mapCollection(tabType))(monitorTypes.toList, monitors, start, end)
+    recordMapF.onFailure(errorHandler)
+
+    def getAxisLines(mt: MonitorType.Value) = {
+      val mtCase = MonitorType.map(mt)
+      val std_law_line =
+        if (mtCase.std_law.isEmpty)
+          None
+        else
+          Some(AxisLine("#FF0000", 2, mtCase.std_law.get, Some(AxisLineLabel("right", "法規值"))))
+
+      val lines = Seq(std_law_line, None).filter { _.isDefined }.map { _.get }
+      if (lines.length > 0)
+        Some(lines)
+      else
+        None
+    }
+
+    val downloadFileName = {
+      val startName = start.toString("YYMMdd")
+      val mtNames = monitorTypes.map { MonitorType.map(_).desp }
+      startName + mtNames.mkString
+    }
+
+    for (recordMap <- recordMapF) yield {
+      val timeSeq = recordMap.keys.toSeq.sorted
+      val series = {
+        for {
+          m <- monitors
+          mt <- monitorTypes
+          //valueMap = monitorReportMap(m)(mt)
+          timeData = timeSeq.map { time =>
+
+            if (recordMap.contains(time) && recordMap(time).contains(m) && recordMap(time)(m).contains(mt))
+              Seq(Some(time.getMillis.toDouble), Some(recordMap(time)(m)(mt).value))
+            else
+              Seq(Some(time.getMillis.toDouble), None)
+          }
+        } yield {
+          if (monitorTypes.length > 1) {
+            seqData(s"${Monitor.map(m).dp_no}_${MonitorType.map(mt).desp}", timeData)
+          } else {
+            seqData(s"${Monitor.map(m).dp_no}_${MonitorType.map(mt).desp}", timeData)
+          }
+        }
+      }
+      val title =
+        s"趨勢圖 (${start.toString("YYYY年MM月dd日 HH:mm")}~${end.toString("YYYY年MM月dd日 HH:mm")})"
+
+      val xAxis = {
+        val duration = new Duration(start, end)
+        if (duration.getStandardDays > 2)
+          XAxis(None, gridLineWidth = Some(1), None)
+        else
+          XAxis(None)
+      }
+
+      val chart =
+        if (monitorTypes.length == 1) {
+          val mt = monitorTypes(0)
+          val mtCase = MonitorType.map(monitorTypes(0))
+
+          HighchartData(
+            Map("type" -> "line"),
+            Map("text" -> title),
+            xAxis,
+
+            Seq(YAxis(None, AxisTitle(Some(Some(s"${mtCase.desp} (${mtCase.unit})"))), getAxisLines(mt))),
+            series,
+            Some(downloadFileName))
+        } else {
+          val yAxis =
+            Seq(YAxis(None, AxisTitle(Some(None)), None))
+
+          HighchartData(
+            Map("type" -> "line"),
+            Map("text" -> title),
+            xAxis,
+            yAxis,
+            series,
+            Some(downloadFileName))
+        }
+
+      chart
+    }
+  }
+
   def boxHelper(monitors: Array[Monitor.Value], monitorTypes: Array[MonitorType.Value], tabType: TableType.Value,
                 reportUnit: ReportUnit.Value, start: DateTime, end: DateTime)(statusFilter: MonitorStatusFilter.Value) = {
 
@@ -547,7 +638,7 @@ object Query extends Controller {
       }
   }
 
-  def historyTrendChart2(monitorStr: String, monitorTypeStr: String, startLong: Long, endLong: Long) = Security.Authenticated {
+  def historyTrendChart2(monitorStr: String, monitorTypeStr: String, startLong: Long, endLong: Long) = Security.Authenticated.async {
     implicit request =>
       import scala.collection.JavaConverters._
       val monitorStrArray = java.net.URLDecoder.decode(monitorStr, "UTF-8").split(':')
@@ -555,11 +646,13 @@ object Query extends Controller {
 
       val monitorTypeStrArray = java.net.URLDecoder.decode(monitorTypeStr, "UTF-8").split(':')
       val monitorTypes = monitorTypeStrArray.map { MonitorType.withName }
-      val reportUnit = ReportUnit.TenMin
       val statusFilter = MonitorStatusFilter.ValidData
       val (tabType, start, end) = (TableType.min, new DateTime(startLong), new DateTime(endLong))
-      val chart = trendHelper(monitors, monitorTypes, tabType, reportUnit, start, end)(statusFilter)
-      Results.Ok(Json.toJson(chart))
+      val chartFuture = trendHelper2(monitors, monitorTypes, tabType, start, end)(statusFilter)
+      chartFuture.onFailure(errorHandler)
+      for (chart <- chartFuture) yield {
+        Results.Ok(Json.toJson(chart))
+      }
   }
 
   def historyBoxPlot(monitorStr: String, monitorTypeStr: String, reportUnitStr: String,

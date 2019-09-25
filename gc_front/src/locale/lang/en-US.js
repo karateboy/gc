@@ -1,4 +1,13 @@
 export default {
+  data_query: 'Data Query',
+  realtime_data: 'Realtime Data',
+  history_data: 'History Record',
+  history_trend: 'History Trend',
+  config: 'Configure',
+  mtype_config: 'Configure measuring type',
+  selector_switch: 'Switch selector',
+  channel_config: 'Configure selector channel',
+  // original
   home: 'Home',
   login: 'Login',
   components: 'Components',

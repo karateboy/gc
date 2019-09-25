@@ -166,7 +166,7 @@ object Record {
     val col = MongoDB.database.getCollection(colName)
     val projFields = "monitor" :: "time" :: mtList.map { MonitorType.BFName(_) }
     val proj = include(projFields: _*)
-    val monitorNames = monitors.map(_.toString())
+    val monitorNames = monitors.map(Monitor.map(_)._id)
     val f = col.find(and(in("monitor", monitorNames: _*), gte("time", startTime.toDate()), lt("time", endTime.toDate()))).projection(proj).sort(ascending("time")).toFuture()
 
     var timeMap = Map.empty[DateTime, Map[Monitor.Value, MTMap]]
@@ -270,7 +270,7 @@ object Record {
     }
   }
 
-  case class MtRecord(mtName: String, value: Double, status: String)
+  case class MtRecord(mtName: String, value: Double, status: String, text: String)
   case class RecordList(time: Long, mtDataList: Seq[MtRecord], pdfReport: ObjectId)
 
   implicit val mtRecordWrite = Json.writes[MtRecord]
@@ -301,52 +301,13 @@ object Record {
           for {
             mt <- mtList
             mtBFName = MonitorType.BFName(mt)
-
+            mtDesp = MonitorType.map(mt).desp
             mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument()
             mtDoc = mtDocOpt.get.asDocument()
             v = mtDoc.get("v") if v.isDouble()
             s = mtDoc.get("s") if s.isString()
           } yield {
-            MtRecord(mtBFName, v.asDouble().doubleValue(), s.asString().getValue)
-          }
-        val pdfReport = doc.get("pdfReport").get.asObjectId().getValue
-        RecordList(time.getMillis, mtDataList, pdfReport)
-      }
-    }
-  }
-
-  def getRecordList2Future(colName: String)(monitor: Monitor.Value, startTime: DateTime, endTime: DateTime) = {
-    import org.mongodb.scala.bson._
-    import org.mongodb.scala.model.Filters._
-    import org.mongodb.scala.model.Projections._
-    import org.mongodb.scala.model.Sorts._
-    import scala.concurrent._
-    import scala.concurrent.duration._
-
-    val mtList = MonitorType.activeMtvList
-    val col = MongoDB.database.getCollection(colName)
-    val projFields = "time" :: "pdfReport" :: mtList.map { MonitorType.BFName(_) }
-    val proj = include(projFields: _*)
-    val f = col.find(and(equal("monitor", monitor.toString), gte("time", startTime.toDate()), lt("time", endTime.toDate()))).projection(proj).sort(ascending("time")).toFuture()
-
-    for {
-      docs <- f
-    } yield {
-      for {
-        doc <- docs
-        time = doc("time").asDateTime()
-      } yield {
-        val mtDataList =
-          for {
-            mt <- mtList
-            mtBFName = MonitorType.BFName(mt)
-
-            mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument()
-            mtDoc = mtDocOpt.get.asDocument()
-            v = mtDoc.get("v") if v.isDouble()
-            s = mtDoc.get("s") if s.isString()
-          } yield {
-            MtRecord(mtBFName, v.asDouble().doubleValue(), s.asString().getValue)
+            MtRecord(mtDesp, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
           }
         val pdfReport = doc.get("pdfReport").get.asObjectId().getValue
         RecordList(time.getMillis, mtDataList, pdfReport)
@@ -460,15 +421,15 @@ object Record {
           for {
             mt <- mtList
             mtBFName = MonitorType.BFName(mt)
-
+            mtDesp = MonitorType.map(mt).desp
             mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument()
             mtDoc = mtDocOpt.get.asDocument()
             v = mtDoc.get("v") if v.isDouble()
             s = mtDoc.get("s") if s.isString()
           } yield {
-            MtRecord(mtBFName, v.asDouble().doubleValue(), s.asString().getValue)
+            MtRecord(mtDesp, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
           }
-        val pdfReport = if(doc.get("pdfReport").isEmpty)
+        val pdfReport = if (doc.get("pdfReport").isEmpty)
           new ObjectId()
         else
           doc.get("pdfReport").get.asObjectId().getValue
@@ -476,7 +437,7 @@ object Record {
       }
     }
   }
-  
+
   def getLatestRecordTimeFuture(colName: String, monitorList: Seq[Monitor.Value]) = {
     import org.mongodb.scala.bson._
     import org.mongodb.scala.model._

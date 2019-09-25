@@ -4,6 +4,7 @@ import akka.actor._
 import play.api.Play.current
 import play.api.libs.concurrent.Akka
 import scala.concurrent.ExecutionContext.Implicits.global
+import akka.pattern.{ ask, pipe }
 
 case object IssueCPcmd
 case object ReadCurrentStreamNum
@@ -14,17 +15,26 @@ class ViciUeaSelector extends SelectorModel {
   val worker = Akka.system.actorOf(Props(new UeaSelectorWorker(this)), name = "selectorAgent")
   worker ! IssueCPcmd
 
-  @volatile private var streamNum = 1
+  @volatile var streamNum = 1 
   def getStreamNum(): Int = streamNum
   def setStreamNum(v: Int) {
     worker ! SetStreamNum(v)
   }
 
+  def modifyStreamNum(v: Int) {
+    streamNum = v
+  }
+
 }
 
 class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
+  val max = current.configuration.getInt("selector.viciUea.max").get
+  for (id <- 1 to max) {
+    Monitor.getMonitorValueByName(id)
+  }
+
   val comPort = Play.current.configuration.getInt("selector.viciUea.com").get
-  Logger.info("UEA is set to ${comPort}")
+  Logger.info(s"UEA is set to ${comPort}")
   val serial = SerialComm.open(comPort)
 
   def receive = {
@@ -48,7 +58,7 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
           val cpNum = Integer.valueOf(ret.head.substring(2), 10).toInt
           if (cpNum != selector.getStreamNum()) {
             Logger.info(s"Selector stream number change to $cpNum")
-            selector.setStreamNum(cpNum)
+            selector.modifyStreamNum(cpNum)
           }
         }
       } catch {

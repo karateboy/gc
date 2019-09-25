@@ -17,12 +17,17 @@ GET      /getUserInfo                                                          c
 GET      /logout                                                               controllers.Login.logout
 POST     /authenticate                                                         controllers.Login.authenticate
 
-GET      /monitors                                                             controllers.Application.monitorList
-GET      /monitor_types                                                        controllers.Application.monitorTypeList
+GET      /monitor                                                             controllers.Application.monitorList
+POST     /monitor																controllers.Application.updateMonitor
+GET      /monitor_type                                                         controllers.Application.monitorTypeList
+POST     /monitor_type                                                         controllers.Application.updateMonitorType
+
 GET      /history_data                                                         controllers.Query.historyData(monitor:String, monitorTypes: String, start: Long, end: Long)
 GET      /pdfReport/:id                                                        controllers.Query.pdfReport(id:String)
 GET      /history_trend                                                        controllers.Query.historyTrendChart2(monitors: String, monitorTypes: String, start: Long, end: Long)
-GET      /realtime_data                                                        controllers.Realtime.realtimeMonitorTypeValues()						
+GET      /realtime_data                                                        controllers.Realtime.realtimeMonitorTypeValues()	
+GET      /current_monitor                                                      controllers.Realtime.getCurrentMonitor
+POST     /current_monitor                                                      controllers.Realtime.setCurrentMonitor(id:Int)					
 # old api
 POST     /User                                                                 controllers.Application.newUser
 GET      /User                                                                 controllers.Application.getAllUsers

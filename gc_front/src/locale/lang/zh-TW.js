@@ -6,6 +6,8 @@ export default {
   history_trend: '歷史趨勢圖',
   config: '設定',
   mtype_config: '測項設定',
+  selector_switch: '切換選樣器',
+  channel_config: '選樣器通道設定',
   // App String end
   home: '首頁',
   login: '登錄',

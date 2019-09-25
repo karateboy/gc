@@ -168,6 +168,16 @@ object MonitorType extends Enumeration {
     }
   }
 
+  def formatWithUnit(mt: MonitorType.Value, v: Option[Double]) = {
+    if (v.isEmpty)
+      "-"
+    else {
+      val prec = map(mt).prec
+      val unit = map(mt).unit
+      s"%.${prec}f $unit".format(v.get)
+    }
+  }
+  
   def overStd(mt: MonitorType.Value, v: Double) = {
     val mtCase = MonitorType.map(mt)
     val overInternal =

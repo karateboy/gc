@@ -62,7 +62,7 @@ export default [
         path: 'realtime_data',
         name: 'realtime_data',
         meta: {
-          icon: 'md-trending-up',
+          icon: 'md-flash',
           title: '即時資料'
         },
         component: () => import('@/view/single-page/home')
@@ -71,7 +71,7 @@ export default [
         path: 'history_data',
         name: 'history_data',
         meta: {
-          icon: 'md-eye',
+          icon: 'md-stats',
           title: '歷史資料'
         },
         component: () => import('@/view/historyData/historyData')
@@ -80,7 +80,7 @@ export default [
         path: 'history_trend',
         name: 'history_trend',
         meta: {
-          icon: 'md-trending-down',
+          icon: 'md-trending-up',
           title: '歷史趨勢'
         },
         component: () => import('@/view/historyTrend/historyTrend')
@@ -88,7 +88,7 @@ export default [
     ]
   },
   {
-    path: '/config',
+    path: '',
     name: 'config',
     meta: {
       icon: 'md-settings',
@@ -98,13 +98,31 @@ export default [
     component: Main,
     children: [
       {
+        path: 'selector_switch',
+        name: 'selector_switch',
+        meta: {
+          icon: 'md-speedometer',
+          title: '設定選樣器'
+        },
+        component: () => import('@/view/selector/selector')
+      },
+      {
         path: 'mtype_config',
         name: 'mtype_config',
         meta: {
           icon: 'md-laptop',
           title: '測項設定'
         },
-        component: () => import('@/view/single-page/home')
+        component: () => import('@/view/config/monitorTypeConfig')
+      },
+      {
+        path: 'channel_config',
+        name: 'channel_config',
+        meta: {
+          icon: 'md-laptop',
+          title: '選樣器通道設定'
+        },
+        component: () => import('@/view/config/monitorConfig')
       }
     ]
   },

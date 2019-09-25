@@ -169,13 +169,14 @@ object Application extends Controller {
 
   def monitorTypeList = Security.Authenticated {
     implicit request =>
-      Ok(Json.toJson(MonitorType.map.values.toSeq))
+      val monitorTypes = MonitorType.mtvList map { MonitorType.map }
+      Ok(Json.toJson(monitorTypes))
   }
 
   def monitorList = Security.Authenticated {
     implicit request =>
-
-      Ok(Json.toJson(Monitor.map.values.toSeq))
+      val monitors = Monitor.mvList map { Monitor.map }
+      Ok(Json.toJson(monitors))
   }
 
   def indParkList = Security.Authenticated.async {
@@ -198,6 +199,22 @@ object Application extends Controller {
     Ok(Json.toJson(ReportUnit.values.toList.sorted.map { ReportUnit.map }))
   }
 
+  def updateMonitorType = Security.Authenticated(BodyParsers.parse.json) {
+    implicit request =>
+      val mtResult = request.body.validate[MonitorType]
+
+      mtResult.fold(
+        error => {
+          Logger.error(JsError.toJson(error).toString())
+          BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
+        },
+        mt => {
+          MonitorType.upsertMonitorType(mt)
+          MonitorType.refreshMtv
+          Ok(Json.obj("ok" -> true))
+        })
+  }
+
   def upsertMonitorType(id: String) = Security.Authenticated(BodyParsers.parse.json) {
     implicit request =>
       val mtResult = request.body.validate[MonitorType]
@@ -211,6 +228,25 @@ object Application extends Controller {
           MonitorType.upsertMonitorType(mt)
           MonitorType.refreshMtv
           Ok(Json.obj("ok" -> true))
+        })
+  }
+
+  def updateMonitor = Security.Authenticated.async(BodyParsers.parse.json) {
+    implicit request =>
+      val mtResult = request.body.validate[Monitor]
+
+      mtResult.fold(
+        error => {
+          Future {
+            Logger.error(JsError.toJson(error).toString())
+            BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
+          }
+        },
+        monitor => {
+          for (ret <- Monitor.upsert(monitor)) yield {
+            Monitor.refresh
+            Ok(Json.obj("ok" -> true))
+          }
         })
   }
 

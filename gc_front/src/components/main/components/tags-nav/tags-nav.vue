@@ -6,8 +6,8 @@
           <Icon :size="18" type="ios-close-circle-outline" />
         </Button>
         <DropdownMenu slot="list">
-          <DropdownItem name="close-all">关闭所有</DropdownItem>
-          <DropdownItem name="close-others">关闭其他</DropdownItem>
+          <DropdownItem name="close-all">清除</DropdownItem>
+          <DropdownItem name="close-others">清除其他</DropdownItem>
         </DropdownMenu>
       </Dropdown>
     </div>
