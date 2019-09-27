@@ -31,6 +31,7 @@ class GcAgent extends Actor {
   import GcAgent._
 
   Logger.info("GcAgent started.")
+
   def receive = {
     case ParseReport =>
       try {
@@ -59,7 +60,6 @@ class GcAgent extends Actor {
     val f1 = PdfReport.collection.insertOne(pdfReport).toFuture()
     f1.onFailure(errorHandler)
     waitReadyResult(f1)
-
 
     import com.github.nscala_time.time.Imports._
 
@@ -143,14 +143,14 @@ class GcAgent extends Actor {
         val f2 = collection.bulkWrite(updateModels.toList, BulkWriteOptions().ordered(false)).toFuture()
         f2.onFailure(errorHandler)
         waitReadyResult(f2)
-      }//End of process report.txt
+      } //End of process report.txt
     }
 
     insertRecord
     true
   }
 
-  def listDirs(files_path: String):List[File] = {
+  def listDirs(files_path: String): List[File] = {
     //import java.io.FileFilter
     val path = new java.io.File(files_path)
     if (path.exists() && path.isDirectory()) {
@@ -166,18 +166,20 @@ class GcAgent extends Actor {
       val dirs = allFileAndDirs.filter(p => p != null && p.isDirectory() && !isArchive(p))
       val resultDirs = dirs.filter(p => p.getName.endsWith(".D"))
       val diveDirs = dirs.filter(p => !p.getName.endsWith(".D"))
-      if(diveDirs.isEmpty)
+      if (diveDirs.isEmpty)
         resultDirs
-      else{
-        val deepDir = diveDirs flatMap(dir =>listDirs(dir.getAbsolutePath))
+      else {
+        val deepDir = diveDirs flatMap (dir => listDirs(dir.getAbsolutePath))
         resultDirs ++ deepDir
-      }        
+      }
     } else {
       Logger.warn(s"invalid input path ${files_path}")
       List.empty[File]
     }
   }
 
+  var retryMap = Map.empty[String, Int]
+  val MAX_RETRY_COUNT = 15
   def processInputPath(parser: (File) => Boolean) = {
     import org.apache.commons.io.FileUtils
     import java.io.File
@@ -195,13 +197,25 @@ class GcAgent extends Actor {
     val dirs = listDirs(GcAgent.inputPath)
     val output =
       for (dir <- dirs) yield {
-        Logger.info(s"Processing ${dir.getName}")
+        Logger.info(s"Processing ${dir.getAbsolutePath}")
         try {
           if (parser(dir))
             setArchive(dir)
         } catch {
           case ex: Throwable =>
-            Logger.warn(s"${dir.getName} is not ready...", ex)
+            val absPath = dir.getAbsolutePath
+            if (retryMap.contains(absPath)) {
+              if (retryMap(absPath) + 1 < MAX_RETRY_COUNT) {
+                retryMap += (absPath -> (retryMap(absPath) + 1))
+              } else {
+                Logger.info(s"$absPath reach max retries. Give up!")
+                retryMap -= absPath
+                setArchive(dir)
+              }
+            } else {
+              Logger.warn(s"${absPath} is not ready...", ex)
+              retryMap += (absPath -> 1)
+            }
         }
       }
   }
