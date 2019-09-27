@@ -2,13 +2,13 @@
   <div>
     <Row>
       <Card>
-        <Form :model="formItem" :label-width="80">
-          <FormItem label="選擇器">
+        <Form ref="historyData" :model="formItem" :rules="rules" :label-width="80">
+          <FormItem label="選擇器" prop="monitor">
             <Select v-model="formItem.monitor" filterable>
               <Option v-for="item in monitorList" :value="item._id" :key="item._id">{{ item.dp_no }}</Option>
             </Select>
           </FormItem>
-          <FormItem label="測項">
+          <FormItem label="測項" prop="monitorTypes">
             <Select v-model="formItem.monitorTypes" filterable multiple>
               <Option
                 v-for="item in monitorTypeList"
@@ -17,7 +17,7 @@
               >{{ item.desp }}</Option>
             </Select>
           </FormItem>
-          <FormItem label="資料區間">
+          <FormItem label="資料區間" prop="dateRange">
             <DatePicker
               type="datetimerange"
               format="yyyy-MM-dd HH:mm"
@@ -27,7 +27,7 @@
             ></DatePicker>
           </FormItem>
           <FormItem>
-            <Button type="primary" @click="query">查詢</Button>
+            <Button type="primary" @click="handleSubmit">查詢</Button>
             <Button style="margin-left: 8px">取消</Button>
           </FormItem>
         </Form>
@@ -95,9 +95,43 @@ export default {
       formItem: {
         monitor: "",
         monitorTypes: [],
-        dateRange: "",
+        dateRange: [
+          moment()
+            .subtract(2, "days")
+            .toDate(),
+          moment().toDate()
+        ],
         start: undefined,
         end: undefined
+      },
+      rules: {
+        monitor: [
+          {
+            required: true,
+            type: "string",
+            min: 1,
+            message: "請選擇通道",
+            trigger: "change"
+          }
+        ],
+        monitorTypes: [
+          {
+            required: true,
+            type: "array",
+            min: 1,
+            message: "至少選擇一個測項",
+            trigger: "change"
+          }
+        ],
+        dateRange: [
+          {
+            required: true,
+            type: "array",
+            min: 2,
+            message: "請選擇資料範圍",
+            trigger: "change"
+          }
+        ]
       },
       display: false,
       showPdf: false,
@@ -108,6 +142,13 @@ export default {
   },
   computed: {},
   methods: {
+    handleSubmit() {
+      this.$refs.historyData.validate(valid => {
+        if (valid) {
+          this.query();
+        }
+      });
+    },
     query() {
       this.display = true;
       this.formItem.start = this.formItem.dateRange[0].getTime();

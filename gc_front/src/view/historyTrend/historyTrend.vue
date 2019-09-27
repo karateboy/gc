@@ -3,7 +3,7 @@
     <Row>
       <Card>
         <Form ref="historyTrend" :model="formItem" :rules="rules" :label-width="80">
-          <FormItem label="選擇器">
+          <FormItem label="選擇器" prop="monitors">
             <Select v-model="formItem.monitors" filterable multiple>
               <Option v-for="item in monitorList" :value="item._id" :key="item._id">{{ item.dp_no }}</Option>
             </Select>

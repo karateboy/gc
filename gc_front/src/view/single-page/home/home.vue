@@ -31,6 +31,7 @@
 import InforCard from "_c/info-card";
 import { ChartPie, ChartBar } from "_c/charts";
 import config from "@/config";
+import moment from "moment";
 const baseUrl =
   process.env.NODE_ENV === "development"
     ? config.baseUrl.dev
@@ -54,58 +55,59 @@ export default {
         title: "選樣器"
       },
       inforCardData: [],
-      pieData: [],
-      pieKey: 0,
-      barData: {
-        Mon: 13253,
-        Tue: 34235,
-        Wed: 26321,
-        Thu: 12340,
-        Fri: 24643,
-        Sat: 1322,
-        Sun: 1324
-      }
+      timer: undefined
     };
   },
   mounted() {
-    getCurrentMonitor()
-      .then(resp => {
-        this.selector = Object.assign(
-          {
-            icon: "ios-speedometer",
-            color: "#ff0000",
-            title: "選樣器"
-          },
-          resp.data
-        );
-      })
-      .catch(err => {
-        alert(err);
-      });
+    this.reloadData();
+  },
+  methods: {
+    reloadData() {
+      console.log("reload Data...");
+      getCurrentMonitor()
+        .then(resp => {
+          this.selector = Object.assign(
+            {
+              icon: "ios-speedometer",
+              color: "#ff0000",
+              title: "選樣器"
+            },
+            resp.data
+          );
+        })
+        .catch(err => {
+          alert(err);
+        });
 
-    getRealtimeData()
-      .then(resp => {
-        this.inforCardData.splice(0, this.inforCardData.length);
-        for (let mtData of resp.data.mtDataList) {
+      getRealtimeData()
+        .then(resp => {
+          this.inforCardData.splice(0, this.inforCardData.length);
           let card = {
-            title: mtData.mtName,
-            icon: "ios-flask",
-            text: mtData.text,
+            title: "最新資料時間",
+            icon: "ios-time",
+            text: moment(resp.data.time).format("LLL"),
             color: "#ff9900"
           };
           this.inforCardData.push(card);
-
-          let pieSlice = {
-            value: mtData.value,
-            name: mtData.mtName
-          };
-          this.pieData.push(pieSlice);
-        }
-        this.pieKey++;
-      })
-      .catch(err => {
-        alert(err);
-      });
+          for (let mtData of resp.data.mtDataList) {
+            let card = {
+              title: mtData.mtName,
+              icon: "ios-flask",
+              text: mtData.text,
+              color: "#ff9900"
+            };
+            this.inforCardData.push(card);
+          }
+          this.pieKey++;
+        })
+        .catch(err => {
+          alert(err);
+        });
+      this.timer = setTimeout(this.reloadData, 30000);
+    }
+  },
+  destroyed() {
+    clearTimeout(this.timer);
   }
 };
 </script>

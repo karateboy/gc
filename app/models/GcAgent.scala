@@ -30,6 +30,7 @@ object GcAgent {
 class GcAgent extends Actor {
   import GcAgent._
 
+  Logger.info("GcAgent started.")
   def receive = {
     case ParseReport =>
       try {
@@ -100,7 +101,6 @@ class GcAgent extends Actor {
           val retTime = rec.substring(0, 7).trim()
           val recType = rec.substring(8, 14).trim()
           val area = rec.substring(15, 25).trim()
-          //val aa = rec.substring(26, 36).trim().toDouble
           val ppm = rec.substring(37, 47).trim()
           val grp = rec.substring(48, 50).trim()
           val name = rec.substring(51).trim()
@@ -111,7 +111,7 @@ class GcAgent extends Actor {
           val mtMap = timeMap.getOrElseUpdate(mDate, Map.empty[MonitorType.Value, (Double, String)])
 
           val mtValue = try {
-            rec.substring(26, 36).trim().toDouble
+            ppm.toDouble
           } catch {
             case _: NumberFormatException =>
               0.0
@@ -120,7 +120,7 @@ class GcAgent extends Actor {
           mtMap.put(monitorType, (mtValue, MonitorStatus.NormalStat))
         } catch {
           case ex: Exception => {
-            Logger.warn("skip invalid record")
+            Logger.warn("skip invalid line-> ${rec}", ex)
           }
         }
 
@@ -201,8 +201,7 @@ class GcAgent extends Actor {
             setArchive(dir)
         } catch {
           case ex: Throwable =>
-            Logger.warn(s"${dir.getName} is not ready...")
-            setArchive(dir)
+            Logger.warn(s"${dir.getName} is not ready...", ex)
         }
       }
   }
