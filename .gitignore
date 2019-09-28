@@ -25,3 +25,4 @@ node_modules
 /sip_front2/yarn.lock
 /gc_front/*.lock
 /gc_front/*.log
+/export/realtime.txt

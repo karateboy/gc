@@ -1,6 +1,6 @@
 name := """gc"""
 
-version := "1.0.5"
+version := "1.0.6"
 
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
@@ -27,8 +27,8 @@ mappings in Universal ++=
     (x => x -> ("report_template/" + x.getName))
 
 mappings in Universal ++=
-(baseDirectory.value / "importEPA/backup/" * "*" get) map
-    (x => x -> ("importEPA/backup/" + x.getName))
+(baseDirectory.value / "export/" * "*" get) map
+    (x => x -> ("export/" + x.getName))
 
 resolvers += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
 

@@ -13,6 +13,7 @@ object Global extends GlobalSettings {
     MongoDB.init()
     Logger.info(s"Selector is set to ${Selector.get}")
     GcAgent.startup()
+    Exporter.exportRealtimeData
   }
 
   override def onStop(app: Application) {

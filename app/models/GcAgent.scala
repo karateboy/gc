@@ -197,13 +197,15 @@ class GcAgent extends Actor {
     val dirs = listDirs(GcAgent.inputPath)
     val output =
       for (dir <- dirs) yield {
-        Logger.info(s"Processing ${dir.getAbsolutePath}")
+        val absPath = dir.getAbsolutePath
+        if (!retryMap.contains(absPath))
+          Logger.info(s"Processing ${absPath}")
+
         try {
           if (parser(dir))
             setArchive(dir)
         } catch {
           case ex: Throwable =>
-            val absPath = dir.getAbsolutePath
             if (retryMap.contains(absPath)) {
               if (retryMap(absPath) + 1 < MAX_RETRY_COUNT) {
                 retryMap += (absPath -> (retryMap(absPath) + 1))
