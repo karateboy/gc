@@ -21,7 +21,7 @@ object Exporter {
   def exportRealtimeData = {
     val path = Paths.get(current.path.getAbsolutePath + "/export/realtime.txt")
     var buffer = ""
-    buffer += s"Selector,${Selector.get}\n"
+    buffer += s"Selector,${Selector.get}\r"
     val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection)
 
     for (records <- latestRecord) yield {
@@ -33,13 +33,13 @@ object Exporter {
         } else {
           records.head
         }
-      buffer += s"InjectionDate, ${data.time}\n"
+      buffer += s"InjectionDate, ${data.time}\r"
       val mtStrs = data.mtDataList map { mt_data => s"${mt_data.mtName}, ${mt_data.value}" }
       val mtDataStr = mtStrs.foldLeft("")((a, b) => {
         if (a.length() == 0)
           b
         else
-          a + "\n" + b
+          a + "\r" + b
       })
       buffer += mtDataStr
       Files.write(path, buffer.getBytes, StandardOpenOption.CREATE)
