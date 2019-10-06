@@ -18,6 +18,8 @@ object Exporter {
     Files.write(path, ret, StandardOpenOption.CREATE)
   }
 
+  var latestDateTime = new DateTime(0)
+
   def exportRealtimeData = {
     val path = Paths.get(current.path.getAbsolutePath + "/export/realtime.txt")
     var buffer = ""
@@ -33,16 +35,23 @@ object Exporter {
         } else {
           records.head
         }
-      buffer += s"InjectionDate, ${data.time}\r"
-      val mtStrs = data.mtDataList map { mt_data => s"${mt_data.mtName}, ${mt_data.value}" }
-      val mtDataStr = mtStrs.foldLeft("")((a, b) => {
-        if (a.length() == 0)
-          b
-        else
-          a + "\r" + b
-      })
-      buffer += mtDataStr
-      Files.write(path, buffer.getBytes, StandardOpenOption.CREATE)
+      val dateTime = new DateTime(data.time)
+      if (latestDateTime < dateTime) {
+        latestDateTime = dateTime
+
+        buffer += s"InjectionDate, ${data.time}\r"
+        val mtStrs = data.mtDataList map { mt_data => s"${mt_data.mtName}, ${mt_data.value}" }
+        val mtDataStr = mtStrs.foldLeft("")((a, b) => {
+          if (a.length() == 0)
+            b
+          else
+            a + "\r" + b
+        })
+        buffer += mtDataStr
+        Files.write(path, buffer.getBytes, StandardOpenOption.CREATE)
+        true
+      } else
+        false
     }
   }
 }

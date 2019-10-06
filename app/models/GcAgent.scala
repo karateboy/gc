@@ -143,6 +143,7 @@ class GcAgent extends Actor {
         val f2 = collection.bulkWrite(updateModels.toList, BulkWriteOptions().ordered(false)).toFuture()
         f2.onFailure(errorHandler)
         waitReadyResult(f2)
+        Exporter.exportRealtimeData
       } //End of process report.txt
     }
 
