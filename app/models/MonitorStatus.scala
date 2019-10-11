@@ -112,8 +112,8 @@ object MonitorStatus {
     val tagInfo = getTagInfo(tag)
     if (tagInfo.statusType == StatusType.Auto) {
       val t = tagInfo.auditRule.get
-      val ruleExp = AutoAudit.map.getOrElse(t.toLower, "未知的規則")
-      s"自動註記:$ruleExp"
+      //val ruleExp = AutoAudit.map.getOrElse(t.toLower, "未知的規則")
+      s"自動註記:"
     } else {
       val ms = map(tag)
       ms.desp

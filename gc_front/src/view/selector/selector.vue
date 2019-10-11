@@ -1,28 +1,21 @@
 <template>
   <div>
     <Row>
-      <i-col :xs="12" :md="8" :lg="4" key="selector" style="height: 120px;padding-bottom: 10px;">
-        <infor-card shadow :color="selector.color" :icon="selector.icon" :icon-size="36">
-          <Card :bordered="false" :dis-hover="true" :title="selector.title" :key="selector._id">
-            <p>通道:{{selector._id}}</p>
-            <p>{{ selector.dp_no}}</p>
-          </Card>
-        </infor-card>
-      </i-col>
-    </Row>
-    <Row>
-      <Card>
-        <Form :model="formItem" :label-width="80">
-          <FormItem label="切換至">
-            <Select v-model="formItem.monitor" filterable>
-              <Option v-for="item in monitorList" :value="item._id" :key="item._id">{{ item.dp_no }}</Option>
-            </Select>
-          </FormItem>
-          <FormItem>
-            <Button type="primary" @click="setCurrentSelector">設定</Button>
-            <Button style="margin-left: 8px">取消</Button>
-          </FormItem>
-        </Form>
+      <Spin size="large" fix v-if="spinShow"></Spin>
+      <Card title="切換通道">
+        <ButtonGroup size="large">
+          <Button
+            size="large"
+            v-for="(item, idx) in monitorList"
+            :key="item._id"
+            :type="buttonType(item._id)"
+            :icon="buttonIcon(item._id)"
+            @click="setSelector(item._id)"
+          >
+            <p>{{'通道' + idx}}</p>
+            {{item.dp_no}}
+          </Button>
+        </ButtonGroup>
       </Card>
     </Row>
   </div>
@@ -66,20 +59,29 @@ export default {
         color: "#ff0000",
         title: "選樣器通道"
       },
-      formItem: {
-        monitor: 1
-      }
+      spinShow: false
     };
   },
   computed: {},
   methods: {
-    setCurrentSelector() {
-      setCurrentMonitor(this.formItem.monitor)
+    buttonType(ch) {
+      if (ch === this.selector._id) return "success";
+      else return "default";
+    },
+    buttonIcon(ch) {
+      if (ch === this.selector._id) return "md-checkmark";
+      else return "";
+    },
+    setSelector(current) {
+      this.spinShow = true;
+      setCurrentMonitor(current)
         .then(resp => {
+          this.spinShow = false;
           this.$Message.success("切換成功");
           this.refreshCurrentSelector();
         })
         .catch(err => {
+          this.spinShow = false;
           alert(err);
         });
     },

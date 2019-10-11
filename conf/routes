@@ -17,17 +17,19 @@ GET      /getUserInfo                                                          c
 GET      /logout                                                               controllers.Login.logout
 POST     /authenticate                                                         controllers.Login.authenticate
 
-GET      /monitor                                                             controllers.Application.monitorList
-POST     /monitor																controllers.Application.updateMonitor
+GET      /monitor                                                              controllers.Application.monitorList
+POST     /monitor                                                              controllers.Application.updateMonitor
 GET      /monitor_type                                                         controllers.Application.monitorTypeList
 POST     /monitor_type                                                         controllers.Application.updateMonitorType
 
 GET      /history_data                                                         controllers.Query.historyData(monitor:String, monitorTypes: String, start: Long, end: Long)
+GET      /history_data/excel                                                   controllers.Query.historyDataExcel(monitor:String, monitorTypes: String, start: Long, end: Long)
 GET      /pdfReport/:id                                                        controllers.Query.pdfReport(id:String)
 GET      /history_trend                                                        controllers.Query.historyTrendChart2(monitors: String, monitorTypes: String, start: Long, end: Long)
-GET      /realtime_data                                                        controllers.Realtime.realtimeMonitorTypeValues()	
+GET      /realtime_data                                                        controllers.Realtime.latestValues	
 GET      /current_monitor                                                      controllers.Realtime.getCurrentMonitor
-POST     /current_monitor                                                      controllers.Realtime.setCurrentMonitor(id:Int)					
+POST     /current_monitor                                                      controllers.Realtime.setCurrentMonitor(id:Int)	
+GET      /last10_data                                                          controllers.Query.last10Data()				
 # old api
 POST     /User                                                                 controllers.Application.newUser
 GET      /User                                                                 controllers.Application.getAllUsers
@@ -36,28 +38,16 @@ DELETE   /User/:id                                                             c
 
 GET      /Group                                                                controllers.Application.getGroupInfoList
 
-GET      /HistoryTrend                                                         controllers.Query.historyTrend
 GET      /JSON/HistoryTrend/:monitors/:monitorType/:reportUnit/:start/:end     controllers.Query.historyTrendChart(monitors, monitorType, reportUnit, start:Long, end:Long, outputTypeStr="html")
 GET      /Excel/HistoryTrend/:monitors/:monitorType/:reportUnit/:start/:end    controllers.Query.historyTrendChart(monitors,monitorType, reportUnit, start:Long, end:Long, outputTypeStr="excel")
 
 GET      /JSON/HistoryBoxplot/:monitors/:monitorType/:reportUnit/:start/:end   controllers.Query.historyBoxPlot(monitors, monitorType, reportUnit, start:Long, end:Long, outputTypeStr="html")
 GET      /Excel/HistorBoxplot/:monitors/:monitorType/:reportUnit/:start/:end   controllers.Query.historyBoxPlot(monitors,monitorType, reportUnit, start:Long, end:Long, outputTypeStr="excel")
 
-GET      /History                                                              controllers.Query.history
 GET      /HistoryReport/:monitor/:monitorType/:tabType/:start/:end             controllers.Query.historyReport(monitor, monitorType, tabType, start:Long, end:Long)
-GET      /Alarm                                                                controllers.Query.alarm
-GET      /AlarmReport/:monitors/:monitorTypes/:start/:end                      controllers.Query.alarmReport(monitors, monitorTypes, start, end)
 
 POST     /SaveMonitorTypeConfig                                                controllers.Application.saveMonitorTypeConfig
 POST     /SaveMonitorConfig                                                    controllers.Application.saveMonitorConfig
-
-GET      /ManualAudit                                                          controllers.Query.manualAudit()
-GET      /ManualAuditHistory                                                   controllers.Query.manualAuditHistory()
-GET      /ManualAuditHistory/:start/:end                                       controllers.Query.manualAuditHistoryReport(start:Long, end:Long)
-
-#Data Management
-GET      /DataManagement                                                       controllers.Application.dataManagement
-
 
 #Realtime
 GET      /MonitorTypeStatusList                                                controllers.Realtime.MonitorTypeStatusList()
@@ -76,23 +66,7 @@ GET      /ReportUnit                                                           c
 GET      /MenuRight                                                            controllers.Application.menuRightList
 
 GET      /Record/:monitor/:monitorType/:start/:end                             controllers.Query.recordList(monitor, monitorType, start:Long, end:Long)
-PUT      /Record/:monitor/:monitorType                                         controllers.Query.updateRecord(monitor, monitorType)
-
-#POST     /QueryRecord                                                          controllers.Query.queryData()
-#POST     /QueryAlarm                                                           controllers.Query.alarmData()		 
-#GET		/WindRose				controllers.Query.windRose
-#GET		/MonitorTypeRose		controllers.Query.monitorTypeRose
-#GET		/WindRoseReport/:monitor/:monitorType/:nWays/:start/:end	controllers.Query.windRoseReport(monitor, monitorType, nWays:Int, start, end)
+#PUT      /Record/:monitor/:monitorType                                         controllers.Query.updateRecord(monitor, monitorType)
 
 #import Data
 GET      /importEpaXLS                                                         controllers.Application.importEpa103
-
-
-#AUDIT
-GET      /AuditConfigPage                                                      controllers.Application.auditConfig
-GET      /AuditConfig                                                          controllers.Application.getAllMonitorAuditConfig
-GET      /AuditConfig/:monitor                                                 controllers.Application.getMonitorAuditConfig(monitor)
-POST     /AuditConfig/:monitor                                                 controllers.Application.setMonitorAuditConfig(monitor)
-GET      /DefaultAuditConfig                                                   controllers.Application.defaultAuditConfig
-
-GET      /TestAlarm                                                            controllers.Application.testAlarm

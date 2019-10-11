@@ -272,4 +272,14 @@ object ExcelUtility {
     wb.setActiveSheet(0)
     finishExcel(reportFilePath, pkg, wb)
   }
+  
+  def createHistoryData(data: Seq[Record.RecordList]) = {
+    implicit val (reportFilePath, pkg, wb) = prepareTemplate("empty.xlsx")
+    val format = wb.createDataFormat();
+    val sheet = wb.getSheetAt(0)
+
+    
+    wb.setActiveSheet(0)
+    finishExcel(reportFilePath, pkg, wb)
+  }
 }

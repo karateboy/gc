@@ -2,9 +2,7 @@ package models
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.implicitConversions
-
 import org.mongodb.scala._
-
 import com.github.nscala_time.time.Imports._
 
 import ModelHelper._
@@ -13,40 +11,27 @@ import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import play.api.libs.json.Reads._
 
-//alarm src format: 'T':"MonitorType"
-//                  'I':"Instrument"
-//                  'S':"System"
 
+case class Alarm(time: DateTime, monitor: Option[Monitor.Value], monitorType: Option[MonitorType.Value], desc: String)
 object Alarm {
-  case class Alarm(time: DateTime, monitor: Monitor.Value, monitorType: MonitorType.Value, desc: String)
-
   implicit val write = Json.writes[Alarm]
-  //implicit val format = Json.format[Alarm]
 
-  val collectionName = "alarms"
-  val collection = MongoDB.database.getCollection(collectionName)
-  def toDocument(ar: Alarm) = {
-    import org.mongodb.scala.bson._
-    Document("time" -> (ar.time: BsonDateTime), "monitor" -> ar.monitor.toString,
-      "monitorType" -> ar.monitorType.toString, "desc" -> ar.desc)
-  }
+  import org.mongodb.scala.bson.codecs.Macros._
+  import org.mongodb.scala.bson.codecs.DEFAULT_CODEC_REGISTRY
+  import org.bson.codecs.configuration.CodecRegistries.{ fromRegistries, fromProviders }
 
-  def toAlarm(doc: Document) = {
-    val time = new DateTime(doc.get("time").get.asDateTime().getValue)
-    val monitor = Monitor.withName(doc.get("monitor").get.asString().getValue)
-    val monitorType = MonitorType.withName(doc.get("monitorType").get.asString().getValue)
-    val desc = doc.get("desc").get.asString().getValue
-    Alarm(time, monitor, monitorType, desc)
-  }
+  val colName = "alarms"
+  val codecRegistry = fromRegistries(fromProviders(classOf[Alarm]), DEFAULT_CODEC_REGISTRY)
+  val collection = MongoDB.database.getCollection[Alarm](colName).withCodecRegistry(codecRegistry)
 
   def init(colNames: Seq[String]) {
     import org.mongodb.scala.model.Indexes._
-    if (!colNames.contains(collectionName)) {
-      val f = MongoDB.database.createCollection(collectionName).toFuture()
+    if (!colNames.contains(colName)) {
+      val f = MongoDB.database.createCollection(colName).toFuture()
       f.onFailure(errorHandler)
       f.onSuccess({
         case _: Seq[_] =>
-          collection.createIndex(ascending("time", "monitor", "monitorType"))
+          collection.createIndex(ascending("time", "monitor", "monitorType")).toFuture()
       })
     }
   }
@@ -65,8 +50,7 @@ object Alarm {
     val f = collection.find(and(gte("time", startB), lt("time", endB),
       in("monitor", monitorStrList: _*), in("monitorType", monitorTypeStrList: _*))).sort(ascending("time")).toFuture()
 
-    val docs = waitReadyResult(f)
-    docs.map { toAlarm }
+    waitReadyResult(f)
   }
 
   def getAlarmsFuture(monitorList: List[Monitor.Value], monitorTypeList: List[MonitorType.Value], start: DateTime, end: DateTime) = {
@@ -93,9 +77,8 @@ object Alarm {
     val filters = Seq(Some(gte("time", startB)), Some(lt("time", endB)), monitorFilter, monitorTypeFilter).flatMap(x => x)
     
     val f = collection.find(and(filters: _*)).sort(ascending("time")).toFuture()
-
-    for (docs <- f)
-      yield docs.map { toAlarm }
+    f.failed.foreach(errorHandler)
+    f
   }
 
   private def checkForDuplicatelog(ar: Alarm) {
@@ -110,7 +93,7 @@ object Alarm {
     countObserver.subscribe(
       (count: Long) => {
         if (count == 0) {
-          val f = collection.insertOne(toDocument(ar)).toFuture()
+          val f = collection.insertOne(ar).toFuture()
         }
       }, // onNext
       (ex: Throwable) => Logger.error("Alarm failed:", ex), // onError
@@ -118,14 +101,8 @@ object Alarm {
       )
   }
 
-  def log(monitor: Monitor.Value, monitorType: MonitorType.Value, desc: String) {
+  def log(monitor: Option[Monitor.Value], monitorType: Option[MonitorType.Value], desc: String)= {
     val ar = Alarm(DateTime.now(), monitor, monitorType, desc)
-    collection.insertOne(toDocument(ar)).toFuture()
-    val f = User.getAllUsersFuture()
-    for (users <- f) {
-      val phoneList =
-        for (user <- users if user.alarm.getOrElse(false)) 
-          yield user.phone
-    }
+    collection.insertOne(ar).toFuture()
   }
 }

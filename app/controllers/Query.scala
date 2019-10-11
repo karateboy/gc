@@ -17,6 +17,7 @@ import models._
 import models.ModelHelper._
 import scala.concurrent.ExecutionContext.Implicits.global
 import models.ObjectIdUtil._
+import java.nio.file.Files
 
 case class Stat(
   avg:        Option[Double],
@@ -53,11 +54,6 @@ case class Stat(
 }
 
 object Query extends Controller {
-  def historyTrend = Security.Authenticated {
-    implicit request =>
-      Ok(views.html.historyTrend())
-  }
-
   def windAvg(sum_sin: Double, sum_cos: Double) = {
     val degree = Math.toDegrees(Math.atan2(sum_sin, sum_cos))
     if (degree >= 0)
@@ -707,11 +703,6 @@ object Query extends Controller {
       }
   }
 
-  def history = Security.Authenticated {
-    implicit request =>
-      Ok(views.html.history())
-  }
-
   import java.util.Date
   import org.mongodb.scala.bson._
   case class CellData(v: String, cellClassName: String)
@@ -720,7 +711,7 @@ object Query extends Controller {
   def historyData(monitorStr: String, monitorTypeStr: String, startLong: Long, endLong: Long) = Security.Authenticated.async {
     implicit request =>
       import scala.collection.JavaConverters._
-      val monitor = Monitor.withName(monitorStr)
+
       val monitorTypeStrArray = java.net.URLDecoder.decode(monitorTypeStr, "UTF-8").split(',')
       val monitorTypes = monitorTypeStrArray.map { MonitorType.withName }
       val (start, end) = (new DateTime(startLong), new DateTime(endLong))
@@ -729,7 +720,15 @@ object Query extends Controller {
       implicit val rdWrite = Json.writes[RowData]
       implicit val dtWrite = Json.writes[DataTab]
 
-      for (recordList <- Record.getRecordListFuture(Record.MinCollection)(monitor, start, end)) yield {
+      val resultFuture = try {
+        val monitor = Monitor.withName(monitorStr)
+        Record.getRecordListFuture(monitor, start, end)(Record.MinCollection)
+      } catch {
+        case _: Throwable =>
+          Record.getRecordListFuture(start, end)(Record.MinCollection)
+      }
+
+      for (recordList <- resultFuture) yield {
         val rows = recordList map {
           r =>
             val mtCellData = monitorTypes.toSeq map { mt =>
@@ -742,10 +741,70 @@ object Query extends Controller {
               }
             }
 
-            RowData(r.time, mtCellData, r.pdfReport)
+            val cellData = mtCellData.+:(CellData(r.monitor, ""))
+            RowData(r.time, cellData, r.pdfReport)
         }
-        val columnNames = monitorTypes.toSeq map { MonitorType.map(_).desp }
 
+        val mtColumnNames = monitorTypes.toSeq map { MonitorType.map(_).desp }
+        val columnNames = mtColumnNames.+:("選擇器")
+        Ok(Json.toJson(DataTab(columnNames, rows)))
+      }
+  }
+
+  def historyDataExcel(monitorStr: String, monitorTypeStr: String, startLong: Long, endLong: Long) = Security.Authenticated.async {
+    implicit request =>
+      import scala.collection.JavaConverters._
+
+      val monitorTypeStrArray = java.net.URLDecoder.decode(monitorTypeStr, "UTF-8").split(',')
+      val monitorTypes = monitorTypeStrArray.map { MonitorType.withName }
+      val (start, end) = (new DateTime(startLong), new DateTime(endLong))
+
+      implicit val cdWrite = Json.writes[CellData]
+      implicit val rdWrite = Json.writes[RowData]
+      implicit val dtWrite = Json.writes[DataTab]
+
+      val resultFuture = try {
+        val monitor = Monitor.withName(monitorStr)
+        Record.getRecordListFuture(monitor, start, end)(Record.MinCollection)
+      } catch {
+        case _: Throwable =>
+          Record.getRecordListFuture(start, end)(Record.MinCollection)
+      }
+
+      for (recordList <- resultFuture) yield {
+        val excelFile = ExcelUtility.createHistoryData(recordList)
+        Ok.sendFile(excelFile, fileName = _ =>
+          play.utils.UriEncoding.encodePathSegment("歷史資料.xlsx", "UTF-8"),
+          onClose = () => { Files.deleteIfExists(excelFile.toPath()) })
+      }
+  }
+
+  def last10Data() = Security.Authenticated.async {
+    implicit request =>
+      import scala.collection.JavaConverters._
+
+      implicit val cdWrite = Json.writes[CellData]
+      implicit val rdWrite = Json.writes[RowData]
+      implicit val dtWrite = Json.writes[DataTab]
+
+      for (recordList <- Record.getLatestRecordListFuture(Record.MinCollection)(10)) yield {
+        val rows = recordList map {
+          r =>
+            val mtCellData = MonitorType.mtvList map { mt =>
+              val mtDataOpt = r.mtDataList.find(mtdt => mtdt.mtName == mt.toString())
+              if (mtDataOpt.isDefined) {
+                val mtData = mtDataOpt.get
+                CellData(mtData.value.toString(), "")
+              } else {
+                CellData("-", "")
+              }
+            }
+
+            val cellData = mtCellData.+:(CellData(r.monitor, ""))
+            RowData(r.time, cellData, r.pdfReport)
+        }
+        val mtColumnNames = MonitorType.mtvList map { MonitorType.map(_).desp }
+        val columnNames = mtColumnNames.+:("選擇器")
         Ok(Json.toJson(DataTab(columnNames, rows)))
       }
   }
@@ -783,27 +842,6 @@ object Query extends Controller {
       Ok(output)
   }
 
-  def alarm() = Security.Authenticated {
-    Ok(views.html.alarm())
-  }
-
-  def alarmReport(monitorEncodedStr: String, monitorTypeEncodedStr: String, startStr: String, endStr: String) = Security.Authenticated {
-    val monitorStr = java.net.URLDecoder.decode(monitorEncodedStr, "UTF-8")
-    val monitors = monitorStr.split(":") map { Monitor.withName }
-    val monitorTypeStr = java.net.URLDecoder.decode(monitorTypeEncodedStr, "UTF-8")
-    val monitorTypes = monitorTypeStr.split(":") map { MonitorType.withName }
-    val (start, end) =
-      (new DateTime(startStr.toLong),
-        new DateTime(endStr.toLong))
-    val report = Alarm.getAlarms(monitors.toList, monitorTypes.toList, start, end)
-    Logger.info("get alarm...")
-    Ok(views.html.alarmReport(start, end, report))
-  }
-
-  def manualAudit() = Security.Authenticated {
-    Ok(views.html.manualAudit(""))
-  }
-
   def recordList(mStr: String, mtStr: String, startLong: Long, endLong: Long) = Security.Authenticated {
     val monitor = Monitor.withName(java.net.URLDecoder.decode(mStr, "UTF-8"))
     val monitorType = MonitorType.withName(java.net.URLDecoder.decode(mtStr, "UTF-8"))
@@ -812,55 +850,6 @@ object Query extends Controller {
 
     val recordMap = Record.getRecordMap(Record.HourCollection)(List(monitorType), monitor, start, end)
     Ok(Json.toJson(recordMap(monitorType)))
-  }
-
-  case class ManualAuditParam(reason: String, updateList: Seq[UpdateRecordParam])
-  case class UpdateRecordParam(time: Long, status: String)
-  def updateRecord(monitorStr: String, monitorTypeStr: String) = Security.Authenticated(BodyParsers.parse.json) {
-    implicit request =>
-      val user = request.user
-      implicit val read = Json.reads[UpdateRecordParam]
-      implicit val maParamRead = Json.reads[ManualAuditParam]
-      val result = request.body.validate[ManualAuditParam]
-
-      val monitor = Monitor.withName(java.net.URLDecoder.decode(monitorStr, "UTF-8"))
-      val monitorType = MonitorType.withName(java.net.URLDecoder.decode(monitorTypeStr, "UTF-8"))
-
-      result.fold(
-        err => {
-          Logger.error(JsError.toJson(err).toString())
-          BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(err).toString()))
-        },
-        maParam => {
-          for (param <- maParam.updateList) {
-            Record.updateRecordStatus(monitor, param.time, monitorType, param.status)(Record.HourCollection)
-            val log = ManualAuditLog(new DateTime(param.time), mt = monitorType, modifiedTime = DateTime.now(),
-              operator = user.name, changedStatus = param.status, reason = maParam.reason)
-            Logger.debug(log.toString)
-            ManualAuditLog.upsertLog(log)
-          }
-        })
-      Ok(Json.obj("ok" -> true))
-  }
-
-  def manualAuditHistory = Security.Authenticated {
-    Ok(views.html.manualAuditHistory(""))
-  }
-
-  import scala.concurrent.ExecutionContext.Implicits.global
-  def manualAuditHistoryReport(start: Long, end: Long) = Security.Authenticated.async {
-    val startTime = new DateTime(start)
-    val endTime = new DateTime(end)
-
-    val logFuture = ManualAuditLog.queryLog(startTime, endTime)
-    val resultF =
-      for {
-        logList <- logFuture
-      } yield {
-        Ok(Json.toJson(logList))
-      }
-
-    resultF
   }
 
   def windRose() = Security.Authenticated {
@@ -968,9 +957,18 @@ object Query extends Controller {
               for {
                 alarm <- alarmList
               } yield {
+                val monitorDesp = if (alarm.monitor.isDefined)
+                  Monitor.map(alarm.monitor.get).dp_no
+                else
+                  "-"
+                val mtDesp = if (alarm.monitorType.isDefined)
+                  MonitorType.map(alarm.monitorType.get).desp
+                else
+                  "-"
+
                 val cellData = Seq(
-                  CellData(Monitor.map(alarm.monitor).dp_no, ""),
-                  CellData(MonitorType.map(alarm.monitorType).desp, ""),
+                  CellData(monitorDesp, ""),
+                  CellData(mtDesp, ""),
                   CellData(alarm.desc, ""))
                 RowData(alarm.time.getMillis, cellData, null)
               }

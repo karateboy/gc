@@ -268,62 +268,6 @@ object Application extends Controller {
           }
         })
   }
-  def dataManagement = Security.Authenticated {
-    Ok(views.html.dataManagement())
-  }
-
-  def auditConfig = Security.Authenticated {
-    Ok(views.html.auditConfig())
-  }
-
-  def getAllMonitorAuditConfig = Security.Authenticated.async {
-    implicit request =>
-      implicit val configWrite = Json.writes[AuditConfig]
-      val mapF = AuditConfig.getConfigMapFuture
-      val userOptF = User.getUserByIdFuture(request.user.id)
-      for {
-        map <- mapF
-        userOpt <- userOptF if userOpt.isDefined
-        groupInfo = Group.getGroupInfo(userOpt.get.groupId)
-        mList = groupInfo.privilege.allowedMonitors.map { Monitor.map }
-      } yield {
-        var fullMap = map
-        for (m <- mList) {
-          if (!fullMap.contains(m._id))
-            fullMap += m._id -> AuditConfig.defaultConfig(m._id)
-        }
-        Ok(Json.toJson(fullMap))
-      }
-  }
-
-  def getMonitorAuditConfig(rawMonitorStr: String) = Security.Authenticated {
-    implicit request =>
-      ???
-    /*
-      val monitorStr = java.net.URLDecoder.decode(rawMonitorStr, "UTF-8")
-      val m = Monitor.withName(monitorStr)
-
-      val autoAudit = Monitor.map(m).autoAudit.getOrElse(AutoAudit.default)
-			*/
-    //Ok(Json.toJson(autoAudit))
-  }
-
-  def setMonitorAuditConfig(rawMonitorStr: String) = Security.Authenticated(BodyParsers.parse.json) {
-    implicit request =>
-      val monitorStr = java.net.URLDecoder.decode(rawMonitorStr, "UTF-8")
-      val monitor = Monitor.withName(monitorStr)
-      val autoAuditResult = request.body.validate[AutoAudit]
-
-      autoAuditResult.fold(
-        error => {
-          Logger.error(JsError.toJson(error).toString())
-          BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
-        },
-        autoAudit => {
-          Monitor.updateMonitorAutoAudit(monitor, autoAudit)
-          Ok(Json.obj("ok" -> true))
-        })
-  }
 
   def menuRightList = Security.Authenticated.async {
     implicit request =>
@@ -339,13 +283,4 @@ object Application extends Controller {
       }
   }
 
-  def testAlarm = Security.Authenticated {
-    Alarm.log(Monitor.withName("台塑六輕工業園區#彰化縣大城站"), MonitorType.withName("PM10"), "測試警報")
-    Ok("")
-  }
-
-  def defaultAuditConfig = Security.Authenticated {
-    AuditConfig.defaultConfig("default")
-    Ok(Json.toJson(AuditConfig.defaultConfig("default")))
-  }
 }

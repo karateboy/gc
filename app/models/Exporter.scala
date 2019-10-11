@@ -24,14 +24,14 @@ object Exporter {
     val path = Paths.get(current.path.getAbsolutePath + "/export/realtime.txt")
     var buffer = ""
     buffer += s"Selector,${Selector.get}\r"
-    val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection)
+    val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection)(1)
 
     for (records <- latestRecord) yield {
       val data =
         if (records.isEmpty) {
           import org.mongodb.scala.bson._
           val mtRecordList = MonitorType.mtvList map { mt => Record.MtRecord(MonitorType.map(mt).desp, 0, MonitorStatus.NormalStat, "") }
-          Record.RecordList(DateTime.now().getMillis, mtRecordList, new ObjectId())
+          Record.RecordList("-", DateTime.now().getMillis, mtRecordList, new ObjectId())
         } else {
           records.head
         }

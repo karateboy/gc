@@ -20,11 +20,7 @@ object MongoDB {
       Calibration.init(colNames)
       User.init(colNames)
       MonitorStatus.init(colNames)
-      Alarm.init(colNames)
-      ManualAuditLog.init(colNames)
-
-      
-      AuditConfig.init(colNames)
+      Alarm.init(colNames)      
     }
     //Program need to wait before init complete
     import scala.concurrent.Await

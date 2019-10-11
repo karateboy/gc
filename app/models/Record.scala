@@ -271,24 +271,22 @@ object Record {
   }
 
   case class MtRecord(mtName: String, value: Double, status: String, text: String)
-  case class RecordList(time: Long, mtDataList: Seq[MtRecord], pdfReport: ObjectId)
+  case class RecordList(monitor: String, time: Long, mtDataList: Seq[MtRecord], pdfReport: ObjectId)
 
   implicit val mtRecordWrite = Json.writes[MtRecord]
   implicit val recordListWrite = Json.writes[RecordList]
 
-  def getRecordListFuture(colName: String)(monitor: Monitor.Value, startTime: DateTime, endTime: DateTime) = {
-    import org.mongodb.scala.bson._
+  import org.mongodb.scala.bson.conversions.Bson
+  def getRecordListFuture2(colName: String)(filter: Bson)(mtList: List[MonitorType.Value]) = {
     import org.mongodb.scala.model.Filters._
     import org.mongodb.scala.model.Projections._
     import org.mongodb.scala.model.Sorts._
-    import scala.concurrent._
-    import scala.concurrent.duration._
-
-    val mtList = MonitorType.activeMtvList
-    val col = MongoDB.database.getCollection(colName)
-    val projFields = "time" :: "pdfReport" :: mtList.map { MonitorType.BFName(_) }
+    val mtFields = mtList map MonitorType.BFName
+    val projFields = "monitor" :: "time" :: "pdfReport" :: mtFields
     val proj = include(projFields: _*)
-    val f = col.find(and(equal("monitor", monitor.toString), gte("time", startTime.toDate()), lt("time", endTime.toDate()))).projection(proj).sort(ascending("time")).toFuture()
+
+    val col = MongoDB.database.getCollection(colName)
+    val f = col.find(filter).projection(proj).sort(ascending("time")).toFuture()
 
     for {
       docs <- f
@@ -296,6 +294,7 @@ object Record {
       for {
         doc <- docs
         time = doc("time").asDateTime()
+        monitor = Monitor.withName(doc("monitor").asString().getValue)
       } yield {
         val mtDataList =
           for {
@@ -310,11 +309,29 @@ object Record {
             MtRecord(mtDesp, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
           }
         val pdfReport = doc.get("pdfReport").get.asObjectId().getValue
-        RecordList(time.getMillis, mtDataList, pdfReport)
+        RecordList(Monitor.map(monitor).dp_no, time.getMillis, mtDataList, pdfReport)
       }
     }
   }
 
+  def getRecordListFuture(monitor: Monitor.Value, startTime: DateTime, endTime: DateTime)(colName: String) = {
+    import org.mongodb.scala.bson._
+    import org.mongodb.scala.model.Filters._
+
+    val mtList = MonitorType.activeMtvList
+    val filter = and(equal("monitor", monitor.toString), gte("time", startTime.toDate()), lt("time", endTime.toDate()))
+    getRecordListFuture2(colName)(filter)(mtList)
+  }
+
+  def getRecordListFuture(startTime: DateTime, endTime: DateTime)(colName: String) = {
+    import org.mongodb.scala.bson._
+    import org.mongodb.scala.model.Filters._
+
+    val mtList = MonitorType.activeMtvList
+    val filter = and(gte("time", startTime.toDate()), lt("time", endTime.toDate()))
+    getRecordListFuture2(colName)(filter)(mtList)
+  }
+    
   def getLatestRecordMapFuture(colName: String) = {
     import org.mongodb.scala.bson._
     import org.mongodb.scala.model.Filters._
@@ -399,23 +416,23 @@ object Record {
     }
   }
 
-  def getLatestRecordListFuture(colName: String) = {
+  def getLatestRecordListFuture(colName: String)(limit: Int) = {
     import org.mongodb.scala.bson._
     import org.mongodb.scala.model._
     import org.mongodb.scala.model.Sorts._
 
     val mtList = MonitorType.activeMtvList
     val col = MongoDB.database.getCollection(colName)
-    val projFields = "monitor" :: "time" :: MonitorType.mtvList.map { MonitorType.BFName(_) }
-    val targetTime = (DateTime.now() - 2.hour).withMinuteOfHour(0).withSecond(0).withMillisOfSecond(0)
+    val projFields = "monitor" :: "time" :: "pdfReport" :: MonitorType.mtvList.map { MonitorType.BFName(_) }
     val proj = Projections.include(projFields: _*)
-    val f = col.find(Filters.exists("_id")).projection(proj).sort(descending("time")).limit(1).toFuture()
+    val f = col.find(Filters.exists("_id")).projection(proj).sort(descending("time")).limit(limit).toFuture()
     for {
       docs <- f
     } yield {
       for {
         doc <- docs
         time = doc("time").asDateTime()
+        monitor = Monitor.withName(doc("monitor").asString().getValue)
       } yield {
         val mtDataList =
           for {
@@ -433,7 +450,7 @@ object Record {
           new ObjectId()
         else
           doc.get("pdfReport").get.asObjectId().getValue
-        RecordList(time.getMillis, mtDataList, pdfReport)
+        RecordList(Monitor.map(monitor).dp_no, time.getMillis, mtDataList, pdfReport)
       }
     }
   }

@@ -27,59 +27,28 @@ object Realtime extends Controller {
       Future {
         Ok("")
       }
-    //      val result =
-    //        for (dataMap <- DataCollectManager.getLatestData()) yield {
-    //          val list =
-    //            for {
-    //              mt <- MonitorType.realtimeMtvList
-    //              recordOpt = dataMap.get(mt)
-    //            } yield {
-    //              val mCase = map(mt)
-    //
-    //              if (recordOpt.isDefined) {
-    //                val record = recordOpt.get
-    //                val duration = new Duration(record.time, DateTime.now())
-    //                val (overInternal, overLaw) = overStd(mt, record.value)
-    //                val status = if (duration.getStandardSeconds <= overTimeLimit)
-    //                  MonitorStatus.map(record.status).desp
-    //                else
-    //                  "通訊中斷"
-    //
-    //                MonitorTypeStatus(mCase.desp, format(mt, Some(record.value)), mCase.unit, "",
-    //                  MonitorStatus.map(record.status).desp,
-    //                  MonitorStatus.getCssClassStr(record.status, overInternal, overLaw), mCase.order)
-    //              } else {
-    //                MonitorTypeStatus(mCase.desp, format(mt, None), mCase.unit, "",
-    //                  "通訊中斷",
-    //                  "abnormal_status", mCase.order)
-    //              }
-    //            }
-    //          Ok(Json.toJson(list))
-    //        }
-    //
-    //      result
   }
 
   def realtimeStatus = Security.Authenticated {
     Ok(views.html.realtimeStatusA(""))
   }
 
-  def realtimeMonitorTypeValues() = Security.Authenticated.async {
+  def latestValues() = Security.Authenticated.async {
     implicit request =>
-      val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection)
+      val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection)(1)
 
       for (records <- latestRecord) yield {
         if (records.isEmpty) {
           import org.mongodb.scala.bson._
-          val emptyRecordList = Record.RecordList(DateTime.now().getMillis, Seq.empty[Record.MtRecord], new ObjectId())
+          val emptyRecordList = Record.RecordList("-", DateTime.now().getMillis, Seq.empty[Record.MtRecord], new ObjectId())
           Ok(Json.toJson(emptyRecordList))
         } else {
           val recordList = records.head
           Ok(Json.toJson(recordList))
         }
       }
-
   }
+
   def realtimeStatusContent() = Security.Authenticated.async {
     implicit request =>
       import MonitorType._

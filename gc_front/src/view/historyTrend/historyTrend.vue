@@ -51,7 +51,7 @@
     </Row>
     <Row>
       <Card v-if="display">
-        <div id="reportDiv"></div>
+        <div id="reportDiv" slot=""></div>
       </Card>
     </Row>
   </div>
@@ -60,7 +60,6 @@
 </style>
 <script>
 import highcharts from "highcharts";
-import highchart_more from "highcharts/highcharts-more";
 import exporting from "highcharts/modules/exporting";
 import { getMonitors, getMonitorTypes, getHistoryTrend } from "@/api/data";
 
@@ -260,7 +259,6 @@ export default {
             };
           }
 
-          highchart_more(highcharts);
           exporting(highcharts);
           highcharts.chart("reportDiv", ret);
         })

@@ -14,8 +14,6 @@ case class Monitor(_id: String, indParkName: String, dp_no: String)
 object Monitor extends Enumeration {
   implicit val monitorRead: Reads[Monitor.Value] = EnumUtils.enumReads(Monitor)
   implicit val monitorWrite: Writes[Monitor.Value] = EnumUtils.enumWrites
-  implicit val autoAuditRead = Json.reads[AutoAudit]
-  implicit val autoAuditWrite = Json.writes[AutoAudit]
 
   implicit val mWrite = Json.writes[Monitor]
   implicit val mRead = Json.reads[Monitor]
@@ -152,27 +150,5 @@ object Monitor extends Enumeration {
     val f = collection.replaceOne(Filters.equal("_id", m._id), m, ReplaceOptions().upsert(true)).toFuture()
     f.onFailure(errorHandler)
     f
-  }
-
-  def updateMonitorAutoAudit(m: Monitor.Value, autoAudit: AutoAudit) = {
-    import org.mongodb.scala._
-    import org.mongodb.scala.model.Filters._
-    import org.mongodb.scala.model.Updates._
-    import org.mongodb.scala.model.FindOneAndUpdateOptions
-
-    import scala.concurrent.ExecutionContext.Implicits.global
-
-    ???
-    /*
-    val idFilter = equal("_id", map(m)._id)
-    val opt = FindOneAndUpdateOptions().returnDocument(com.mongodb.client.model.ReturnDocument.AFTER)
-    val f = collection.findOneAndUpdate(idFilter, set("autoAudit", autoAudit.toDocument), opt).toFuture()
-
-    val ret = waitReadyResult(f)
-
-    val mCase = toMonitor(ret)
-    map = map + (m -> mCase)
-    *
-    */
   }
 }

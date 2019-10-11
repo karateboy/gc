@@ -22,15 +22,15 @@ import com.itextpdf.tool.xml.XMLWorkerHelper;
  * @author user
  */
 object PdfUtility {
-  def creatPdfWithReportHeader(title:String, content:play.twirl.api.HtmlFormat.Appendable)={
-    val html = views.html.reportTemplate(title, content)
-    createPdf(html.toString)
-  }
-  
-  def creatPdfWithReportHeaderP(title:String, content:play.twirl.api.HtmlFormat.Appendable)={
-    val html = views.html.reportTemplate(title, content)
-    createPdf(html.toString, false)
-  }
+//  def creatPdfWithReportHeader(title:String, content:play.twirl.api.HtmlFormat.Appendable)={
+//    val html = views.html.reportTemplate(title, content)
+//    createPdf(html.toString)
+//  }
+//  
+//  def creatPdfWithReportHeaderP(title:String, content:play.twirl.api.HtmlFormat.Appendable)={
+//    val html = views.html.reportTemplate(title, content)
+//    createPdf(html.toString, false)
+//  }
   
   def createPdf(htmlInput: String, landscape:Boolean=true) = {
 

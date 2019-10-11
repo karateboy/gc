@@ -16,6 +16,7 @@
                 :key="item._id"
               >{{ item.desp }}</Option>
             </Select>
+            <Button type="primary" @click="selectAllMonitorTypes()">全選</Button>
           </FormItem>
           <FormItem label="資料區間" prop="dateRange">
             <DatePicker
@@ -27,8 +28,9 @@
             ></DatePicker>
           </FormItem>
           <FormItem>
-            <Button type="primary" @click="handleSubmit">查詢</Button>
+            <Button type="primary" icon="ios-search" @click="handleSubmit">查詢</Button>
             <Button style="margin-left: 8px">取消</Button>
+            <Button type="primary" style="margin-left: 8px" icon="ios-document" @click="downloadExcel">下載Excel</Button>
           </FormItem>
         </Form>
       </Card>
@@ -57,6 +59,7 @@
 <script>
 import moment from "moment";
 import config from "@/config";
+import URI from "urijs"
 const baseUrl =
   process.env.NODE_ENV === "development"
     ? config.baseUrl.dev
@@ -105,15 +108,6 @@ export default {
         end: undefined
       },
       rules: {
-        monitor: [
-          {
-            required: true,
-            type: "string",
-            min: 1,
-            message: "請選擇通道",
-            trigger: "change"
-          }
-        ],
         monitorTypes: [
           {
             required: true,
@@ -148,6 +142,12 @@ export default {
           this.query();
         }
       });
+    },
+    selectAllMonitorTypes() {
+      this.formItem.monitorTypes.splice(0, this.formItem.monitorTypes.length);
+      for (let mt of this.monitorTypeList) {
+        this.formItem.monitorTypes.push(mt._id);
+      }
     },
     query() {
       this.display = true;
@@ -206,6 +206,12 @@ export default {
     showPdfReport(idx) {
       let url = this.rows[idx].pdfUrl;
       window.open(url);
+    },
+    downloadExcel() {
+      let uri = new URI(`${baseUrl}/history_data/excel`);
+      console.log(uri.toString());
+      //let url = baseUrl + `/Excel/HistoryTrend/${this.query_url}`;
+      //window.open(url);
     }
   }
 };

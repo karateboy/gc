@@ -1,32 +1,39 @@
 <template>
   <div>
-    <Row :gutter="20">
-      <i-col :xs="12" :md="8" :lg="4" key="selector" style="height: 120px;padding-bottom: 10px;">
-        <infor-card shadow :color="selector.color" :icon="selector.icon" :icon-size="36">
-          <Card :bordered="false" :dis-hover="true" :title="selector.title" :key="selector._id">
-            <p>通道:{{selector._id}}</p>
-            <p>{{ selector.dp_no}}</p>
-          </Card>
-        </infor-card>
+    <Row :gutter="20" type="flex">
+      <i-col :xs="12" :md="8" :lg="4">
+        <Card :key="selector._id" shadown>
+          <strong>{{selector.title}}</strong>
+          <Divider type="vertical" />
+          <span>{{ selector.dp_no}}</span>
+        </Card>
       </i-col>
-      <i-col
-        :xs="12"
-        :md="8"
-        :lg="4"
-        v-for="(infor, i) in inforCardData"
-        :key="`infor-${i}`"
-        style="height: 120px;padding-bottom: 10px;"
-      >
-        <infor-card shadow :color="infor.color" :icon="infor.icon" :icon-size="36">
-          <Card :bordered="false" :dis-hover="true" :title="infor.title">
-            <p>{{ infor.text}}</p>
-          </Card>
-        </infor-card>
+      <i-col :xs="12" :md="8" :lg="4" v-for="(infor, i) in inforCardData" :key="`infor-${i}`">
+        <Card shadow>
+          <strong>{{infor.title}}</strong>
+          <Divider type="vertical" />
+          {{ infor.text}}
+        </Card>
       </i-col>
+    </Row>
+    <Divider dashed />
+    <Row>
+      <Table :columns="columns" :data="rows">
+        <template slot-scope="{ row }" slot="name">
+          <strong>{{ row.name }}</strong>
+        </template>
+        <template slot-scope="{ row, index }" slot="action">
+          <Button
+            type="primary"
+            size="small"
+            style="margin-right: 5px"
+            @click="showPdfReport(index)"
+          >報表</Button>
+        </template>
+      </Table>
     </Row>
   </div>
 </template>
-
 <script>
 import InforCard from "_c/info-card";
 import { ChartPie, ChartBar } from "_c/charts";
@@ -37,13 +44,11 @@ const baseUrl =
     ? config.baseUrl.dev
     : config.baseUrl.pro;
 
-import { getRealtimeData, getCurrentMonitor } from "@/api/data";
+import { getRealtimeData, getCurrentMonitor, getLast10Data } from "@/api/data";
 export default {
   name: "home",
   components: {
-    InforCard,
-    ChartPie,
-    ChartBar
+    InforCard
   },
   data() {
     return {
@@ -55,7 +60,9 @@ export default {
         title: "選樣器"
       },
       inforCardData: [],
-      timer: undefined
+      timer: undefined,
+      columns: [],
+      rows: []
     };
   },
   mounted() {
@@ -63,7 +70,6 @@ export default {
   },
   methods: {
     reloadData() {
-      console.log("reload Data...");
       getCurrentMonitor()
         .then(resp => {
           this.selector = Object.assign(
@@ -83,9 +89,9 @@ export default {
         .then(resp => {
           this.inforCardData.splice(0, this.inforCardData.length);
           let card = {
-            title: "最新資料時間",
+            title: "最近資料時間",
             icon: "ios-time",
-            text: moment(resp.data.time).format("LLL"),
+            text: moment(resp.data.time).format("M-D HH:mm"),
             color: "#ff9900"
           };
           this.inforCardData.push(card);
@@ -103,7 +109,58 @@ export default {
         .catch(err => {
           alert(err);
         });
+
+      getLast10Data()
+        .then(resp => {
+          const ret = resp.data;
+          this.columns.splice(0, this.columns.length);
+          this.rows.splice(0, this.rows.length);
+          this.columns.push({
+            title: "日期",
+            key: "date",
+            sortable: true
+          });
+          for (let i = 0; i < ret.columnNames.length; i++) {
+            let col = {
+              title: ret.columnNames[i],
+              key: `col${i}`,
+              sortable: true
+            };
+            this.columns.push(col);
+          }
+          //setup for report column
+          this.columns.push({
+            title: "動作",
+            slot: "action",
+            width: 150,
+            align: "center"
+          });
+          for (let row of ret.rows) {
+            let rowData = {
+              date: new moment(row.date).format("lll"),
+              cellClassName: {}
+            };
+            for (let c = 0; c < row.cellData.length; c++) {
+              let key = `col${c}`;
+              rowData[key] = row.cellData[c].v;
+              rowData.cellClassName[key] = row.cellData[c].cellClassName;
+              if (baseUrl.length !== 0) {
+                rowData.pdfUrl = `${baseUrl}pdfReport/${row.pdfReport}`;
+              } else {
+                rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
+              }
+            }
+            this.rows.push(rowData);
+          }
+        })
+        .catch(err => {
+          alert(err);
+        });
       this.timer = setTimeout(this.reloadData, 30000);
+    },
+    showPdfReport(idx) {
+      let url = this.rows[idx].pdfUrl;
+      window.open(url);
     }
   },
   destroyed() {
