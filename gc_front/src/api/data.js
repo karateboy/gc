@@ -31,6 +31,15 @@ export const getHistoryData = ({ monitor, monitorTypes, start, end }) => {
   })
 }
 
+export const getAlarm = ({ start, end }) => {
+  return axios.request({
+    url: 'alarm',
+    method: 'get',
+    params: {
+      start, end
+    }
+  })
+}
 export const getLast10Data = () => {
   return axios.request({
     url: 'last10_data',

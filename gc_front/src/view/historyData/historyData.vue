@@ -30,7 +30,12 @@
           <FormItem>
             <Button type="primary" icon="ios-search" @click="handleSubmit">查詢</Button>
             <Button style="margin-left: 8px">取消</Button>
-            <Button type="primary" style="margin-left: 8px" icon="ios-document" @click="downloadExcel">下載Excel</Button>
+            <Button
+              type="primary"
+              style="margin-left: 8px"
+              icon="ios-document"
+              @click="downloadExcel"
+            >下載Excel</Button>
           </FormItem>
         </Form>
       </Card>
@@ -59,7 +64,7 @@
 <script>
 import moment from "moment";
 import config from "@/config";
-import URI from "urijs"
+import URI from "urijs";
 const baseUrl =
   process.env.NODE_ENV === "development"
     ? config.baseUrl.dev
@@ -208,10 +213,21 @@ export default {
       window.open(url);
     },
     downloadExcel() {
-      let uri = new URI(`${baseUrl}/history_data/excel`);
-      console.log(uri.toString());
-      //let url = baseUrl + `/Excel/HistoryTrend/${this.query_url}`;
-      //window.open(url);
+      this.$refs.historyData.validate(valid => {
+        if (valid) {
+          let uri = new URI(`${baseUrl}history_data/excel`);
+          uri
+            .addSearch("monitor", this.formItem.monitor)
+            .addSearch(
+              "monitorTypes",
+              encodeURIComponent(this.formItem.monitorTypes.join(","))
+            )
+            .addSearch("start", this.formItem.dateRange[0].getTime())
+            .addSearch("end", this.formItem.dateRange[1].getTime());
+
+          window.open(uri);
+        }
+      });
     }
   }
 };

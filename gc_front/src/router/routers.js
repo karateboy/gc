@@ -84,6 +84,15 @@ export default [
           title: '歷史趨勢'
         },
         component: () => import('@/view/historyTrend/historyTrend')
+      },
+      {
+        path: 'alarm',
+        name: 'alarm',
+        meta: {
+          icon: 'ios-warning',
+          title: '警報查詢'
+        },
+        component: () => import('@/view/historyData/alarm')
       }
     ]
   },

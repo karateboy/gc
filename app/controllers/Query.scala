@@ -772,7 +772,7 @@ object Query extends Controller {
       }
 
       for (recordList <- resultFuture) yield {
-        val excelFile = ExcelUtility.createHistoryData(recordList)
+        val excelFile = ExcelUtility.createHistoryData(recordList, monitorTypes)
         Ok.sendFile(excelFile, fileName = _ =>
           play.utils.UriEncoding.encodePathSegment("歷史資料.xlsx", "UTF-8"),
           onClose = () => { Files.deleteIfExists(excelFile.toPath()) })
@@ -863,118 +863,37 @@ object Query extends Controller {
   import Record._
   case class QueryParam(dataType: String, monitors: Seq[String], monitorTypes: Seq[String], start: Long, end: Long)
 
-  /*
-  def queryData() = Security.Authenticated.async(BodyParsers.parse.json) {
+  def alarmData(start: Long, end: Long) = Security.Authenticated.async {
     implicit request =>
-      implicit val read = Json.reads[QueryParam]
-      val ret = request.body.validate[QueryParam]
 
-      ret.fold(
-        err => Future {
-          Logger.error(JsError.toJson(err).toString())
-          BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(err).toString()))
-        },
-        param => {
-          import scala.collection.JavaConverters._
-          val monitors = param.monitors.map(Monitor.withName)
-          val monitorTypes = param.monitorTypes.map { MonitorType.withName }
-          val tabType = TableType.hour
+      val alarmListF = Alarm.getList(start, end)
 
-          val (start, end) = (new DateTime(param.start), new DateTime(param.end))
+      for (alarmList <- alarmListF) yield {
+        implicit val cellWrite = Json.writes[CellData]
+        implicit val rowWrite = Json.writes[RowData]
+        implicit val dtWrite = Json.writes[DataTab]
+        val columnNames = Seq("選擇器", "測項", "說明")
+        val rows =
+          for {
+            alarm <- alarmList
+          } yield {
+            val monitorDesp = if (alarm.monitor.isDefined)
+              Monitor.map(alarm.monitor.get).dp_no
+            else
+              "-"
+            val mtDesp = if (alarm.monitorType.isDefined)
+              MonitorType.map(alarm.monitorType.get).desp
+            else
+              "-"
 
-          val timeList = tabType match {
-            case TableType.hour =>
-              getPeriods(start, end, 1.hour)
-            case TableType.min =>
-              getPeriods(start, end, 1.minute)
+            val cellData = Seq(
+              CellData(monitorDesp, ""),
+              CellData(mtDesp, ""),
+              CellData(alarm.desc, ""))
+            RowData(alarm.time.getTime, cellData, new ObjectId())
           }
-
-          val timeRecordMapF = Record.getMonitorRecordMapF(TableType.mapCollection(tabType))(monitorTypes.toList, monitors, start, end)
-          for (timeRecordMap <- timeRecordMapF) yield {
-            implicit val cellWrite = Json.writes[CellData]
-            implicit val rowWrite = Json.writes[RowData]
-            implicit val dtWrite = Json.writes[DataTab]
-            val columnNames =
-              for {
-                m <- monitors
-                mt <- monitorTypes
-                monitorName = Monitor.map(m).dp_no
-                mtName = MonitorType.map(mt).desp
-              } yield {
-                s"${monitorName}:${mtName}"
-              }
-            val rows =
-              for {
-                time <- timeList
-                monitorRecordMap = timeRecordMap.getOrElse(time, Map.empty[Monitor.Value, MTMap])
-              } yield {
-                val cellData =
-                  for {
-                    m <- monitors
-                    mtMap = monitorRecordMap.getOrElse(m, Map.empty)
-                    mt <- monitorTypes
-                  } yield {
-                    if (!mtMap.contains(mt))
-                      CellData("-", "abnormal_status")
-                    else {
-                      val record = mtMap(mt)
-                      CellData(MonitorType.format(mt, Some(record.value)), MonitorType.getCssClassStr(mt, record))
-                    }
-                  }
-                RowData(time.getMillis, cellData)
-              }
-            Ok(Json.toJson(DataTab(columnNames, rows)))
-          }
-        })
-  }
-*/
-  def alarmData() = Security.Authenticated.async(BodyParsers.parse.json) {
-    implicit request =>
-      implicit val read = Json.reads[QueryParam]
-      val ret = request.body.validate[QueryParam]
-
-      ret.fold(
-        err => Future {
-          Logger.error(JsError.toJson(err).toString())
-          BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(err).toString()))
-        },
-        param => {
-          import scala.collection.JavaConverters._
-          val monitors = param.monitors.map(Monitor.withName)
-          val monitorTypes = param.monitorTypes.map { MonitorType.withName }
-          val tabType = TableType.hour
-
-          val (start, end) = (new DateTime(param.start), new DateTime(param.end))
-
-          val alarmListF = Alarm.getAlarmsFuture(monitors.toList, monitorTypes.toList, start, end)
-
-          for (alarmList <- alarmListF) yield {
-            implicit val cellWrite = Json.writes[CellData]
-            implicit val rowWrite = Json.writes[RowData]
-            implicit val dtWrite = Json.writes[DataTab]
-            val columnNames = Seq("測站", "測項", "說明")
-            val rows =
-              for {
-                alarm <- alarmList
-              } yield {
-                val monitorDesp = if (alarm.monitor.isDefined)
-                  Monitor.map(alarm.monitor.get).dp_no
-                else
-                  "-"
-                val mtDesp = if (alarm.monitorType.isDefined)
-                  MonitorType.map(alarm.monitorType.get).desp
-                else
-                  "-"
-
-                val cellData = Seq(
-                  CellData(monitorDesp, ""),
-                  CellData(mtDesp, ""),
-                  CellData(alarm.desc, ""))
-                RowData(alarm.time.getMillis, cellData, null)
-              }
-            Ok(Json.toJson(DataTab(columnNames, rows)))
-          }
-        })
+        Ok(Json.toJson(DataTab(columnNames, rows)))
+      }
   }
 
   def pdfReport(id: String) = Security.Authenticated.async {

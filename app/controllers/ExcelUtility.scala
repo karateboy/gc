@@ -272,13 +272,41 @@ object ExcelUtility {
     wb.setActiveSheet(0)
     finishExcel(reportFilePath, pkg, wb)
   }
-  
-  def createHistoryData(data: Seq[Record.RecordList]) = {
-    implicit val (reportFilePath, pkg, wb) = prepareTemplate("empty.xlsx")
+
+  def createHistoryData(recordList: Seq[Record.RecordList], monitorTypes: Seq[MonitorType.Value]) = {
+    implicit val (reportFilePath, pkg, wb) = prepareTemplate("historyData.xlsx")
     val format = wb.createDataFormat();
     val sheet = wb.getSheetAt(0)
 
+    //Create header
+
+    var row = 0
+    val header = sheet.createRow(0)
+    header.createCell(0).setCellValue("日期")
+    header.createCell(1).setCellValue("選擇器")
+    for ((mt, col) <- monitorTypes.zip(2 to 1 + monitorTypes.length)) {
+      header.createCell(col).setCellValue(MonitorType.map(mt).desp)
+    }
+    val dateStyle = wb.createCellStyle()
+    dateStyle.setDataFormat(format.getFormat("yyyy-mm-dd hh:mm"))
     
+    for ((r, rowNum) <- recordList.zip(1 to recordList.size)) {
+      val row = sheet.createRow(rowNum)
+      val dateCell = row.createCell(0)
+      dateCell.setCellStyle(dateStyle)
+      dateCell.setCellValue(new DateTime(r.time).toDate())
+      row.createCell(1).setCellValue(r.monitor)
+      for ((mt, colNum) <- monitorTypes.zip(2 to 1 + monitorTypes.length)) {
+        val mtDataOpt = r.mtDataList.find(mtdt => mtdt.mtName == mt.toString())
+        val cell = row.createCell(colNum)
+        if (mtDataOpt.isDefined) {
+          cell.setCellValue(mtDataOpt.get.value)
+        } else {
+          cell.setCellValue("-")
+        }
+      }
+    }
+
     wb.setActiveSheet(0)
     finishExcel(reportFilePath, pkg, wb)
   }

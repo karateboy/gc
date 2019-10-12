@@ -15,8 +15,12 @@ libraryDependencies ++= Seq(
 )
 
 libraryDependencies += "com.github.tototoshi" %% "scala-csv" % "1.3.6"
+
 libraryDependencies += "org.apache.poi" % "poi" % "4.1.0"
 libraryDependencies += "org.apache.poi" % "poi-ooxml" % "4.1.0"
+libraryDependencies += "org.apache.poi" % "poi-ooxml-schemas" % "4.1.0"
+libraryDependencies += "org.apache.poi" % "poi-scratchpad" % "4.1.0"
+
 libraryDependencies += "org.scream3r" % "jssc" % "2.8.0"
 libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "2.22.0"
 libraryDependencies += "org.mongodb.scala" %% "mongo-scala-driver" % "2.7.0"

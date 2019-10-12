@@ -6,6 +6,7 @@ import play.api.Play.current
 abstract class SelectorModel() {
   def getStreamNum(): Int
   def setStreamNum(v: Int)
+  val canSetStream: Boolean
 }
 
 object VirtualSelector extends SelectorModel {
@@ -17,6 +18,7 @@ object VirtualSelector extends SelectorModel {
 
   def getStreamNum(): Int = currentStream
   def setStreamNum(v: Int) { currentStream = v }
+  val canSetStream = true
 }
 
 object Selector {
@@ -26,6 +28,10 @@ object Selector {
     case "VICI_UEA" =>
       Logger.info("VICI Universial Electric Actuator is selected")
       new ViciUeaSelector()
+      
+    case "MOXA" =>
+      Logger.info("MOXA E1212 is selected")
+      new MoxaSelector()
     case unknown =>
       Logger.error(s"Unknown model $unknown")
       ???

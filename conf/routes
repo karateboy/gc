@@ -29,7 +29,10 @@ GET      /history_trend                                                        c
 GET      /realtime_data                                                        controllers.Realtime.latestValues	
 GET      /current_monitor                                                      controllers.Realtime.getCurrentMonitor
 POST     /current_monitor                                                      controllers.Realtime.setCurrentMonitor(id:Int)	
-GET      /last10_data                                                          controllers.Query.last10Data()				
+GET      /last10_data                                                          controllers.Query.last10Data()	
+GET      /alarm                                                                controllers.Query.alarmData(start: Long, end: Long)
+GET      /testAlarm                                                            controllers.Application.testAlarm	
+GET      /GcWebSocket                                                        controllers.Application.gcWebSocket	
 # old api
 POST     /User                                                                 controllers.Application.newUser
 GET      /User                                                                 controllers.Application.getAllUsers

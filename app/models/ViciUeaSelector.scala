@@ -20,7 +20,8 @@ class ViciUeaSelector extends SelectorModel {
   def setStreamNum(v: Int) {
     worker ! SetStreamNum(v)
   }
-
+  val canSetStream = true
+  
   def modifyStreamNum(v: Int) {
     streamNum = v
   }

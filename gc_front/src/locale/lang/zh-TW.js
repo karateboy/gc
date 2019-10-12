@@ -8,6 +8,7 @@ export default {
   mtype_config: '測項設定',
   selector_switch: '切換選樣器',
   channel_config: '選樣器通道設定',
+  alarm: '警報查詢',
   // App String end
   home: '首頁',
   login: '登錄',

@@ -18,9 +18,12 @@ import 'v-org-tree/dist/v-org-tree.css'
 import axios from 'axios'
 import highcharts from 'highcharts'
 import moment from 'moment'
-
+import VueNativeSock from 'vue-native-websocket'
+import URI from 'urijs'
 axios.defaults.baseURL = process.env.NODE_ENV === 'development' ? config.baseUrl.dev : config.baseUrl.pro;
 axios.defaults.withCredentials = true
+
+let uri = new URI(axios.defaults.baseURL);
 
 moment.locale('zh-Tw')
 highcharts.setOptions({
@@ -83,6 +86,15 @@ Vue.use(iView, {
 })
 Vue.use(TreeTable)
 Vue.use(VOrgTree)
+let host = process.env.NODE_ENV === 'development' ? 'localhost:9000' : `${location.host}`;
+Vue.use(VueNativeSock, `ws://${host}/GcWebSocket`,
+  {
+    store,
+    format: 'json',
+    reconnection: true, // (Boolean) whether to reconnect automatically (false)
+    reconnectionAttempts: 5, // (Number) number of reconnection attempts before giving up (Infinity),
+    reconnectionDelay: 3000 // (Number) how long to initially wait before attempting a new (1000)
+  })
 /**
  * @description 注册admin内置插件
  */

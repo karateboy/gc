@@ -2,6 +2,7 @@ package controllers
 
 import play.api._
 import play.api.mvc._
+import play.api.mvc.WebSocket
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -283,4 +284,17 @@ object Application extends Controller {
       }
   }
 
+  def testAlarm = Security.Authenticated.async {
+    implicit request =>
+      for {
+        ret <- Alarm.log(None, None, "Test alarm")
+      } yield {
+        Ok("Test alarm!")
+      }
+  }
+
+  //Websocket
+  def gcWebSocket = WebSocket.acceptWithActor[String, String] { request => out =>
+    GcWebSocketActor.props(out)
+  }
 }
