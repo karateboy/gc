@@ -10,6 +10,9 @@ case object Collect
 class MoxaSelector extends SelectorModel {
   val host = current.configuration.getString("selector.MOXA.host").get
   val max = current.configuration.getInt("selector.MOXA.max").get
+  for (id <- 1 to max) {
+    Monitor.getMonitorValueByName(id)
+  }
   val worker = Akka.system.actorOf(Props(new MoxaE1212Collector(host, max, this)), name = "moxaAgent")
   worker ! ConnectHost
 

@@ -9,24 +9,24 @@
       <Icon type="ios-keypad"></Icon>
         說明:汙染物濃度超過最大或最小值, 系統自動註記
       </p>
-      <Table 
+      <Table
         ref="selection" :columns="columnsList" :data="ruleConfig"
-        @on-cell-change="handleCellChange" 
+        @on-cell-change="handleCellChange"
         @on-change="handleChange"
         @on-selection-change="OnSelectionChanged"
-        :hover-show="true"  
-        :editIncell="true" 
+        :hover-show="true"
+        :editIncell="true"
       ></Table>
-    </Card>                            
+    </Card>
 </template>
 
 <script>
-import canEditTable from "./components/canEditTable.vue";
-import axios from "axios";
+import canEditTable from './components/canEditTable.vue';
+import axios from 'axios';
 
 export default {
-  name: "minMaxRule2",
-  components: {    
+  name: 'minMaxRule2',
+  components: {
   },
   props: {
     rule: Object
@@ -37,28 +37,28 @@ export default {
       ruleConfig: this.toRuleConfig(),
       columnsList: [
         {
-          type: "selection",
-          align: "center",
+          type: 'selection',
+          align: 'center',
           width: 100
         },
         {
-          title: "序號",
-          type: "index",
+          title: '序號',
+          type: 'index',
           width: 80,
-          align: "center"
+          align: 'center'
         },
         {
-          title: "測項",
-          key: "mt"
+          title: '測項',
+          key: 'mt'
         },
         {
-          title: "最大值",
-          key: "max",
+          title: '最大值',
+          key: 'max',
           editable: true
         },
         {
-          title: "最小值",
-          key: "min",
+          title: '最小值',
+          key: 'min',
           editable: true
         }
       ]
@@ -80,8 +80,8 @@ export default {
       return ruleConfig;
     },
     handleCellChange(val, index, key) {
-      //let id = this.monitorList[index]._id;
-      //this.$Message.success(`修改${id}的${key}`);
+      // let id = this.monitorList[index]._id;
+      // this.$Message.success(`修改${id}的${key}`);
       console.log(this.ruleConfig);
     },
     handleChange(val, index) {
@@ -109,7 +109,7 @@ export default {
       return selection;
     },
     onSelectAll() {
-      console.log("select all");
+      console.log('select all');
     }
   },
   created() {}

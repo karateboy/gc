@@ -33,25 +33,25 @@
 <style scoped>
 </style>
 <script>
-import moment from "moment";
-import config from "@/config";
-import URI from "urijs";
-import axios from "axios";
+import moment from 'moment';
+import config from '@/config';
+import URI from 'urijs';
+import axios from 'axios';
+
+import { getAlarm } from '@/api/data';
 const baseUrl =
-  process.env.NODE_ENV === "development"
+  process.env.NODE_ENV === 'development'
     ? config.baseUrl.dev
     : config.baseUrl.pro;
-
-import { getAlarm } from "@/api/data";
 export default {
-  name: "alarm",
+  name: 'alarm',
   mounted() {},
   data() {
     return {
       formItem: {
         dateRange: [
           moment()
-            .subtract(2, "days")
+            .subtract(2, 'days')
             .toDate(),
           moment().toDate()
         ],
@@ -62,16 +62,16 @@ export default {
         dateRange: [
           {
             required: true,
-            type: "array",
+            type: 'array',
             min: 2,
-            message: "請選擇資料範圍",
-            trigger: "change"
+            message: '請選擇資料範圍',
+            trigger: 'change'
           }
         ]
       },
       display: false,
       showPdf: false,
-      pdfUrl: "",
+      pdfUrl: '',
       columns: [],
       rows: []
     };
@@ -96,8 +96,8 @@ export default {
           this.columns.splice(0, this.columns.length);
           this.rows.splice(0, this.rows.length);
           this.columns.push({
-            title: "日期",
-            key: "date",
+            title: '日期',
+            key: 'date',
             sortable: true
           });
           for (let i = 0; i < ret.columnNames.length; i++) {
@@ -110,16 +110,14 @@ export default {
           }
           for (let row of ret.rows) {
             let rowData = {
-              date: new moment(row.date).format("lll"),
+              date: new moment(row.date).format('lll'),
               cellClassName: {}
             };
             for (let c = 0; c < row.cellData.length; c++) {
               let key = `col${c}`;
               rowData[key] = row.cellData[c].v;
               rowData.cellClassName[key] = row.cellData[c].cellClassName;
-              if (baseUrl.length != 0)
-                rowData.pdfUrl = `${baseUrl}pdfReport/${row.pdfReport}`;
-              else rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
+              if (baseUrl.length != 0) { rowData.pdfUrl = `${baseUrl}pdfReport/${row.pdfReport}`; } else rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
             }
             this.rows.push(rowData);
           }

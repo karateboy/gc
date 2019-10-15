@@ -1,36 +1,49 @@
+
 export default {
   state: {
-    hasAlarm: false
+    socket: {
+      isConnected: false,
+      message: '',
+      reconnectError: false
+    },
+    alarms: []
   },
   mutations: {
     clearAlarm(state) {
       state.hasAlarm = false;
+    },
+    SOCKET_ONOPEN(state, event) {
+      console.log('SOCKET_ONOPEN')
+      state.socket.isConnected = true
+    },
+    SOCKET_ONCLOSE(state, event) {
+      console.log('SOCKET_ONCLOSE')
+      state.socket.isConnected = false
+    },
+    SOCKET_ONERROR(state, event) {
+      console.error(state, event)
+    },
+    // default handler called for all methods
+    SOCKET_ONMESSAGE(state, message) {
+      state.socket.message = message
+    },
+    // mutations for reconnect methods
+    SOCKET_RECONNECT(state, count) {
+      console.info(state, count)
+    },
+    SOCKET_RECONNECT_ERROR(state) {
+      state.socket.reconnectError = true;
     }
   },
   getters: {
-    hasUnhandledAlarm: state => state.hasAlarm
+    alarmUnreadCount: state => state.messageUnreadList.length
   },
   actions: {
-    // 此方法用来获取未读消息条数，接口只返回数值，不返回消息列表
-    getUnreadMessageCount({ state, commit }) { },
-    // 获取消息列表，其中包含未读、已读、回收站三个列表
     getMessageList({ state, commit }) {
       return new Promise((resolve, reject) => {
-        getMessage().then(res => {
-          const { unread, readed, trash } = res.data
-          commit('setMessageUnreadList', unread.sort((a, b) => new Date(b.create_time) - new Date(a.create_time)))
-          commit('setMessageReadedList', readed.map(_ => {
-            _.loading = false
-            return _
-          }).sort((a, b) => new Date(b.create_time) - new Date(a.create_time)))
-          commit('setMessageTrashList', trash.map(_ => {
-            _.loading = false
-            return _
-          }).sort((a, b) => new Date(b.create_time) - new Date(a.create_time)))
-          resolve()
-        }).catch(error => {
-          reject(error)
-        })
+        resolve()
+      }).catch(error => {
+        reject(error)
       })
     }
   }

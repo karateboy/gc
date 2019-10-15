@@ -19,11 +19,9 @@ import axios from 'axios'
 import highcharts from 'highcharts'
 import moment from 'moment'
 import VueNativeSock from 'vue-native-websocket'
-import URI from 'urijs'
+
 axios.defaults.baseURL = process.env.NODE_ENV === 'development' ? config.baseUrl.dev : config.baseUrl.pro;
 axios.defaults.withCredentials = true
-
-let uri = new URI(axios.defaults.baseURL);
 
 moment.locale('zh-Tw')
 highcharts.setOptions({

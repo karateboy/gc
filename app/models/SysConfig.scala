@@ -12,16 +12,10 @@ object SysConfig extends Enumeration {
   val collection = MongoDB.database.getCollection(ColName)
 
   val valueKey = "value"
-  val EPAHR_LAST = Value
-  val SET_MT_ITEM_ID = Value
-  val EPA_LAST = Value
-  val DUST_LAST = Value
+  val ALARM_LAST_READ = Value
 
   val defaultConfig = Map(
-    EPAHR_LAST -> Document(valueKey -> DateTime.parse("2010-1-1").toDate()),
-    SET_MT_ITEM_ID -> Document(valueKey -> false),
-    EPA_LAST-> Document(valueKey -> DateTime.parse("2018-7-1").toDate()),
-    DUST_LAST -> Document(valueKey -> DateTime.parse("2018-7-1").toDate()))
+    ALARM_LAST_READ -> Document(valueKey -> DateTime.parse("2019-10-1").toDate()))
 
   def init(colNames: Seq[String]) {
     if (!colNames.contains(ColName)) {
@@ -67,4 +61,20 @@ object SysConfig extends Enumeration {
   }
 
   def set(_id: SysConfig.Value, v: BsonValue) = upsert(_id, Document(valueKey -> v))
+
+  def getAlarmLastRead() = {
+    import java.util.Date
+    import java.time.Instant
+    val f = get(ALARM_LAST_READ)
+    f.failed.foreach(errorHandler)
+    for (ret <- f) yield Date.from(Instant.ofEpochMilli(ret.asDateTime().getValue))
+  }
+
+  def setAlarmLastRead() = {
+    import java.util.Date
+    import java.time.Instant
+    val f = upsert(ALARM_LAST_READ, Document(valueKey -> Date.from(Instant.now())))
+    f.failed.foreach(errorHandler)
+    f
+  }
 }

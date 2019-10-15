@@ -24,11 +24,10 @@
 </template>
 
 <script>
-import canEditTable from "./components/canEditTable.vue";
-import tableData from "./components/table_data.js";
-import { getMonitorTypes, setMonitorType } from "@/api/data";
+import canEditTable from './components/canEditTable.vue';
+import { getMonitorTypes, setMonitorType } from '@/api/data';
 export default {
-  name: "monitorTypeConfig",
+  name: 'monitorTypeConfig',
   components: {
     canEditTable
   },
@@ -36,42 +35,42 @@ export default {
     return {
       columnsList: [
         {
-          title: "序號",
-          type: "index",
+          title: '序號',
+          type: 'index',
           width: 80,
-          align: "center"
+          align: 'center'
         },
         {
-          title: "名稱",
-          key: "desp",
+          title: '名稱',
+          key: 'desp',
           editable: true
         },
         {
-          title: "單位",
-          key: "unit",
+          title: '單位',
+          key: 'unit',
           editable: true
         },
         {
-          title: "警報值",
-          key: "std_internal",
+          title: '警報值',
+          key: 'std_internal',
           editable: true
         },
         {
-          title: "超高警報值",
-          key: "std_law",
+          title: '超高警報值',
+          key: 'std_law',
           editable: true
         },
         {
-          title: "小數點位數",
-          key: "prec",
+          title: '小數點位數',
+          key: 'prec',
           editable: true
         },
         {
-          title: "操作",
-          align: "center",
+          title: '操作',
+          align: 'center',
           width: 200,
-          key: "handle",
-          handle: ["edit"]
+          key: 'handle',
+          handle: ['edit']
         }
       ],
       monitorTypeList: []
@@ -100,8 +99,7 @@ export default {
       this.showCurrentTableData = true;
     },
     handleDel(val, index) {
-      let id = this.monitorTypeList[index]._id;
-      this.$Message.success("删除了第" + (index + 1) + "行測項");
+      this.$Message.success('删除了第' + (index + 1) + '行測項');
     },
     handleCellChange(val, index, key) {
       return this.handleChange(val, index);

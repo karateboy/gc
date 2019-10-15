@@ -17,7 +17,7 @@
                             <Button type="primary" @click="handleSubmit">儲存</Button>
                             <Button type="ghost" style="margin-left: 8px" @click="handleReset('auditConfig')">取消</Button>
                         </FormItem>
-                    </Form>                    
+                    </Form>
                 </Card>
             </Col>
         </Row>
@@ -29,7 +29,7 @@
                   極大極小值
                   <div slot="content">
                     <min-max-rule2 :rule="activeConfig.minMaxRule"></min-max-rule2>
-                  </div>                  
+                  </div>
                 </Panel>
                 <Panel name="2">
                   合理性
@@ -103,27 +103,27 @@
                 </Panel>
               </Collapse>
             </Card>
-          </Col>  
+          </Col>
         </Row>
     </div>
 </template>
 <style scoped>
 </style>
 <script>
-import Cookies from "js-cookie";
-import axios from "axios";
-import moment from "moment";
-import minMaxRule2 from "./minMaxRule2.vue";
+import Cookies from 'js-cookie';
+import axios from 'axios';
+import moment from 'moment';
+import minMaxRule2 from './minMaxRule2.vue';
 
 export default {
-  name: "auditConfig",
+  name: 'auditConfig',
   components: {
     minMaxRule2
   },
   mounted() {
-    //Init monitorList
+    // Init monitorList
     axios
-      .get("/Monitor")
+      .get('/Monitor')
       .then(resp => {
         this.monitorList.splice(0, this.monitorList.length);
         for (let monitor of resp.data) {
@@ -133,9 +133,9 @@ export default {
       .catch(err => {
         alert(err);
       });
-    //Init monitorTypeList
+    // Init monitorTypeList
     axios
-      .get("/MonitorType")
+      .get('/MonitorType')
       .then(resp => {
         this.monitorTypeList.splice(0, this.monitorTypeList.length);
         for (let mt of resp.data) {
@@ -145,9 +145,9 @@ export default {
       .catch(err => {
         alert(err);
       });
-    //Get configs
+    // Get configs
     axios
-      .get("/AuditConfig")
+      .get('/AuditConfig')
       .then(resp => {
         const ret = resp.data;
         this.auditConfigMap = Object.assign({}, this.auditConfigMap, ret);
@@ -156,7 +156,7 @@ export default {
         alert(err);
       });
     axios
-      .get("/DefaultAuditConfig")
+      .get('/DefaultAuditConfig')
       .then(resp => {
         const ret = resp.data;
         this.activeConfig = Object.assign({}, this.activeConfig, ret);
@@ -166,7 +166,7 @@ export default {
       });
   },
   watch: {
-    "formItem.monitor": function(newValue, oldValue) {
+    'formItem.monitor': function(newValue, oldValue) {
     }
   },
   data() {
@@ -184,13 +184,13 @@ export default {
         monitor: [
           {
             required: true,
-            type: "string",
-            message: "請選擇測站",
-            trigger: "change"
+            type: 'string',
+            message: '請選擇測站',
+            trigger: 'change'
           }
         ]
       },
-      configPage: "MinMax"
+      configPage: 'MinMax'
     };
   },
   computed: {},
@@ -209,7 +209,7 @@ export default {
       this.display = true;
       let monitor = encodeURIComponent(this.formItem.monitor);
       let monitorTypes = encodeURIComponent(
-        this.formItem.monitorTypes.join(":")
+        this.formItem.monitorTypes.join(':')
       );
       let start = this.formItem.dateRange[0].getTime();
       let end = this.formItem.dateRange[1].getTime();
@@ -228,7 +228,7 @@ export default {
               key: `col${i}`,
               sortable: true
             };
-            if (i === 0) col.fixed = "left";
+            if (i === 0) col.fixed = 'left';
             this.columns.push(col);
           }
           for (let row of ret.rows) {

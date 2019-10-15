@@ -35,29 +35,29 @@
   </div>
 </template>
 <script>
-import InforCard from "_c/info-card";
-import { ChartPie, ChartBar } from "_c/charts";
-import config from "@/config";
-import moment from "moment";
+import InforCard from '_c/info-card';
+import { ChartPie, ChartBar } from '_c/charts';
+import config from '@/config';
+import moment from 'moment';
+
+import { getRealtimeData, getCurrentMonitor, getLast10Data } from '@/api/data';
 const baseUrl =
-  process.env.NODE_ENV === "development"
+  process.env.NODE_ENV === 'development'
     ? config.baseUrl.dev
     : config.baseUrl.pro;
-
-import { getRealtimeData, getCurrentMonitor, getLast10Data } from "@/api/data";
 export default {
-  name: "home",
+  name: 'home',
   components: {
     InforCard
   },
   data() {
     return {
       selector: {
-        _id: "default",
-        dp_no: "#2",
-        icon: "ios-speedometer",
-        color: "#ff0000",
-        title: "選樣器"
+        _id: 'default',
+        dp_no: '#2',
+        icon: 'ios-speedometer',
+        color: '#ff0000',
+        title: '選樣器'
       },
       inforCardData: [],
       timer: undefined,
@@ -74,9 +74,9 @@ export default {
         .then(resp => {
           this.selector = Object.assign(
             {
-              icon: "ios-speedometer",
-              color: "#ff0000",
-              title: "選樣器"
+              icon: 'ios-speedometer',
+              color: '#ff0000',
+              title: '選樣器'
             },
             resp.data
           );
@@ -89,18 +89,18 @@ export default {
         .then(resp => {
           this.inforCardData.splice(0, this.inforCardData.length);
           let card = {
-            title: "最近資料時間",
-            icon: "ios-time",
-            text: moment(resp.data.time).format("M-D HH:mm"),
-            color: "#ff9900"
+            title: '最近資料時間',
+            icon: 'ios-time',
+            text: moment(resp.data.time).format('M-D HH:mm'),
+            color: '#ff9900'
           };
           this.inforCardData.push(card);
           for (let mtData of resp.data.mtDataList) {
             let card = {
               title: mtData.mtName,
-              icon: "ios-flask",
+              icon: 'ios-flask',
               text: mtData.text,
-              color: "#ff9900"
+              color: '#ff9900'
             };
             this.inforCardData.push(card);
           }
@@ -116,8 +116,8 @@ export default {
           this.columns.splice(0, this.columns.length);
           this.rows.splice(0, this.rows.length);
           this.columns.push({
-            title: "日期",
-            key: "date",
+            title: '日期',
+            key: 'date',
             sortable: true
           });
           for (let i = 0; i < ret.columnNames.length; i++) {
@@ -128,16 +128,16 @@ export default {
             };
             this.columns.push(col);
           }
-          //setup for report column
+          // setup for report column
           this.columns.push({
-            title: "動作",
-            slot: "action",
+            title: '動作',
+            slot: 'action',
             width: 150,
-            align: "center"
+            align: 'center'
           });
           for (let row of ret.rows) {
             let rowData = {
-              date: new moment(row.date).format("lll"),
+              date: new moment(row.date).format('lll'),
               cellClassName: {}
             };
             for (let c = 0; c < row.cellData.length; c++) {

@@ -23,16 +23,16 @@
 <style scoped>
 </style>
 <script>
-import InforCard from "_c/info-card";
-import config from "@/config";
+import InforCard from '_c/info-card';
+import config from '@/config';
+
+import { getMonitors, getCurrentMonitor, setCurrentMonitor } from '@/api/data';
 const baseUrl =
-  process.env.NODE_ENV === "development"
+  process.env.NODE_ENV === 'development'
     ? config.baseUrl.dev
     : config.baseUrl.pro;
-
-import { getMonitors, getCurrentMonitor, setCurrentMonitor } from "@/api/data";
 export default {
-  name: "selector",
+  name: 'selector',
   components: {
     InforCard
   },
@@ -53,11 +53,11 @@ export default {
     return {
       monitorList: [],
       selector: {
-        _id: "default",
-        dp_no: "#2",
-        icon: "ios-speedometer",
-        color: "#ff0000",
-        title: "選樣器通道"
+        _id: 'default',
+        dp_no: '#2',
+        icon: 'ios-speedometer',
+        color: '#ff0000',
+        title: '選樣器通道'
       },
       spinShow: false
     };
@@ -65,19 +65,19 @@ export default {
   computed: {},
   methods: {
     buttonType(ch) {
-      if (ch === this.selector._id) return "success";
-      else return "default";
+      if (ch === this.selector._id) return 'success';
+      else return 'default';
     },
     buttonIcon(ch) {
-      if (ch === this.selector._id) return "md-checkmark";
-      else return "";
+      if (ch === this.selector._id) return 'md-checkmark';
+      else return '';
     },
     setSelector(current) {
       this.spinShow = true;
       setCurrentMonitor(current)
         .then(resp => {
           this.spinShow = false;
-          this.$Message.success("切換成功");
+          this.$Message.success('切換成功');
           this.refreshCurrentSelector();
         })
         .catch(err => {
@@ -90,9 +90,9 @@ export default {
         .then(resp => {
           this.selector = Object.assign(
             {
-              icon: "ios-speedometer",
-              color: "#ff0000",
-              title: "選樣器通道"
+              icon: 'ios-speedometer',
+              color: '#ff0000',
+              title: '選樣器通道'
             },
             resp.data
           );
