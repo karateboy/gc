@@ -1,4 +1,4 @@
-
+import Vue from 'vue'
 export default {
   state: {
     socket: {
@@ -10,14 +10,13 @@ export default {
   },
   mutations: {
     clearAlarm(state) {
-      state.hasAlarm = false;
+      state.alarms.slice(0, state.alarms.length)
     },
     SOCKET_ONOPEN(state, event) {
-      console.log('SOCKET_ONOPEN')
+      Vue.prototype.$socket = event.currentTarget
       state.socket.isConnected = true
     },
     SOCKET_ONCLOSE(state, event) {
-      console.log('SOCKET_ONCLOSE')
       state.socket.isConnected = false
     },
     SOCKET_ONERROR(state, event) {
@@ -33,18 +32,29 @@ export default {
     },
     SOCKET_RECONNECT_ERROR(state) {
       state.socket.reconnectError = true;
+    },
+    ReportAlarm(state, event) {
+      state.alarms.splice(0, state.alarms.length)
+      for (let ar of event.alarms) {
+        state.alarms.push(ar)
+      }
     }
   },
   getters: {
-    alarmUnreadCount: state => state.messageUnreadList.length
+    unreadAlarm: state => state.alarms,
+    unreadAlarmCount: state => state.alarms.length
   },
   actions: {
-    getMessageList({ state, commit }) {
-      return new Promise((resolve, reject) => {
-        resolve()
-      }).catch(error => {
-        reject(error)
-      })
+    readAlarm(context) {
+      try {
+        return new Promise((resolve, reject) => {
+          context.commit('clearAlarm')
+          Vue.prototype.$socket.sendObj({ msgType: 'alarmRead' })
+          resolve();
+        });
+      } catch (error) {
+        reject(error);
+      }
     }
   }
 }

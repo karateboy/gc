@@ -294,7 +294,8 @@ object Application extends Controller {
   }
 
   //Websocket
-  def gcWebSocket = WebSocket.acceptWithActor[String, String] { request => out =>
+  import GcWebSocketActor._
+  def gcWebSocket = WebSocket.acceptWithActor[InEvent, OutEvent]{ request => out =>
     GcWebSocketActor.props(out)
   }
 }

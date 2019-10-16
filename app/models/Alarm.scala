@@ -102,8 +102,13 @@ object Alarm {
 
     f1.andThen({
       case Success(count)=>
-        if(count == 0)
-          collection.insertOne(ar).toFuture()
+        if(count == 0){
+          val f2 = collection.insertOne(ar).toFuture()
+          f2.andThen({
+            case Success(x)=>
+              GcWebSocketActor.notifyAllActors
+          })
+        }
     })
     
   }
