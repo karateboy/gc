@@ -24,6 +24,8 @@ object Exporter {
   import com.serotonin.modbus4j._
   var masterOpt: Option[ModbusMaster] = None
 
+  val exportLocalModbus = Play.current.configuration.getBoolean("exportLocalModbus").getOrElse(false)
+
   def writeModbusSlave(data: Record.RecordList) = {
     import com.serotonin.modbus4j.ip.IpParameters
 
@@ -57,7 +59,7 @@ object Exporter {
         master.setValue(locator, value);
       }
 
-      def writeDouble(offset: Int, value: Double) = {        
+      def writeDouble(offset: Int, value: Double) = {
         val locator = BaseLocator.holdingRegister(slaveID, offset, DataType.EIGHT_BYTE_FLOAT);
         master.setValue(locator, value);
       }
@@ -104,10 +106,11 @@ object Exporter {
       val dateTime = new DateTime(data.time)
       if (latestDateTime < dateTime) {
         latestDateTime = dateTime
-        
+
         //Export to modbus
-        writeModbusSlave(data)
-        
+        if(exportLocalModbus)
+          writeModbusSlave(data)
+
         buffer += s"InjectionDate, ${data.time}\r"
         val mtStrs = data.mtDataList map { mt_data => s"${mt_data.mtName}, ${mt_data.value}" }
         val mtDataStr = mtStrs.foldLeft("")((a, b) => {

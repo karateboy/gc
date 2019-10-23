@@ -180,7 +180,7 @@ class GcAgent extends Actor {
   }
 
   var retryMap = Map.empty[String, Int]
-  val MAX_RETRY_COUNT = 15
+  val MAX_RETRY_COUNT = 30
   def processInputPath(parser: (File) => Boolean) = {
     import org.apache.commons.io.FileUtils
     import java.io.File
@@ -208,7 +208,7 @@ class GcAgent extends Actor {
         } catch {
           case ex: Throwable =>
             if (retryMap.contains(absPath)) {
-              if (retryMap(absPath) + 1 < MAX_RETRY_COUNT) {
+              if (retryMap(absPath) + 1 <= MAX_RETRY_COUNT) {
                 retryMap += (absPath -> (retryMap(absPath) + 1))
               } else {
                 Logger.info(s"$absPath reach max retries. Give up!")
