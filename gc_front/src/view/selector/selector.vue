@@ -6,13 +6,13 @@
         <ButtonGroup size="large">
           <Button
             size="large"
-            v-for="(item, idx) in monitorList"
+            v-for="item in monitorList"
             :key="item._id"
             :type="buttonType(item._id)"
             :icon="buttonIcon(item._id)"
             @click="setSelector(item._id)"
           >
-            <p>{{'通道' + idx}}</p>
+            <p>{{'通道' + item._id}}</p>
             {{item.dp_no}}
           </Button>
         </ButtonGroup>

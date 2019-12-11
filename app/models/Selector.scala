@@ -7,6 +7,7 @@ abstract class SelectorModel() {
   def getStreamNum(): Int
   def setStreamNum(v: Int)
   val canSetStream: Boolean
+  val max: Int
 }
 
 object VirtualSelector extends SelectorModel {
@@ -28,7 +29,7 @@ object Selector {
     case "VICI_UEA" =>
       Logger.info("VICI Universial Electric Actuator is selected")
       new ViciUeaSelector()
-      
+
     case "MOXA" =>
       Logger.info("MOXA E1212 is selected")
       new MoxaSelector()
