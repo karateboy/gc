@@ -11,7 +11,7 @@ case object ReadCurrentStreamNum
 case class SetStreamNum(v: Int)
 
 class ViciUeaSelector extends SelectorModel {
-
+  val max = current.configuration.getInt("selector.viciUea.max").get
   val worker = Akka.system.actorOf(Props(new UeaSelectorWorker(this)), name = "selectorAgent")
   worker ! IssueCPcmd
 
