@@ -1,18 +1,20 @@
 <template>
   <div>
-    <Row :gutter="20" type="flex">
-      <i-col :xs="12" :md="8" :lg="4">
-        <Card :key="selector._id" shadown>
-          <strong>{{selector.title}}</strong>
+    <Row type="flex" justify="start" :gutter="10" >
+      <i-col :xs="12" :md="8" :lg="6" style="padding-top:5px;">
+        <Card :key="selector._id" :padding="2"  shadown>
+          <span class="tag">{{selector.title}}</span>
           <Divider type="vertical" />
-          <span>{{ selector.dp_no}}</span>
+          <span class="tag_value">{{ selector.dp_no}}</span>
         </Card>
       </i-col>
-      <i-col :xs="12" :md="8" :lg="4" v-for="(infor, i) in inforCardData" :key="`infor-${i}`">
-        <Card shadow>
-          <strong>{{infor.title}}</strong>
+      <i-col :xs="12" :md="8" :lg="6" v-for="(infor, i) in inforCardData" :key="`infor-${i}`" style="padding-top:5px;">
+        <Card :key="i" :padding="2" shadown>
+          <span class="tag">{{infor.title}}</span>
           <Divider type="vertical" />
-          {{ infor.text}}
+          <span class="tag_value">
+            <strong>{{ infor.text}}</strong>
+          </span>
         </Card>
       </i-col>
     </Row>
@@ -34,30 +36,44 @@
     </Row>
   </div>
 </template>
-<script>
-import InforCard from '_c/info-card';
-import { ChartPie, ChartBar } from '_c/charts';
-import config from '@/config';
-import moment from 'moment';
+<style scoped>
+.tag {
+  font-size: 20px;
+  background-color: #ffbf00;
+}
 
-import { getRealtimeData, getCurrentMonitor, getLast10Data } from '@/api/data';
+.tag_value {
+  font-size: 20px;
+}
+
+.verticalLine {
+  border-left: thick solid #ff0000;
+}
+</style>
+<script>
+import InforCard from "_c/info-card";
+import { ChartPie, ChartBar } from "_c/charts";
+import config from "@/config";
+import moment from "moment";
+
+import { getRealtimeData, getCurrentMonitor, getLast10Data } from "@/api/data";
 const baseUrl =
-  process.env.NODE_ENV === 'development'
+  process.env.NODE_ENV === "development"
     ? config.baseUrl.dev
     : config.baseUrl.pro;
 export default {
-  name: 'home',
+  name: "home",
   components: {
     InforCard
   },
   data() {
     return {
       selector: {
-        _id: 'default',
-        dp_no: '#2',
-        icon: 'ios-speedometer',
-        color: '#ff0000',
-        title: '選樣器'
+        _id: "default",
+        dp_no: "#2",
+        icon: "ios-speedometer",
+        color: "#ff0000",
+        title: "選樣器"
       },
       inforCardData: [],
       timer: undefined,
@@ -74,9 +90,9 @@ export default {
         .then(resp => {
           this.selector = Object.assign(
             {
-              icon: 'ios-speedometer',
-              color: '#ff0000',
-              title: '選樣器'
+              icon: "ios-speedometer",
+              color: "#ff0000",
+              title: "選樣器"
             },
             resp.data
           );
@@ -89,18 +105,18 @@ export default {
         .then(resp => {
           this.inforCardData.splice(0, this.inforCardData.length);
           let card = {
-            title: '最近資料時間',
-            icon: 'ios-time',
-            text: moment(resp.data.time).format('M-D HH:mm'),
-            color: '#ff9900'
+            title: "資料時間",
+            icon: "ios-time",
+            text: moment(resp.data.time).format("M-D HH:mm"),
+            color: "#ff9900"
           };
           this.inforCardData.push(card);
           for (let mtData of resp.data.mtDataList) {
             let card = {
               title: mtData.mtName,
-              icon: 'ios-flask',
+              icon: "ios-flask",
               text: mtData.text,
-              color: '#ff9900'
+              color: "#ff9900"
             };
             this.inforCardData.push(card);
           }
@@ -116,8 +132,8 @@ export default {
           this.columns.splice(0, this.columns.length);
           this.rows.splice(0, this.rows.length);
           this.columns.push({
-            title: '日期',
-            key: 'date',
+            title: "日期",
+            key: "date",
             sortable: true
           });
           for (let i = 0; i < ret.columnNames.length; i++) {
@@ -130,14 +146,14 @@ export default {
           }
           // setup for report column
           this.columns.push({
-            title: '動作',
-            slot: 'action',
+            title: "動作",
+            slot: "action",
             width: 150,
-            align: 'center'
+            align: "center"
           });
           for (let row of ret.rows) {
             let rowData = {
-              date: new moment(row.date).format('lll'),
+              date: new moment(row.date).format("lll"),
               cellClassName: {}
             };
             for (let c = 0; c < row.cellData.length; c++) {
