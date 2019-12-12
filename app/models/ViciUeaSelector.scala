@@ -13,7 +13,6 @@ case class SetStreamNum(v: Int)
 class ViciUeaSelector extends SelectorModel {
   val max = current.configuration.getInt("selector.viciUea.max").get
   val worker = Akka.system.actorOf(Props(new UeaSelectorWorker(this)), name = "selectorAgent")
-  worker ! IssueCPcmd
 
   @volatile var streamNum = 1
   def getStreamNum(): Int = streamNum
@@ -38,7 +37,9 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
   Logger.info(s"UEA is set to ${comPort}")
   val serial = SerialComm.open(comPort)
 
-  var timer: Cancellable = _
+  var timer = context.system.scheduler.scheduleOnce(
+    scala.concurrent.duration.Duration(0, scala.concurrent.duration.MICROSECONDS),
+    self, IssueCPcmd)
 
   def receive = {
     case IssueCPcmd =>
@@ -50,9 +51,9 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
           Logger.error("write CP cmd failed", ex)
       }
       timer = context.system.scheduler.scheduleOnce(
-        scala.concurrent.duration.Duration(200, scala.concurrent.duration.MICROSECONDS),
+        scala.concurrent.duration.Duration(500, scala.concurrent.duration.MICROSECONDS),
         self, ReadCurrentStreamNum)
-        
+
     case ReadCurrentStreamNum =>
       try {
         val ret = serial.getLine2
@@ -68,7 +69,7 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
           Logger.error("read stream failed", ex)
       }
       timer = context.system.scheduler.scheduleOnce(
-        scala.concurrent.duration.Duration(200, scala.concurrent.duration.MICROSECONDS),
+        scala.concurrent.duration.Duration(500, scala.concurrent.duration.MICROSECONDS),
         self, IssueCPcmd)
 
     case SetStreamNum(v) =>
@@ -76,11 +77,7 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
         import java.util.Locale
         val setCmd = s"GO%02d\r".format(v)
         serial.os.write(setCmd.getBytes)
-        timer.cancel()
-        timer = context.system.scheduler.scheduleOnce(
-          scala.concurrent.duration.Duration(0, scala.concurrent.duration.SECONDS),
-          self, IssueCPcmd)
-
+        selector.modifyStreamNum(v)
       } catch {
         case ex: Throwable =>
           Logger.error("write GO cmd failed", ex)
