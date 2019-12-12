@@ -15,13 +15,13 @@ class ViciUeaSelector extends SelectorModel {
   val worker = Akka.system.actorOf(Props(new UeaSelectorWorker(this)), name = "selectorAgent")
   worker ! IssueCPcmd
 
-  @volatile var streamNum = 1 
+  @volatile var streamNum = 1
   def getStreamNum(): Int = streamNum
   def setStreamNum(v: Int) {
     worker ! SetStreamNum(v)
   }
   val canSetStream = true
-  
+
   def modifyStreamNum(v: Int) {
     streamNum = v
   }
@@ -38,6 +38,8 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
   Logger.info(s"UEA is set to ${comPort}")
   val serial = SerialComm.open(comPort)
 
+  var timer: Cancellable = _
+
   def receive = {
     case IssueCPcmd =>
       try {
@@ -47,11 +49,10 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
         case ex: Throwable =>
           Logger.error("write CP cmd failed", ex)
       }
-      import scala.concurrent.duration._
-      context.system.scheduler.scheduleOnce(
-        scala.concurrent.duration.Duration(1, scala.concurrent.duration.SECONDS),
+      timer = context.system.scheduler.scheduleOnce(
+        scala.concurrent.duration.Duration(200, scala.concurrent.duration.MICROSECONDS),
         self, ReadCurrentStreamNum)
-
+        
     case ReadCurrentStreamNum =>
       try {
         val ret = serial.getLine2
@@ -66,8 +67,8 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
         case ex: Throwable =>
           Logger.error("read stream failed", ex)
       }
-      context.system.scheduler.scheduleOnce(
-        scala.concurrent.duration.Duration(1, scala.concurrent.duration.SECONDS),
+      timer = context.system.scheduler.scheduleOnce(
+        scala.concurrent.duration.Duration(200, scala.concurrent.duration.MICROSECONDS),
         self, IssueCPcmd)
 
     case SetStreamNum(v) =>
@@ -75,9 +76,18 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
         import java.util.Locale
         val setCmd = s"GO%02d\r".format(v)
         serial.os.write(setCmd.getBytes)
+        timer.cancel()
+        timer = context.system.scheduler.scheduleOnce(
+          scala.concurrent.duration.Duration(0, scala.concurrent.duration.SECONDS),
+          self, IssueCPcmd)
+
       } catch {
         case ex: Throwable =>
-          Logger.error("write CP cmd failed", ex)
+          Logger.error("write GO cmd failed", ex)
       }
+
+  }
+  override def postStop() {
+    timer.cancel()
   }
 }

@@ -127,7 +127,7 @@ object Realtime extends Controller {
       import java.util.Timer
 
       Future {
-        blocking { Thread.sleep(1500) }
+        blocking { Thread.sleep(1000) }
         Ok("")
       }
   }

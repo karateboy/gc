@@ -177,6 +177,7 @@ object Application extends Controller {
   def monitorList = Security.Authenticated {
     implicit request =>
       val monitors = Monitor.mvList map { Monitor.map }
+      val actualMonitors = monitors.filter(m => m._id.toInt <= Selector.model.max)
       Ok(Json.toJson(monitors))
   }
 
@@ -295,7 +296,7 @@ object Application extends Controller {
 
   //Websocket
   import GcWebSocketActor._
-  def gcWebSocket = WebSocket.acceptWithActor[InEvent, OutEvent]{ request => out =>
+  def gcWebSocket = WebSocket.acceptWithActor[InEvent, OutEvent] { request => out =>
     GcWebSocketActor.props(out)
   }
 }
