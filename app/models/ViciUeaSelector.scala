@@ -78,6 +78,12 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
         val setCmd = s"GO%02d\r".format(v)
         serial.os.write(setCmd.getBytes)
         selector.modifyStreamNum(v)
+        
+        // Read current position after 2 seconds
+        timer.cancel()
+        timer = context.system.scheduler.scheduleOnce(
+          scala.concurrent.duration.Duration(2, scala.concurrent.duration.SECONDS),
+          self, IssueCPcmd)
       } catch {
         case ex: Throwable =>
           Logger.error("write GO cmd failed", ex)
