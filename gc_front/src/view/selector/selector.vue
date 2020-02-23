@@ -24,13 +24,9 @@
 </style>
 <script>
 import InforCard from '_c/info-card';
-import config from '@/config';
 
 import { getMonitors, getCurrentMonitor, setCurrentMonitor } from '@/api/data';
-const baseUrl =
-  process.env.NODE_ENV === 'development'
-    ? config.baseUrl.dev
-    : config.baseUrl.pro;
+
 export default {
   name: 'selector',
   components: {

@@ -42,8 +42,6 @@
 <style scoped>
 </style>
 <script>
-import highcharts from 'highcharts'
-import Cookies from 'js-cookie'
 import axios from 'axios'
 import moment from 'moment'
 import baseUrl from '../../baseUrl'
@@ -124,7 +122,7 @@ export default {
   },
   computed: {
     downloadable() {
-      return this.query_url.length != 0
+      return this.query_url.length !== 0
     }
   },
   methods: {
@@ -213,7 +211,7 @@ export default {
             }
           }
 
-          let myChart = highcharts.chart('reportDiv', ret)
+          // let myChart = highcharts.chart('reportDiv', ret)
           // $("#downloadExcel").prop("href", "/Excel/HistoryTrend/" + base_url);
           // $("#reportDiv").highcharts(ret);
         })

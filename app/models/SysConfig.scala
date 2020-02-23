@@ -13,9 +13,11 @@ object SysConfig extends Enumeration {
 
   val valueKey = "value"
   val ALARM_LAST_READ = Value
+  val DATA_PERIOD = Value
 
   val defaultConfig = Map(
-    ALARM_LAST_READ -> Document(valueKey -> DateTime.parse("2019-10-1").toDate()))
+    ALARM_LAST_READ -> Document(valueKey -> DateTime.parse("2019-10-1").toDate()),
+    DATA_PERIOD -> Document(valueKey -> 30))
 
   def init(colNames: Seq[String]) {
     if (!colNames.contains(ColName)) {
@@ -74,6 +76,19 @@ object SysConfig extends Enumeration {
     import java.util.Date
     import java.time.Instant
     val f = upsert(ALARM_LAST_READ, Document(valueKey -> Date.from(Instant.now())))
+    f.failed.foreach(errorHandler)
+    f
+  }
+
+  def getDataPeriod() = {
+    val f = get(DATA_PERIOD)
+    f.failed.foreach(errorHandler)
+    for (ret <- f)
+      yield ret.asInt32().getValue
+  }
+
+  def setDataPeriod(min: Int) = {
+    val f = upsert(DATA_PERIOD, Document(valueKey -> min))
     f.failed.foreach(errorHandler)
     f
   }

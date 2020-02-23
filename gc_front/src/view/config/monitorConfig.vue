@@ -33,7 +33,6 @@
 
 <script>
 import canEditTable from './components/canEditTable.vue';
-import tableData from './components/table_data.js';
 import { getMonitors, setMonitor } from '@/api/data';
 
 export default {
@@ -89,7 +88,6 @@ export default {
       this.showCurrentTableData = true;
     },
     handleDel(val, index) {
-      let id = this.monitorList[index]._id;
       this.$Message.success('删除了第' + (index + 1) + '行測項');
     },
     handleCellChange(val, index, key) {

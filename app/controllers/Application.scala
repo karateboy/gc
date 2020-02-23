@@ -299,4 +299,27 @@ object Application extends Controller {
   def gcWebSocket = WebSocket.acceptWithActor[InEvent, OutEvent] { request => out =>
     GcWebSocketActor.props(out)
   }
+
+  def getDataPeriod = Security.Authenticated.async {
+    for (ret <- SysConfig.getDataPeriod()) yield Ok(Json.toJson(ret))
+  }
+
+  case class ParamInt(value:Int)
+  def setDataPeriod = Security.Authenticated.async(BodyParsers.parse.json) {
+    implicit request =>
+      implicit val reads = Json.reads[ParamInt]
+      val ret = request.body.validate[ParamInt]
+      ret.fold(
+        error => {
+          Future {
+            Logger.error(JsError.toJson(error).toString())
+            BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
+          }
+        },
+        param => {
+          for (ret <- SysConfig.setDataPeriod(param.value)) yield {
+            Ok(Json.obj("ok" -> true))
+          }
+        })
+  }
 }

@@ -32,7 +32,10 @@ POST     /current_monitor                                                      c
 GET      /last10_data                                                          controllers.Query.last10Data()	
 GET      /alarm                                                                controllers.Query.alarmData(start: Long, end: Long)
 GET      /testAlarm                                                            controllers.Application.testAlarm	
-GET      /GcWebSocket                                                        controllers.Application.gcWebSocket	
+GET      /GcWebSocket                                                          controllers.Application.gcWebSocket
+GET      /dataPeriod                                                           controllers.Application.getDataPeriod
+POST     /dataPeriod                                                           controllers.Application.setDataPeriod
+	
 # old api
 POST     /User                                                                 controllers.Application.newUser
 GET      /User                                                                 controllers.Application.getAllUsers

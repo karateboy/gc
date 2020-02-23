@@ -26,13 +26,15 @@ object Exporter {
 
   val exportLocalModbus = Play.current.configuration.getBoolean("exportLocalModbus").getOrElse(false)
 
+  val modbusPort = Play.current.configuration.getInt("modbus_port").getOrElse(503)    
+    
   def writeModbusSlave(data: Record.RecordList) = {
     import com.serotonin.modbus4j.ip.IpParameters
 
     def connectHost() {
       val ipParameters = new IpParameters()
       ipParameters.setHost("127.0.0.1");
-      ipParameters.setPort(502);
+      ipParameters.setPort(modbusPort);
       val modbusFactory = new ModbusFactory()
 
       val master = modbusFactory.createTcpMaster(ipParameters, true)

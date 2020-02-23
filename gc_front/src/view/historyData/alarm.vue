@@ -35,8 +35,6 @@
 <script>
 import moment from 'moment';
 import config from '@/config';
-import URI from 'urijs';
-import axios from 'axios';
 
 import { getAlarm } from '@/api/data';
 const baseUrl =
@@ -117,7 +115,9 @@ export default {
               let key = `col${c}`;
               rowData[key] = row.cellData[c].v;
               rowData.cellClassName[key] = row.cellData[c].cellClassName;
-              if (baseUrl.length != 0) { rowData.pdfUrl = `${baseUrl}pdfReport/${row.pdfReport}`; } else rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
+              if (baseUrl.length !== 0) {
+                rowData.pdfUrl = `${baseUrl}pdfReport/${row.pdfReport}`;
+              } else rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
             }
             this.rows.push(rowData);
           }

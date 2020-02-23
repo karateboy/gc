@@ -16,7 +16,8 @@ module.exports = {
     'camelcase': 'off',
     "space-before-function-paren": 'off',
     "new-cap":'off',
-    "semi":'off'
+    "semi":'off',
+    "quotes":'off'
   },
   parserOptions: {
     parser: 'babel-eslint'
