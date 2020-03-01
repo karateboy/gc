@@ -1,3 +1,4 @@
+/* eslint-disable handle-callback-err */
 <template>
   <div class="user-avatar-dropdown">
     <Dropdown @on-click="handleClick">
@@ -15,46 +16,66 @@
 </template>
 
 <script>
-import './user.less';
-import { mapActions, mapGetters } from 'vuex';
+import "./user.less";
+import axios from "axios";
+import { mapActions, mapGetters } from "vuex";
 export default {
-  name: 'User',
+  name: "User",
   props: {
     userAvatar: {
       type: String,
-      default: ''
+      default: ""
     },
     messageUnreadCount: {
       type: Number,
       default: 0
     }
   },
+  data() {
+    return {
+      alarmSound: undefined
+    };
+  },
   computed: {
-    ...mapGetters(['unreadAlarm', 'unreadAlarmCount']),
+    ...mapGetters(["unreadAlarm", "unreadAlarmCount"]),
     badgeText() {
-      if (this.unreadAlarmCount === 0) return '';
-      else return '警報';
+      if (this.unreadAlarmCount === 0) return "";
+      else return "警報";
+    }
+  },
+  watch: {
+    unreadAlarmCount: function(newValue, oldValue) {
+      if (newValue !== 0) {
+        this.alarmSound = new Audio(
+          `${axios.defaults.baseURL}static/alarm.mp3`
+        );
+        this.alarmSound.play();
+      }
     }
   },
   methods: {
-    ...mapActions(['handleLogOut', 'readAlarm']),
+    ...mapActions(["handleLogOut", "readAlarm"]),
     logout() {
       this.handleLogOut().then(() => {
         this.$router.push({
-          name: 'login'
+          name: "login"
         });
       });
     },
     handleClick(name) {
       switch (name) {
-        case 'logout':
+        case "logout":
           this.logout();
           break;
-        case 'readAlarm':
+        case "readAlarm":
+          if (this.alarmSound) this.alarmSound.pause();
+
           this.readAlarm().then(() => {
-            this.$router.push({
-              name: 'alarm'
-            });
+            if (this.$router.currentRoute.name !== "alarm") {
+              this.$router.push({
+                name: "alarm"
+              });
+            }
           });
           break;
       }

@@ -86,36 +86,36 @@ object Alarm {
     f
   }
 
-  private def checkForDuplicatelog(ar: Alarm)={
+  private def checkForDuplicatelog(ar: Alarm, noDuplicateMin: Int = 30) = {
     //None blocking...
-    import scala.util.{Try, Success}
+    import scala.util.{ Try, Success }
     import java.time.Instant
     import java.time.temporal._
-    val start = Date.from(Instant.ofEpochMilli(ar.time.getTime).minus(30, ChronoUnit.MINUTES))
+    val start = Date.from(Instant.ofEpochMilli(ar.time.getTime).minus(noDuplicateMin, ChronoUnit.MINUTES))
     val end = ar.time
 
     val monitorFilter = equal("monitor", ar.monitor.getOrElse(null))
-        
-    
+
     val f1 = collection.countDocuments(and(gte("time", start), lt("time", end),
       equal("monitor", ar.monitor.getOrElse(null)), equal("monitorType", ar.monitorType.getOrElse(null)), equal("desc", ar.desc))).toFuture()
 
     f1.andThen({
-      case Success(count)=>
-        if(count == 0){
+      case Success(count) =>
+        if (count == 0) {
           val f2 = collection.insertOne(ar).toFuture()
           f2.andThen({
-            case Success(x)=>
+            case Success(x) =>
               GcWebSocketActor.notifyAllActors
           })
         }
     })
-    
+
   }
 
-  def log(monitor: Option[Monitor.Value], monitorType: Option[MonitorType.Value], desc: String) = {
+  def log(monitor: Option[Monitor.Value], monitorType: Option[MonitorType.Value],
+          desc: String, noDuplicateMin: Int = 30) = {
     import java.time.Instant
     val ar = Alarm(Date.from(Instant.now()), monitor, monitorType, desc)
-    checkForDuplicatelog(ar)
+    checkForDuplicatelog(ar, noDuplicateMin)
   }
 }

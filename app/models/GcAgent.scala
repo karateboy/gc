@@ -233,7 +233,7 @@ class GcAgent extends Actor {
     val f = SysConfig.getDataPeriod()
     for (dataPeriod <- f) yield {
       if ((latestDatTime + dataPeriod.minutes) < DateTime.now)
-        Alarm.log(None, None, "沒有資料匯入!")
+        Alarm.log(None, None, "沒有資料匯入!", dataPeriod)
     }
   }
   override def postStop = {

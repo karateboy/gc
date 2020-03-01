@@ -10,7 +10,7 @@ export default {
   },
   mutations: {
     clearAlarm(state) {
-      state.alarms.slice(0, state.alarms.length)
+      state.alarms.splice(0, state.alarms.length)
     },
     SOCKET_ONOPEN(state, event) {
       Vue.prototype.$socket = event.currentTarget
