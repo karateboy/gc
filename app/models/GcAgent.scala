@@ -45,7 +45,7 @@ class GcAgent extends Actor {
       context.system.scheduler.scheduleOnce(scala.concurrent.duration.Duration(1, scala.concurrent.duration.MINUTES), self, ParseReport)
   }
 
-  var latestDatTime: com.github.nscala_time.time.Imports.DateTime = com.github.nscala_time.time.Imports.DateTime.now()
+  var latestDataTime: com.github.nscala_time.time.Imports.DateTime = com.github.nscala_time.time.Imports.DateTime.now()
   import java.io.File
   def parser(reportDir: File): Boolean = {
     import java.nio.file.{ Paths, Files, StandardOpenOption }
@@ -83,8 +83,7 @@ class GcAgent extends Actor {
         mDates.head
       }
 
-      if (mDate > this.latestDatTime)
-        this.latestDatTime = mDate
+      this.latestDataTime = DateTime.now()
 
       def getRecordLines(inputLines: Seq[String]): Seq[String] = {
         val head = inputLines.dropWhile(!_.startsWith("-------")).drop(1)
@@ -232,7 +231,7 @@ class GcAgent extends Actor {
     import com.github.nscala_time.time.Imports._
     val f = SysConfig.getDataPeriod()
     for (dataPeriod <- f) yield {
-      if ((latestDatTime + dataPeriod.minutes) < DateTime.now)
+      if ((latestDataTime + dataPeriod.minutes) < DateTime.now)
         Alarm.log(None, None, "沒有資料匯入!", dataPeriod)
     }
   }
