@@ -1,4 +1,5 @@
 package controllers
+
 import play.api._
 import play.api.mvc._
 import play.api.libs.json._
@@ -8,6 +9,7 @@ import play.api.data._
 import play.api.data.Forms._
 import play.api.libs.ws._
 import play.api.libs.ws.ning.NingAsyncHttpClientConfigBuilder
+
 import scala.concurrent._
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json._
@@ -15,9 +17,13 @@ import com.github.nscala_time.time.Imports._
 import Highchart._
 import models._
 
+import scala.collection.mutable
+
 object Realtime extends Controller {
   val overTimeLimit = 6
+
   case class MonitorTypeStatus(desp: String, value: String, unit: String, instrument: String, status: String, classStr: String, order: Int)
+
   def MonitorTypeStatusList() = Security.Authenticated.async {
     implicit request =>
       import MonitorType._
@@ -65,7 +71,9 @@ object Realtime extends Controller {
   }
 
   case class CellData(v: String, cellClassName: String)
+
   case class RowData(cellData: Seq[CellData])
+
   case class DataTab(columnNames: Seq[String], rows: Seq[RowData])
 
   implicit val cellWrite = Json.writes[CellData]
@@ -78,11 +86,13 @@ object Realtime extends Controller {
       val user = request.user
       val latestRecordMapF = Record.getLatestRecordMap2Future(Record.HourCollection)
       val targetTime = (DateTime.now() - 2.hour).withMinuteOfHour(0).withSecond(0).withMillisOfSecond(0)
-      val ylMonitors = Monitor.mvList filter { Monitor.map(_).indParkName == "台塑六輕工業園區" }
+      val ylMonitors = Monitor.mvList filter {
+        Monitor.map(_).gcName == "台塑六輕工業園區"
+      }
       for {
         map <- latestRecordMapF
         yulinMap = map.filter { kv =>
-          Monitor.map(kv._1).indParkName == "台塑六輕工業園區"
+          Monitor.map(kv._1).gcName == "台塑六輕工業園區"
         }
       } yield {
         var yulinFullMap = yulinMap
@@ -99,7 +109,7 @@ object Realtime extends Controller {
           (monitor, recordPair) <- yulinFullMap
           (time, recordMap) = recordPair
         } yield {
-          val monitorCell = CellData(s"${Monitor.map(monitor).dp_no}", "")
+          val monitorCell = CellData(s"${Monitor.map(monitor).selector}", "")
           val timeCell = CellData(s"${time.toLocalTime().toString("HH:mm")}", "")
           val valueCells =
             for {
@@ -116,18 +126,29 @@ object Realtime extends Controller {
 
   def getCurrentMonitor() = Security.Authenticated {
     implicit request =>
-      val m = Monitor.withName(Monitor.monitorId(Selector.get))
-      Ok(Json.toJson(Monitor.map(m)))
+      val monitors: mutable.Seq[_root_.models.Monitor.Value] =
+        for (gcConfig <- GcAgent.gcConfigList) yield {
+          Monitor.withName(Monitor.monitorId(gcConfig.gcName, gcConfig.selector.get))
+        }
+      val monitorCase: mutable.Seq[Monitor] = monitors map {
+        Monitor.map
+      }
+      Ok(Json.toJson(monitorCase))
   }
 
-  def setCurrentMonitor(id: Int) = Security.Authenticated.async {
+  def setCurrentMonitor(gcName: String, id: Int) = Security.Authenticated.async {
     implicit request =>
-      Logger.info(s"Selector set to ${id}")
-      Selector.set(id)
+      Logger.info(s"$gcName Selector set to ${id}")
+      for (config <- GcAgent.gcConfigList.find(config => config.gcName == gcName)) {
+        config.selector.set(id)
+      }
+
       import java.util.Timer
 
       Future {
-        blocking { Thread.sleep(1000) }
+        blocking {
+          Thread.sleep(1000)
+        }
         Ok("")
       }
   }

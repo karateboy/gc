@@ -177,7 +177,7 @@ object Application extends Controller {
   def monitorList = Security.Authenticated {
     implicit request =>
       val monitors = Monitor.mvList map { Monitor.map }
-      val actualMonitors = monitors.filter(m => m._id.toInt <= Selector.model.max)
+      // val actualMonitors = monitors.filter(m => m._id.toInt <= Selector.model.max)
       Ok(Json.toJson(monitors))
   }
 

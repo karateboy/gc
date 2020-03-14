@@ -38,7 +38,7 @@ case class Privilege(
       Monitor.indParkMonitor(filter.indPark) filter {
         mv =>
           filter.names.isEmpty ||
-            filter.names.exists({ name => Monitor.map(mv).dp_no.contains(name) })
+            filter.names.exists({ name => Monitor.map(mv).selector.contains(name) })
       }
     }
   }

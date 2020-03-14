@@ -67,7 +67,7 @@ object Exporter {
       }
 
       //Selector
-      writeShort(0, Selector.get.toShort)
+      //writeShort(0, Selector.get.toShort)
       for ((mtData, idx) <- data.mtDataList.zipWithIndex) {
         writeDouble(idx * 4 + 1, mtData.value)
       }
@@ -92,7 +92,7 @@ object Exporter {
   def exportRealtimeData = {
     val path = Paths.get(current.path.getAbsolutePath + "/export/realtime.txt")
     var buffer = ""
-    buffer += s"Selector,${Selector.get}\r"
+    // buffer += s"Selector,${Selector.get}\r"
     val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection)(1)
 
     for (records <- latestRecord) yield {

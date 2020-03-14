@@ -7,11 +7,11 @@ import ModelHelper._
 import scala.concurrent.ExecutionContext.Implicits.global
 case object ConnectHost
 case object Collect
-class MoxaSelector extends SelectorModel {
-  val host = current.configuration.getString("selector.MOXA.host").get
-  val max = current.configuration.getInt("selector.MOXA.max").get
+class MoxaSelector(gcName:String, config:Configuration) extends SelectorModel {
+  val host = config.getString("host").get
+  val max = config.getInt("max").get
   for (id <- 1 to max) {
-    Monitor.getMonitorValueByName(id)
+    Monitor.getMonitorValueByName(gcName, id)
   }
   val worker = Akka.system.actorOf(Props(new MoxaE1212Collector(host, max, this)), name = "moxaAgent")
   worker ! ConnectHost

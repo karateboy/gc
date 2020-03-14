@@ -202,7 +202,7 @@ object ExcelUtility {
     val statMap = Query.getPeriodStatReportMap(periodMap, 1.day)(reportDate, reportDate + 1.day)
 
     def fillMonitorDailyReport(monitor: Monitor.Value) = {
-      titleRow.createCell(0).setCellValue((Monitor.map(monitor).indParkName + Monitor.map(monitor).dp_no) + "監測日報表")
+      titleRow.createCell(0).setCellValue((Monitor.map(monitor).gcName + Monitor.map(monitor).selector) + "監測日報表")
       dateRow.createCell(0).setCellValue(s"日期:${reportDate.toString("yyyy年MM月dd日")}")
 
       for {

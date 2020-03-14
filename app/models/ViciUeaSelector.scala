@@ -1,24 +1,32 @@
 package models
+
 import play.api._
 import akka.actor._
 import play.api.Play.current
 import play.api.libs.concurrent.Akka
 import scala.concurrent.ExecutionContext.Implicits.global
-import akka.pattern.{ ask, pipe }
+import akka.pattern.{ask, pipe}
 
 case object IssueCPcmd
+
 case object ReadCurrentStreamNum
+
 case class SetStreamNum(v: Int)
 
-class ViciUeaSelector extends SelectorModel {
-  val max = current.configuration.getInt("selector.viciUea.max").get
+class ViciUeaSelector(gcName: String, config: Configuration) extends SelectorModel {
+  val max = config.getInt("max").get
   val worker = Akka.system.actorOf(Props(new UeaSelectorWorker(this)), name = "selectorAgent")
 
+  def getGcName = gcName
+
   @volatile var streamNum = 1
+
   def getStreamNum(): Int = streamNum
+
   def setStreamNum(v: Int) {
     worker ! SetStreamNum(v)
   }
+
   val canSetStream = true
 
   def modifyStreamNum(v: Int) {
@@ -30,7 +38,7 @@ class ViciUeaSelector extends SelectorModel {
 class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
   val max = current.configuration.getInt("selector.viciUea.max").get
   for (id <- 1 to max) {
-    Monitor.getMonitorValueByName(id)
+    Monitor.getMonitorValueByName(selector.getGcName, id)
   }
 
   val comPort = Play.current.configuration.getInt("selector.viciUea.com").get
@@ -78,7 +86,7 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
         val setCmd = s"GO%02d\r".format(v)
         serial.os.write(setCmd.getBytes)
         selector.modifyStreamNum(v)
-        
+
         // Read current position after 2 seconds
         timer.cancel()
         timer = context.system.scheduler.scheduleOnce(
@@ -90,6 +98,7 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
       }
 
   }
+
   override def postStop() {
     timer.cancel()
   }

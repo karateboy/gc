@@ -10,11 +10,11 @@ abstract class SelectorModel() {
   val max: Int
 }
 
-object VirtualSelector extends SelectorModel {
+class VirtualSelector(gcName:String, config: Configuration) extends SelectorModel {
   private var currentStream = 1
-  val max = current.configuration.getInt("selector.virtual.max").get
+  val max = config.getInt("max").get
   for (id <- 1 to max) {
-    Monitor.getMonitorValueByName(id)
+    Monitor.getMonitorValueByName(gcName, id)
   }
 
   def getStreamNum(): Int = currentStream
@@ -22,17 +22,17 @@ object VirtualSelector extends SelectorModel {
   val canSetStream = true
 }
 
-object Selector {
-  val selectorModel = Play.current.configuration.getString("selector.model").get
+class Selector(gcName:String, config: Configuration) {
+  val selectorModel: String = config.getString("model").get
   val model: SelectorModel = selectorModel match {
-    case "virtual" => VirtualSelector
+    case "virtual" => new VirtualSelector(gcName, config.getConfig("virtual").get)
     case "VICI_UEA" =>
       Logger.info("VICI Universial Electric Actuator is selected")
-      new ViciUeaSelector()
+      new ViciUeaSelector(gcName, config.getConfig("viciUea").get)
 
     case "MOXA" =>
       Logger.info("MOXA E1212 is selected")
-      new MoxaSelector()
+      new MoxaSelector(gcName, config.getConfig("MOXA").get)
     case unknown =>
       Logger.error(s"Unknown model $unknown")
       ???

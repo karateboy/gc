@@ -26,3 +26,4 @@ node_modules
 /gc_front/*.lock
 /gc_front/*.log
 /export/realtime.txt
+.idea

@@ -281,9 +281,9 @@ object Query extends Controller {
         }
       } yield {
         if (monitorTypes.length > 1) {
-          seqData(s"${Monitor.map(m).dp_no}_${MonitorType.map(mt).desp}", timeData)
+          seqData(s"${Monitor.map(m).selector}_${MonitorType.map(mt).desp}", timeData)
         } else {
-          seqData(s"${Monitor.map(m).dp_no}_${MonitorType.map(mt).desp}", timeData)
+          seqData(s"${Monitor.map(m).selector}_${MonitorType.map(mt).desp}", timeData)
         }
       }
     }
@@ -409,9 +409,9 @@ object Query extends Controller {
           }
         } yield {
           if (monitorTypes.length > 1) {
-            seqData(s"${Monitor.map(m).dp_no}_${MonitorType.map(mt).desp}", timeData)
+            seqData(s"${Monitor.map(m).selector}_${MonitorType.map(mt).desp}", timeData)
           } else {
-            seqData(s"${Monitor.map(m).dp_no}_${MonitorType.map(mt).desp}", timeData)
+            seqData(s"${Monitor.map(m).selector}_${MonitorType.map(mt).desp}", timeData)
           }
         }
       }
@@ -498,7 +498,7 @@ object Query extends Controller {
         m <- monitors
         boxReport = monitorTypes map { mt => monitorReportMap(m)(mt) }
       } yield {
-        seqData(s"${Monitor.map(m).dp_no}", boxReport)
+        seqData(s"${Monitor.map(m).selector}", boxReport)
       }
     }
 
@@ -878,7 +878,7 @@ object Query extends Controller {
             alarm <- alarmList
           } yield {
             val monitorDesp = if (alarm.monitor.isDefined)
-              Monitor.map(alarm.monitor.get).dp_no
+              Monitor.map(alarm.monitor.get).selector
             else
               "-"
             val mtDesp = if (alarm.monitorType.isDefined)

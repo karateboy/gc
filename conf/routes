@@ -28,7 +28,7 @@ GET      /pdfReport/:id                                                        c
 GET      /history_trend                                                        controllers.Query.historyTrendChart2(monitors: String, monitorTypes: String, start: Long, end: Long)
 GET      /realtime_data                                                        controllers.Realtime.latestValues	
 GET      /current_monitor                                                      controllers.Realtime.getCurrentMonitor
-POST     /current_monitor                                                      controllers.Realtime.setCurrentMonitor(id:Int)	
+POST     /current_monitor                                                      controllers.Realtime.setCurrentMonitor(gcName:String, id:Int)
 GET      /last10_data                                                          controllers.Query.last10Data()	
 GET      /alarm                                                                controllers.Query.alarmData(start: Long, end: Long)
 GET      /testAlarm                                                            controllers.Application.testAlarm	

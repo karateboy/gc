@@ -4,17 +4,32 @@ import play.api._
 import akka.actor._
 import play.api.Play.current
 import play.api.libs.concurrent.Akka
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import ModelHelper._
 import org.mongodb.scala.bson._
 import org.mongodb.scala.model._
 
+import scala.collection.JavaConverters._
+import scala.collection.mutable
+
+case class GcConfig(index: Int, inputDir: String, selector: Selector){
+  val gcName = GcAgent.getGcName(index)
+}
+
 object GcAgent {
   case object ParseReport
+  def getGcName(idx:Int) = s"gc${idx}"
 
-  val inputPath = Play.current.configuration.getString("inputDir").getOrElse("C:/gc/")
-
-  Logger.info(s"inputDir =$inputPath")
+  val gcConfigList: mutable.Seq[GcConfig] = {
+    val configList = Play.current.configuration.getConfigList("gcConfigList").get.asScala
+    for ((config, idx) <- configList.zipWithIndex) yield {
+      val inputDir = config.getString("inputDir", None).get
+      val selector = new Selector(getGcName(idx), config.getConfig("model").get)
+      Logger.info(s"${getGcName(idx)} inputDir =$inputDir")
+      GcConfig(idx, inputDir, selector)
+    }
+  }
 
   var receiver: ActorRef = _
   def startup() = {
@@ -35,8 +50,12 @@ class GcAgent extends Actor {
   def receive = {
     case ParseReport =>
       try {
-        processInputPath(parser)
-        checkNoDataPeriod
+        for(gcConfig <- gcConfigList){
+          processInputPath(gcConfig, parser)
+          checkNoDataPeriod
+        }
+        
+        
       } catch {
         case ex: Throwable =>
           Logger.error("process InputPath failed", ex)
@@ -47,7 +66,7 @@ class GcAgent extends Actor {
 
   var latestDataTime: com.github.nscala_time.time.Imports.DateTime = com.github.nscala_time.time.Imports.DateTime.now()
   import java.io.File
-  def parser(reportDir: File): Boolean = {
+  def parser(gcConfig:GcConfig, reportDir: File): Boolean = {
     import java.nio.file.{ Paths, Files, StandardOpenOption }
     import java.nio.charset.{ StandardCharsets }
     import scala.collection.JavaConverters._
@@ -65,7 +84,7 @@ class GcAgent extends Actor {
 
     import com.github.nscala_time.time.Imports._
 
-    val monitor = Monitor.getMonitorValueByName(Selector.get)
+    val monitor = Monitor.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
 
     def insertRecord() = {
       val lines =
@@ -185,7 +204,7 @@ class GcAgent extends Actor {
 
   var retryMap = Map.empty[String, Int]
   val MAX_RETRY_COUNT = 30
-  def processInputPath(parser: (File) => Boolean) = {
+  def processInputPath(gcConfig: GcConfig, parser: (GcConfig, File) => Boolean) = {
     import org.apache.commons.io.FileUtils
     import java.io.File
     import org.apache.commons.io.filefilter.DirectoryFileFilter
@@ -199,7 +218,7 @@ class GcAgent extends Actor {
       val dfav = Files.getFileAttributeView(path, classOf[DosFileAttributeView])
       dfav.setArchive(true)
     }
-    val dirs = listDirs(GcAgent.inputPath)
+    val dirs = listDirs(gcConfig.inputDir)
     val output =
       for (dir <- dirs) yield {
         val absPath = dir.getAbsolutePath
@@ -207,7 +226,7 @@ class GcAgent extends Actor {
           Logger.info(s"Processing ${absPath}")
 
         try {
-          if (parser(dir))
+          if (parser(gcConfig, dir))
             setArchive(dir)
         } catch {
           case ex: Throwable =>

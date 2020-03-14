@@ -11,7 +11,6 @@ object Global extends GlobalSettings {
     Logger.info("Application has started")
     super.onStart(app)
     MongoDB.init()
-    Logger.info(s"Selector is set to ${Selector.get}")
     GcAgent.startup()
     Exporter.exportRealtimeData
   }

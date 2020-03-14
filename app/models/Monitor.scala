@@ -9,7 +9,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import org.mongodb.scala.bson._
 import org.mongodb.scala.model._
 
-case class Monitor(_id: String, indParkName: String, dp_no: String)
+case class Monitor(_id: String, gcName: String, selector: String)
 
 object Monitor extends Enumeration {
   implicit val monitorRead: Reads[Monitor.Value] = EnumUtils.enumReads(Monitor)
@@ -33,12 +33,12 @@ object Monitor extends Enumeration {
   val codecRegistry = fromRegistries(fromProviders(classOf[Monitor]), DEFAULT_CODEC_REGISTRY)
   val collection = MongoDB.database.getCollection[Monitor](colName).withCodecRegistry(codecRegistry)
 
-  def monitorId(selector: Int) = s"${selector}"
+  def monitorId(gcName:String, selector: Int) = s"$gcName:${selector}"
 
-  def buildMonitor(selector: Int, dp_no: String) = {
+  def buildMonitor(gcName:String, selector: Int, dp_no: String) = {
     assert(!dp_no.isEmpty)
 
-    Monitor(monitorId(selector), "", dp_no)
+    Monitor(monitorId(gcName, selector), gcName, dp_no)
   }
 
 
@@ -47,11 +47,11 @@ object Monitor extends Enumeration {
       val f = MongoDB.database.createCollection(colName).toFuture()
       f.onFailure(errorHandler)
       f.onSuccess({
-        case _: Seq[t] =>          
+        case _: Seq[t] =>
       })
-      
+
       waitReadyResult(f)
-    } 
+    }
   }
 
   def newMonitor(m: Monitor) = {
@@ -93,26 +93,26 @@ object Monitor extends Enumeration {
 
   var map: Map[Value, Monitor] = Map(mList.map { e => Value(e._id) -> e }: _*)
   var mvList = mList.map(mt => Monitor.withName(mt._id))
-  def indParkSet = mvList.map { map(_).indParkName }.foldRight(Set.empty[String])((name, set) => set + name)
+  def indParkSet = mvList.map { map(_).gcName }.foldRight(Set.empty[String])((name, set) => set + name)
   def indParkMonitor(indParkFilter: Seq[String]) =
     mvList.filter(p => {
       val monitor = Monitor.map(p)
-      indParkFilter.contains(monitor.indParkName)
+      indParkFilter.contains(monitor.gcName)
     })
 
   def indParkMonitor(indPark: String) =
     mvList.filter(p => {
       val monitor = Monitor.map(p)
-      monitor.indParkName == indPark
+      monitor.gcName == indPark
     })
 
-  def getMonitorValueByName(selector: Int) = {
+  def getMonitorValueByName(gcName:String, selector: Int) = {
     try {
-      val id = monitorId(selector)
+      val id = monitorId(gcName, selector)
       Monitor.withName(id)
     } catch {
       case _: NoSuchElementException =>
-        newMonitor(buildMonitor(selector, s"#${selector}"))
+        newMonitor(buildMonitor(gcName, selector, s"#$selector"))
     }
   }
   
