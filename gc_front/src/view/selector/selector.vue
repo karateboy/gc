@@ -2,17 +2,17 @@
   <div>
     <Row>
       <Spin size="large" fix v-if="spinShow"></Spin>
-      <Card title="切換通道">
+      <Card v-for="(gc, idx) in gcList" :key="gc" :title="`${gc}切換通道`">
         <ButtonGroup size="large">
           <Button
             size="large"
-            v-for="item in monitorList"
+            v-for="item in gcMonitorList[idx]"
             :key="item._id"
             :type="buttonType(item._id)"
             :icon="buttonIcon(item._id)"
             @click="setSelector(item._id)"
           >
-            <p>{{'通道' + item._id}}</p>
+            <p>{{`通道${item.selector}`}}</p>
             {{item.dp_no}}
           </Button>
         </ButtonGroup>
@@ -23,57 +23,57 @@
 <style scoped>
 </style>
 <script>
-import InforCard from '_c/info-card';
+import InforCard from "_c/info-card";
 
-import { getMonitors, getCurrentMonitor, setCurrentMonitor } from '@/api/data';
+import {
+  getCurrentMonitor,
+  setCurrentMonitor,
+  getGcMonitorList
+} from "@/api/data";
 
 export default {
-  name: 'selector',
+  name: "selector",
   components: {
     InforCard
   },
   mounted() {
-    getMonitors()
+    getGcMonitorList()
       .then(resp => {
-        this.monitorList.splice(0, this.monitorList.length);
-        for (let mt of resp.data) {
-          this.monitorList.push(mt);
+        const ret = resp.data;
+        for (let gc in ret) {
+          this.gcList.push(gc);
+          this.gcMonitorList.push(ret[gc]);
         }
       })
-      .catch(err => {
-        alert(err);
-      });
+      .catch(err => alert(err));
+
     this.refreshCurrentSelector();
   },
   data() {
     return {
+      gcList: [],
       monitorList: [],
-      selector: {
-        _id: 'default',
-        dp_no: '#2',
-        icon: 'ios-speedometer',
-        color: '#ff0000',
-        title: '選樣器通道'
-      },
+      gcMonitorList: [],
+      current_selector: [],
       spinShow: false
     };
   },
   computed: {},
   methods: {
-    buttonType(ch) {
-      if (ch === this.selector._id) return 'success';
-      else return 'default';
+    buttonType(id) {
+      if (this.current_selector.indexOf(id) !== -1) return "success";
+      else return "default";
     },
-    buttonIcon(ch) {
-      if (ch === this.selector._id) return 'md-checkmark';
-      else return '';
+    buttonIcon(id) {
+      if (this.current_selector.indexOf(id) !== -1) return "md-checkmark";
+      else return "";
     },
     setSelector(current) {
       this.spinShow = true;
       setCurrentMonitor(current)
         .then(resp => {
           this.spinShow = false;
-          this.$Message.success('切換成功');
+          this.$Message.success("切換成功");
           this.refreshCurrentSelector();
         })
         .catch(err => {
@@ -84,14 +84,11 @@ export default {
     refreshCurrentSelector() {
       getCurrentMonitor()
         .then(resp => {
-          this.selector = Object.assign(
-            {
-              icon: 'ios-speedometer',
-              color: '#ff0000',
-              title: '選樣器通道'
-            },
-            resp.data
-          );
+          const ret = resp.data;
+          this.current_selector.splice(0, this.current_selector.length);
+          for (let selector of ret) {
+            this.current_selector.push(selector._id);
+          }
         })
         .catch(err => {
           alert(err);

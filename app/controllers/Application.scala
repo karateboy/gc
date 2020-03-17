@@ -181,6 +181,12 @@ object Application extends Controller {
       Ok(Json.toJson(monitors))
   }
 
+  def gcList = Security.Authenticated {
+    implicit request =>
+        val gcList = Monitor.indParkSet.toList
+        Ok(Json.toJson(gcList))
+  }
+
   def indParkList = Security.Authenticated.async {
     implicit request =>
       val userOptF = User.getUserByIdFuture(request.user.id)

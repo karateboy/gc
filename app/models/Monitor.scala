@@ -9,7 +9,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import org.mongodb.scala.bson._
 import org.mongodb.scala.model._
 
-case class Monitor(_id: String, gcName: String, selector: String)
+case class Monitor(_id: String, gcName: String, selector: String, dp_no:String)
 
 object Monitor extends Enumeration {
   implicit val monitorRead: Reads[Monitor.Value] = EnumUtils.enumReads(Monitor)
@@ -38,7 +38,7 @@ object Monitor extends Enumeration {
   def buildMonitor(gcName:String, selector: Int, dp_no: String) = {
     assert(!dp_no.isEmpty)
 
-    Monitor(monitorId(gcName, selector), gcName, dp_no)
+    Monitor(monitorId(gcName, selector), gcName, selector.toString, dp_no)
   }
 
 
@@ -112,7 +112,7 @@ object Monitor extends Enumeration {
       Monitor.withName(id)
     } catch {
       case _: NoSuchElementException =>
-        newMonitor(buildMonitor(gcName, selector, s"#$selector"))
+        newMonitor(buildMonitor(gcName, selector, s"$gcName:$selector"))
     }
   }
   

@@ -17,6 +17,7 @@ GET      /getUserInfo                                                          c
 GET      /logout                                                               controllers.Login.logout
 POST     /authenticate                                                         controllers.Login.authenticate
 
+GET      /gc                                                                   controllers.Application.gcList
 GET      /monitor                                                              controllers.Application.monitorList
 POST     /monitor                                                              controllers.Application.updateMonitor
 GET      /monitor_type                                                         controllers.Application.monitorTypeList
@@ -28,7 +29,8 @@ GET      /pdfReport/:id                                                        c
 GET      /history_trend                                                        controllers.Query.historyTrendChart2(monitors: String, monitorTypes: String, start: Long, end: Long)
 GET      /realtime_data                                                        controllers.Realtime.latestValues	
 GET      /current_monitor                                                      controllers.Realtime.getCurrentMonitor
-POST     /current_monitor                                                      controllers.Realtime.setCurrentMonitor(gcName:String, id:Int)
+POST     /current_monitor                                                      controllers.Realtime.setCurrentMonitor(monitorId:String)
+GET      /gc_monitor                                                           controllers.Realtime.getGcMonitors
 GET      /last10_data                                                          controllers.Query.last10Data()	
 GET      /alarm                                                                controllers.Query.alarmData(start: Long, end: Long)
 GET      /testAlarm                                                            controllers.Application.testAlarm	

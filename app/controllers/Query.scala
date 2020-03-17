@@ -409,9 +409,9 @@ object Query extends Controller {
           }
         } yield {
           if (monitorTypes.length > 1) {
-            seqData(s"${Monitor.map(m).selector}_${MonitorType.map(mt).desp}", timeData)
+            seqData(s"${Monitor.map(m).dp_no}_${MonitorType.map(mt).desp}", timeData)
           } else {
-            seqData(s"${Monitor.map(m).selector}_${MonitorType.map(mt).desp}", timeData)
+            seqData(s"${Monitor.map(m).dp_no}_${MonitorType.map(mt).desp}", timeData)
           }
         }
       }
@@ -637,7 +637,7 @@ object Query extends Controller {
   def historyTrendChart2(monitorStr: String, monitorTypeStr: String, startLong: Long, endLong: Long) = Security.Authenticated.async {
     implicit request =>
       import scala.collection.JavaConverters._
-      val monitorStrArray = java.net.URLDecoder.decode(monitorStr, "UTF-8").split(':')
+      val monitorStrArray = java.net.URLDecoder.decode(monitorStr, "UTF-8").split(',')
       val monitors = monitorStrArray.map { Monitor.withName }
 
       val monitorTypeStrArray = java.net.URLDecoder.decode(monitorTypeStr, "UTF-8").split(':')
@@ -746,7 +746,7 @@ object Query extends Controller {
         }
 
         val mtColumnNames = monitorTypes.toSeq map { MonitorType.map(_).desp }
-        val columnNames = mtColumnNames.+:("選擇器")
+        val columnNames = mtColumnNames.+:("GC/選擇器")
         Ok(Json.toJson(DataTab(columnNames, rows)))
       }
   }
@@ -804,7 +804,7 @@ object Query extends Controller {
             RowData(r.time, cellData, r.pdfReport)
         }
         val mtColumnNames = MonitorType.mtvList map { MonitorType.map(_).desp }
-        val columnNames = mtColumnNames.+:("選擇器")
+        val columnNames = mtColumnNames.+:("GC/選擇器")
         Ok(Json.toJson(DataTab(columnNames, rows)))
       }
   }

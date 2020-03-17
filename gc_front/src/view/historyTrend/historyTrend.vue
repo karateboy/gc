@@ -3,9 +3,18 @@
     <Row>
       <Card>
         <Form ref="historyTrend" :model="formItem" :rules="rules" :label-width="80">
+          <FormItem label="GC" prop="gc">
+            <Select v-model="formItem.gc" filterable multiple>
+              <Option v-for="item in gcList" :value="item" :key="item">{{ item }}</Option>
+            </Select>
+          </FormItem>
           <FormItem label="選擇器" prop="monitors">
             <Select v-model="formItem.monitors" filterable multiple>
-              <Option v-for="item in monitorList" :value="item._id" :key="item._id">{{ item.dp_no }}</Option>
+              <Option
+                v-for="item in monitorUnderGc"
+                :value="item._id"
+                :key="item._id"
+              >{{ item.dp_no }}</Option>
             </Select>
           </FormItem>
           <FormItem label="測項" prop="monitorTypes">
@@ -51,7 +60,7 @@
     </Row>
     <Row>
       <Card v-if="display">
-        <div id="reportDiv" slot=""></div>
+        <div id="reportDiv" slot></div>
       </Card>
     </Row>
   </div>
@@ -59,13 +68,28 @@
 <style scoped>
 </style>
 <script>
-import highcharts from 'highcharts';
-import exporting from 'highcharts/modules/exporting';
-import { getMonitors, getMonitorTypes, getHistoryTrend } from '@/api/data';
+import highcharts from "highcharts";
+import exporting from "highcharts/modules/exporting";
+import {
+  getGcList,
+  getMonitors,
+  getMonitorTypes,
+  getHistoryTrend
+} from "@/api/data";
 
 export default {
-  name: 'historyTrend',
+  name: "historyTrend",
   mounted() {
+    getGcList()
+      .then(resp => {
+        const ret = resp.data;
+        this.gcList.splice(0, this.gcList.length);
+        for (let gc of ret) {
+          this.gcList.push(gc);
+        }
+      })
+      .catch(err => alert(err));
+
     getMonitors()
       .then(resp => {
         this.monitorList.splice(0, this.monitorList.length);
@@ -90,43 +114,45 @@ export default {
   },
   data() {
     return {
+      gcList: [],
       monitorList: [],
       monitorTypeList: [],
       chartType: [
         {
-          type: 'line',
-          desc: '折線圖'
+          type: "line",
+          desc: "折線圖"
         },
         {
-          type: 'spline',
-          desc: '曲線圖'
+          type: "spline",
+          desc: "曲線圖"
         },
         {
-          type: 'area',
-          desc: '面積圖'
+          type: "area",
+          desc: "面積圖"
         },
         {
-          type: 'areaspline',
-          desc: '曲線面積圖'
+          type: "areaspline",
+          desc: "曲線面積圖"
         },
         {
-          type: 'column',
-          desc: '柱狀圖'
+          type: "column",
+          desc: "柱狀圖"
         },
         {
-          type: 'scatter',
-          desc: '點圖'
+          type: "scatter",
+          desc: "點圖"
         },
         {
-          type: 'boxplot',
-          desc: '盒鬚圖'
+          type: "boxplot",
+          desc: "盒鬚圖"
         }
       ],
       formItem: {
+        gc: [],
         monitors: [],
         monitorTypes: [],
         dateRange: [],
-        chartType: 'line',
+        chartType: "line",
         start: undefined,
         end: undefined
       },
@@ -134,36 +160,44 @@ export default {
         monitors: [
           {
             required: true,
-            type: 'array',
+            type: "array",
             min: 1,
-            message: '至少選擇一個通道',
-            trigger: 'change'
+            message: "至少選擇一個通道",
+            trigger: "change"
           }
         ],
         monitorTypes: [
           {
             required: true,
-            type: 'array',
+            type: "array",
             min: 1,
-            message: '至少選擇一個測項',
-            trigger: 'change'
+            message: "至少選擇一個測項",
+            trigger: "change"
           }
         ],
         dateRange: [
           {
             required: true,
-            type: 'array',
+            type: "array",
             min: 1,
-            message: '請選擇資料範圍',
-            trigger: 'change'
+            message: "請選擇資料範圍",
+            trigger: "change"
           }
         ]
       },
       display: false,
-      query_url: ''
+      query_url: ""
     };
   },
   computed: {
+    monitorUnderGc() {
+      return this.monitorList.filter(monitor => {
+        if (this.formItem.gc.length === 0) return true;
+        else {
+          return this.formItem.gc.indexOf(monitor.gcName) !== -1;
+        }
+      });
+    },
     downloadable() {
       return this.query_url.length !== 0;
     }
@@ -185,14 +219,14 @@ export default {
     },
     query() {
       this.display = true;
-      let monitors = encodeURIComponent(this.formItem.monitors.join(':'));
+      let monitors = encodeURIComponent(this.formItem.monitors.join(","));
       let monitorTypes = encodeURIComponent(
-        this.formItem.monitorTypes.join(':')
+        this.formItem.monitorTypes.join(":")
       );
 
-      if (this.formItem.chartType === 'boxplot') {
+      if (this.formItem.chartType === "boxplot") {
         if (this.formItem.monitorTypes.length > 1) {
-          alert('盒鬚圖只能選擇單一測項!');
+          alert("盒鬚圖只能選擇單一測項!");
           return;
         }
       }
@@ -207,47 +241,47 @@ export default {
       })
         .then(resp => {
           const ret = resp.data;
-          if (this.formItem.chartType !== 'boxplot') {
+          if (this.formItem.chartType !== "boxplot") {
             ret.chart = {
               type: this.formItem.chartType,
-              zoomType: 'x',
+              zoomType: "x",
               panning: true,
-              panKey: 'shift',
+              panKey: "shift",
               alignTicks: false
             };
 
             var pointFormatter = function() {
               var d = new Date(this.x);
-              return d.toLocaleString() + ': ' + Math.round(this.y) + '度';
+              return d.toLocaleString() + ": " + Math.round(this.y) + "度";
             };
 
             ret.colors = [
-              '#7CB5EC',
-              '#434348',
-              '#90ED7D',
-              '#F7A35C',
-              '#8085E9',
-              '#F15C80',
-              '#E4D354',
-              '#2B908F',
-              '#FB9FA8',
-              '#91E8E1',
-              '#7CB5EC',
-              '#80C535',
-              '#969696'
+              "#7CB5EC",
+              "#434348",
+              "#90ED7D",
+              "#F7A35C",
+              "#8085E9",
+              "#F15C80",
+              "#E4D354",
+              "#2B908F",
+              "#FB9FA8",
+              "#91E8E1",
+              "#7CB5EC",
+              "#80C535",
+              "#969696"
             ];
 
             ret.tooltip = { valueDecimals: 2 };
             ret.legend = { enabled: true };
             ret.credits = {
               enabled: false,
-              href: 'http://www.wecc.com.tw/'
+              href: "http://www.wecc.com.tw/"
             };
-            ret.xAxis.type = 'datetime';
+            ret.xAxis.type = "datetime";
             ret.xAxis.dateTimeLabelFormats = {
-              day: '%b%e日',
-              week: '%b%e日',
-              month: '%y年%b'
+              day: "%b%e日",
+              week: "%b%e日",
+              month: "%y年%b"
             };
 
             ret.plotOptions = {
@@ -260,7 +294,7 @@ export default {
           }
 
           exporting(highcharts);
-          highcharts.chart('reportDiv', ret);
+          highcharts.chart("reportDiv", ret);
         })
         .catch(err => {
           alert(err);

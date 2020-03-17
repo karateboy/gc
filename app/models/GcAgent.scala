@@ -19,14 +19,16 @@ case class GcConfig(index: Int, inputDir: String, selector: Selector){
 
 object GcAgent {
   case object ParseReport
-  def getGcName(idx:Int) = s"gc${idx}"
+  def getGcName(idx:Int) = s"gc${idx+1}"
 
   val gcConfigList: mutable.Seq[GcConfig] = {
     val configList = Play.current.configuration.getConfigList("gcConfigList").get.asScala
     for ((config, idx) <- configList.zipWithIndex) yield {
       val inputDir = config.getString("inputDir", None).get
-      val selector = new Selector(getGcName(idx), config.getConfig("model").get)
-      Logger.info(s"${getGcName(idx)} inputDir =$inputDir")
+      Logger.info(config.toString)
+      val selector = new Selector(getGcName(idx), config.getConfig("selector").get)
+      Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
+      Logger.info(s"${selector.toString}")
       GcConfig(idx, inputDir, selector)
     }
   }

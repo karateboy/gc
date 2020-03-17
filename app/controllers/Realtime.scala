@@ -124,6 +124,20 @@ object Realtime extends Controller {
       }
   }
 
+  def getGcMonitors() = Security.Authenticated {
+    implicit request =>
+      var gcNameMonitorMap = Map.empty[String, Seq[Monitor]]
+
+      for (monitor <- Monitor.mvList map {
+        Monitor.map
+      }) {
+        val gcMonitorList = gcNameMonitorMap.getOrElse(monitor.gcName, Seq.empty[Monitor])
+        gcNameMonitorMap = gcNameMonitorMap + (monitor.gcName -> gcMonitorList.:+(monitor))
+      }
+
+      Ok(Json.toJson(gcNameMonitorMap))
+  }
+
   def getCurrentMonitor() = Security.Authenticated {
     implicit request =>
       val monitors: mutable.Seq[_root_.models.Monitor.Value] =
@@ -136,11 +150,14 @@ object Realtime extends Controller {
       Ok(Json.toJson(monitorCase))
   }
 
-  def setCurrentMonitor(gcName: String, id: Int) = Security.Authenticated.async {
+  def setCurrentMonitor(monitorId: String) = Security.Authenticated.async {
     implicit request =>
-      Logger.info(s"$gcName Selector set to ${id}")
+      val tokens = monitorId.split(":")
+      val gcName = tokens(0)
+      val selector = tokens(1).toInt
+      Logger.info(s"$gcName Selector set to ${selector}")
       for (config <- GcAgent.gcConfigList.find(config => config.gcName == gcName)) {
-        config.selector.set(id)
+        config.selector.set(selector)
       }
 
       import java.util.Timer

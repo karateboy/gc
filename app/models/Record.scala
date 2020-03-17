@@ -309,7 +309,7 @@ object Record {
             MtRecord(mtDesp, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
           }
         val pdfReport = doc.get("pdfReport").get.asObjectId().getValue
-        RecordList(Monitor.map(monitor).selector, time.getMillis, mtDataList, pdfReport)
+        RecordList(Monitor.map(monitor).dp_no, time.getMillis, mtDataList, pdfReport)
       }
     }
   }
@@ -450,7 +450,7 @@ object Record {
           new ObjectId()
         else
           doc.get("pdfReport").get.asObjectId().getValue
-        RecordList(Monitor.map(monitor).selector, time.getMillis, mtDataList, pdfReport)
+        RecordList(Monitor.map(monitor).dp_no, time.getMillis, mtDataList, pdfReport)
       }
     }
   }

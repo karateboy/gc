@@ -7,6 +7,20 @@ export const getMonitors = () => {
   })
 }
 
+export const getGcList = () => {
+  return axios.request({
+    url: 'gc',
+    method: 'get'
+  })
+}
+
+export const getGcMonitorList = () => {
+  return axios.request({
+    url: 'gc_monitor',
+    method: 'get'
+  })
+}
+
 export const setMonitor = (data) => {
   return axios.request({
     url: 'monitor',
@@ -73,11 +87,11 @@ export const getCurrentMonitor = () => {
   })
 }
 
-export const setCurrentMonitor = (id) => {
+export const setCurrentMonitor = (monitorId) => {
   return axios.request({
     url: 'current_monitor',
     method: 'post',
-    params: { id }
+    params: { monitorId }
   })
 }
 

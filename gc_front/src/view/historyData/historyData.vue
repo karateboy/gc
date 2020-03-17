@@ -3,9 +3,18 @@
     <Row>
       <Card>
         <Form ref="historyData" :model="formItem" :rules="rules" :label-width="80">
+          <FormItem label="GC" prop="gc">
+            <Select v-model="formItem.gc" filterable>
+              <Option v-for="item in gcList" :value="item" :key="item">{{ item }}</Option>
+            </Select>
+          </FormItem>
           <FormItem label="選擇器" prop="monitor">
             <Select v-model="formItem.monitor" filterable>
-              <Option v-for="item in monitorList" :value="item._id" :key="item._id">{{ item.dp_no }}</Option>
+              <Option
+                v-for="item in monitorUnderGc"
+                :value="item._id"
+                :key="item._id"
+              >{{ item.dp_no }}</Option>
             </Select>
           </FormItem>
           <FormItem label="測項" prop="monitorTypes">
@@ -62,20 +71,37 @@
 <style scoped>
 </style>
 <script>
-import moment from 'moment';
-import config from '@/config';
-import URI from 'urijs';
+import moment from "moment";
+import config from "@/config";
+import URI from "urijs";
 
-import { getMonitors, getMonitorTypes, getHistoryData } from '@/api/data';
+import {
+  getGcList,
+  getMonitors,
+  getMonitorTypes,
+  getHistoryData
+} from "@/api/data";
 const baseUrl =
-  process.env.NODE_ENV === 'development'
+  process.env.NODE_ENV === "development"
     ? config.baseUrl.dev
     : config.baseUrl.pro;
 export default {
-  name: 'historyData',
+  name: "historyData",
   mounted() {
+    getGcList()
+      .then(resp => {
+        const ret = resp.data;
+        this.gcList.splice(0, this.gcList.length);
+        for (let gc of ret) {
+          this.gcList.push(gc);
+        }
+      })
+      .catch(err => alert(err));
+
     getMonitors()
       .then(resp => {
+        const ret = resp.data;
+        console.log(ret);
         this.monitorList.splice(0, this.monitorList.length);
         for (let mt of resp.data) {
           this.monitorList.push(mt);
@@ -96,16 +122,28 @@ export default {
         alert(err);
       });
   },
+  computed: {
+    monitorUnderGc() {
+      return this.monitorList.filter(monitor => {
+        if (!this.formItem.gc) return true;
+        else {
+          return monitor.gcName === this.formItem.gc;
+        }
+      });
+    }
+  },
   data() {
     return {
+      gcList: [],
       monitorList: [],
       monitorTypeList: [],
       formItem: {
-        monitor: '',
+        gc: "",
+        monitor: "",
         monitorTypes: [],
         dateRange: [
           moment()
-            .subtract(2, 'days')
+            .subtract(2, "days")
             .toDate(),
           moment().toDate()
         ],
@@ -116,30 +154,29 @@ export default {
         monitorTypes: [
           {
             required: true,
-            type: 'array',
+            type: "array",
             min: 1,
-            message: '至少選擇一個測項',
-            trigger: 'change'
+            message: "至少選擇一個測項",
+            trigger: "change"
           }
         ],
         dateRange: [
           {
             required: true,
-            type: 'array',
+            type: "array",
             min: 2,
-            message: '請選擇資料範圍',
-            trigger: 'change'
+            message: "請選擇資料範圍",
+            trigger: "change"
           }
         ]
       },
       display: false,
       showPdf: false,
-      pdfUrl: '',
+      pdfUrl: "",
       columns: [],
       rows: []
     };
   },
-  computed: {},
   methods: {
     handleSubmit() {
       this.$refs.historyData.validate(valid => {
@@ -160,7 +197,7 @@ export default {
       this.formItem.end = this.formItem.dateRange[1].getTime();
       getHistoryData({
         monitor: this.formItem.monitor,
-        monitorTypes: encodeURIComponent(this.formItem.monitorTypes.join(',')),
+        monitorTypes: encodeURIComponent(this.formItem.monitorTypes.join(",")),
         start: this.formItem.start,
         end: this.formItem.end
       })
@@ -169,8 +206,8 @@ export default {
           this.columns.splice(0, this.columns.length);
           this.rows.splice(0, this.rows.length);
           this.columns.push({
-            title: '日期',
-            key: 'date',
+            title: "日期",
+            key: "date",
             sortable: true
           });
           for (let i = 0; i < ret.columnNames.length; i++) {
@@ -183,21 +220,23 @@ export default {
           }
           // setup for report column
           this.columns.push({
-            title: '動作',
-            slot: 'action',
+            title: "動作",
+            slot: "action",
             width: 150,
-            align: 'center'
+            align: "center"
           });
           for (let row of ret.rows) {
             let rowData = {
-              date: new moment(row.date).format('lll'),
+              date: new moment(row.date).format("lll"),
               cellClassName: {}
             };
             for (let c = 0; c < row.cellData.length; c++) {
               let key = `col${c}`;
               rowData[key] = row.cellData[c].v;
               rowData.cellClassName[key] = row.cellData[c].cellClassName;
-              if (baseUrl.length !== 0) { rowData.pdfUrl = `${baseUrl}pdfReport/${row.pdfReport}`; } else rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
+              if (baseUrl.length !== 0) {
+                rowData.pdfUrl = `${baseUrl}pdfReport/${row.pdfReport}`;
+              } else rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
             }
             this.rows.push(rowData);
           }
@@ -215,13 +254,13 @@ export default {
         if (valid) {
           let uri = new URI(`${baseUrl}history_data/excel`);
           uri
-            .addSearch('monitor', this.formItem.monitor)
+            .addSearch("monitor", this.formItem.monitor)
             .addSearch(
-              'monitorTypes',
-              encodeURIComponent(this.formItem.monitorTypes.join(','))
+              "monitorTypes",
+              encodeURIComponent(this.formItem.monitorTypes.join(","))
             )
-            .addSearch('start', this.formItem.dateRange[0].getTime())
-            .addSearch('end', this.formItem.dateRange[1].getTime());
+            .addSearch("start", this.formItem.dateRange[0].getTime())
+            .addSearch("end", this.formItem.dateRange[1].getTime());
 
           window.open(uri);
         }

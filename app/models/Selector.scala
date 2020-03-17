@@ -40,7 +40,6 @@ class Selector(gcName:String, config: Configuration) {
 
   def get = model.getStreamNum()
   def set(v: Int) = model.setStreamNum(v)
-
 }
 
 
