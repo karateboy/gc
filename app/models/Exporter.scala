@@ -1,16 +1,25 @@
 package models
+
 import play.api._
-import java.nio.file.{ Paths, Files, StandardOpenOption }
+import java.nio.file.{Files, Paths, StandardOpenOption}
+
 import play.api.Play.current
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.github.nscala_time.time.Imports._
+
 import scala.concurrent._
 import ModelHelper._
+import com.github.s7connector.api.factory.S7ConnectorFactory
+
 object Exporter {
   val activeMonitorType = List(MonitorType.mtvList: _*)
+
   def exportActiveMonitorType = {
     val path = Paths.get(current.path.getAbsolutePath + "/export/activeMonitor.txt")
-    val monitorTypeStrList = activeMonitorType map { MonitorType.map(_)._id }
+    val monitorTypeStrList = activeMonitorType map {
+      MonitorType.map(_)._id
+    }
     val ret = monitorTypeStrList.fold("")((a, b) => {
       if (a.isEmpty())
         b
@@ -21,13 +30,16 @@ object Exporter {
   }
 
   var latestDateTime = new DateTime(0)
+
   import com.serotonin.modbus4j._
+
   var masterOpt: Option[ModbusMaster] = None
 
   val exportLocalModbus = Play.current.configuration.getBoolean("exportLocalModbus").getOrElse(false)
 
-  val modbusPort = Play.current.configuration.getInt("modbus_port").getOrElse(503)    
-    
+  val modbusPort = Play.current.configuration.getInt("modbus_port").getOrElse(503)
+
+
   def writeModbusSlave(data: Record.RecordList) = {
     import com.serotonin.modbus4j.ip.IpParameters
 
@@ -56,6 +68,7 @@ object Exporter {
         val request = new WriteRegisterRequest(slaveID, offset, value)
         master.send(request)
       }
+
       def writeLong(offset: Int, value: Long) = {
         val locator = BaseLocator.holdingRegister(slaveID, offset, DataType.EIGHT_BYTE_INT_SIGNED);
         master.setValue(locator, value);
@@ -80,13 +93,40 @@ object Exporter {
           if (masterOpt.isEmpty)
             connectHost
 
-          masterOpt map { writeReg }
+          masterOpt map {
+            writeReg
+          }
         } catch {
           case ex: Exception =>
             Logger.error(ex.getMessage, ex)
         }
       }
     } onFailure errorHandler
+  }
+
+  import com.github.s7connector.api._
+  import java.nio.ByteBuffer
+
+  def writePlc(data: Record.RecordList) = {
+    val tokens = data.monitor.split(":")
+    val gcName = tokens(0)
+    for {gcConfig <- GcAgent.gcConfigList.find(gcConfig => gcConfig.gcName == gcName)
+         plcConfig <- gcConfig.plcConfig
+         } {
+      val connector =
+        S7ConnectorFactory
+          .buildTCPConnector()
+          .withHost(plcConfig.host)
+          .build();
+      for (mtData <- data.mtDataList) {
+        if (plcConfig.exportMap.contains(mtData.mtName)) {
+          val entry = plcConfig.exportMap(mtData.mtName)
+          connector.write(DaveArea.DB, entry.db, entry.offset,
+            ByteBuffer.allocate(4).putFloat(mtData.value.toFloat).array())
+        }
+      }
+      connector.close()
+    }
   }
 
   def exportRealtimeData = {
@@ -110,8 +150,11 @@ object Exporter {
         latestDateTime = dateTime
 
         //Export to modbus
-        if(exportLocalModbus)
+        if (exportLocalModbus)
           writeModbusSlave(data)
+
+        //Export to plc if properly configured
+        writePlc(data)
 
         buffer += s"InjectionDate, ${data.time}\r"
         val mtStrs = data.mtDataList map { mt_data => s"${mt_data.mtName}, ${mt_data.value}" }

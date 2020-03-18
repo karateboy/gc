@@ -809,39 +809,6 @@ object Query extends Controller {
       }
   }
 
-  def historyReport(monitorStr: String, monitorTypeStr: String, tabTypeStr: String,
-                    startLong: Long, endLong: Long) = Security.Authenticated {
-    implicit request =>
-      import scala.collection.JavaConverters._
-      val monitor = Monitor.withName(java.net.URLDecoder.decode(monitorStr, "UTF-8"))
-
-      val monitorTypeStrArray = monitorTypeStr.split(':')
-      val monitorTypes = monitorTypeStrArray.map { MonitorType.withName }
-      val tabType = TableType.withName(tabTypeStr)
-      val (start, end) = (new DateTime(startLong), new DateTime(endLong))
-
-      val timeList = tabType match {
-        case TableType.hour =>
-          getPeriods(start, end, 1.hour)
-        case TableType.min =>
-          getPeriods(start, end, 1.minute)
-      }
-
-      val recordMap = Record.getRecordMap(TableType.mapCollection(tabType))(monitorTypes.toList, monitor, start, end)
-      val recordTimeMap = recordMap.map { p =>
-        val recordSeq = p._2
-        val timePair = recordSeq.map { r => r.time -> r }
-        p._1 -> Map(timePair: _*)
-      }
-
-      val explain = monitorTypes.map { t =>
-        val mtCase = MonitorType.map(t)
-        s"${mtCase.desp}(${mtCase.unit})"
-      }.mkString(",")
-      val output = views.html.historyReport(monitorTypes, explain, start, end, timeList, recordTimeMap)
-      Ok(output)
-  }
-
   def recordList(mStr: String, mtStr: String, startLong: Long, endLong: Long) = Security.Authenticated {
     val monitor = Monitor.withName(java.net.URLDecoder.decode(mStr, "UTF-8"))
     val monitorType = MonitorType.withName(java.net.URLDecoder.decode(mtStr, "UTF-8"))
@@ -850,11 +817,6 @@ object Query extends Controller {
 
     val recordMap = Record.getRecordMap(Record.HourCollection)(List(monitorType), monitor, start, end)
     Ok(Json.toJson(recordMap(monitorType)))
-  }
-
-  def windRose() = Security.Authenticated {
-    implicit request =>
-      Ok(views.html.windRose())
   }
 
   import java.nio.file.Files

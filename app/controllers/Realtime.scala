@@ -35,10 +35,6 @@ object Realtime extends Controller {
       }
   }
 
-  def realtimeStatus = Security.Authenticated {
-    Ok(views.html.realtimeStatusA(""))
-  }
-
   def latestValues() = Security.Authenticated.async {
     implicit request =>
       val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection)(1)
@@ -52,21 +48,6 @@ object Realtime extends Controller {
           val recordList = records.head
           Ok(Json.toJson(recordList))
         }
-      }
-  }
-
-  def realtimeStatusContent() = Security.Authenticated.async {
-    implicit request =>
-      import MonitorType._
-      val user = request.user
-      val latestRecordMap = Record.getLatestRecordMapFuture(Record.MinCollection)
-
-      for {
-        userOpt <- User.getUserByIdFuture(user.id) if userOpt.isDefined
-        groupInfo = Group.getGroupInfo(userOpt.get.groupId)
-        map <- latestRecordMap
-      } yield {
-        Ok(views.html.realtimeStatus(map, groupInfo.privilege))
       }
   }
 

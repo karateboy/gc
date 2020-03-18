@@ -52,15 +52,12 @@ GET      /Excel/HistoryTrend/:monitors/:monitorType/:reportUnit/:start/:end    c
 GET      /JSON/HistoryBoxplot/:monitors/:monitorType/:reportUnit/:start/:end   controllers.Query.historyBoxPlot(monitors, monitorType, reportUnit, start:Long, end:Long, outputTypeStr="html")
 GET      /Excel/HistorBoxplot/:monitors/:monitorType/:reportUnit/:start/:end   controllers.Query.historyBoxPlot(monitors,monitorType, reportUnit, start:Long, end:Long, outputTypeStr="excel")
 
-GET      /HistoryReport/:monitor/:monitorType/:tabType/:start/:end             controllers.Query.historyReport(monitor, monitorType, tabType, start:Long, end:Long)
 
 POST     /SaveMonitorTypeConfig                                                controllers.Application.saveMonitorTypeConfig
 POST     /SaveMonitorConfig                                                    controllers.Application.saveMonitorConfig
 
 #Realtime
 GET      /MonitorTypeStatusList                                                controllers.Realtime.MonitorTypeStatusList()
-GET      /RealtimeStatus                                                       controllers.Realtime.realtimeStatus()
-GET      /RealtimeStatusContent                                                controllers.Realtime.realtimeStatusContent()
 GET      /RealtimeData                                                         controllers.Realtime.realtimeData()
 
 #JSON

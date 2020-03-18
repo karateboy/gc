@@ -1,5 +1,7 @@
 package models
 
+import java.util
+
 import play.api._
 import akka.actor._
 import play.api.Play.current
@@ -13,13 +15,21 @@ import org.mongodb.scala.model._
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-case class GcConfig(index: Int, inputDir: String, selector: Selector){
+case class ExportEntry(db: Int, offset: Int)
+
+case class SiemensPlcConfig(host: String, exportMap: Map[String, ExportEntry])
+
+case class GcConfig(index: Int, inputDir: String, selector: Selector, plcConfig: Option[SiemensPlcConfig]) {
   val gcName = GcAgent.getGcName(index)
 }
 
+import scala.collection.JavaConverters._
+
 object GcAgent {
+
   case object ParseReport
-  def getGcName(idx:Int) = s"gc${idx+1}"
+
+  def getGcName(idx: Int) = s"gc${idx + 1}"
 
   val gcConfigList: mutable.Seq[GcConfig] = {
     val configList = Play.current.configuration.getConfigList("gcConfigList").get.asScala
@@ -27,13 +37,24 @@ object GcAgent {
       val inputDir = config.getString("inputDir", None).get
       Logger.info(config.toString)
       val selector = new Selector(getGcName(idx), config.getConfig("selector").get)
+      val plcConfig: Option[SiemensPlcConfig] =
+        for (config <- config.getConfig("siemens_plc")) yield {
+          val host = config.getString("host").get
+          val mapping: mutable.Seq[(String, ExportEntry)] = for (mapConfig <- config.getConfigList("mapping").get.asScala) yield {
+            val gas = mapConfig.getString("gas").get
+            val db = mapConfig.getInt("db").get
+            val offset = mapConfig.getInt("offset").get
+            gas -> ExportEntry(db, offset)
+          }
+          SiemensPlcConfig(host, mapping.toMap)
+        }
       Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
-      Logger.info(s"${selector.toString}")
-      GcConfig(idx, inputDir, selector)
+      GcConfig(idx, inputDir, selector, plcConfig)
     }
   }
 
   var receiver: ActorRef = _
+
   def startup() = {
     receiver = Akka.system.actorOf(Props(classOf[GcAgent]), name = "gcAgent")
     receiver ! ParseReport
@@ -45,6 +66,7 @@ object GcAgent {
 }
 
 class GcAgent extends Actor {
+
   import GcAgent._
 
   Logger.info("GcAgent started.")
@@ -52,12 +74,12 @@ class GcAgent extends Actor {
   def receive = {
     case ParseReport =>
       try {
-        for(gcConfig <- gcConfigList){
+        for (gcConfig <- gcConfigList) {
           processInputPath(gcConfig, parser)
           checkNoDataPeriod
         }
-        
-        
+
+
       } catch {
         case ex: Throwable =>
           Logger.error("process InputPath failed", ex)
@@ -67,10 +89,12 @@ class GcAgent extends Actor {
   }
 
   var latestDataTime: com.github.nscala_time.time.Imports.DateTime = com.github.nscala_time.time.Imports.DateTime.now()
+
   import java.io.File
-  def parser(gcConfig:GcConfig, reportDir: File): Boolean = {
-    import java.nio.file.{ Paths, Files, StandardOpenOption }
-    import java.nio.charset.{ StandardCharsets }
+
+  def parser(gcConfig: GcConfig, reportDir: File): Boolean = {
+    import java.nio.file.{Paths, Files, StandardOpenOption}
+    import java.nio.charset.{StandardCharsets}
     import scala.collection.JavaConverters._
     import org.mongodb.scala.bson._
     val pdfReportFile =
@@ -206,6 +230,7 @@ class GcAgent extends Actor {
 
   var retryMap = Map.empty[String, Int]
   val MAX_RETRY_COUNT = 30
+
   def processInputPath(gcConfig: GcConfig, parser: (GcConfig, File) => Boolean) = {
     import org.apache.commons.io.FileUtils
     import java.io.File
@@ -220,6 +245,7 @@ class GcAgent extends Actor {
       val dfav = Files.getFileAttributeView(path, classOf[DosFileAttributeView])
       dfav.setArchive(true)
     }
+
     val dirs = listDirs(gcConfig.inputDir)
     val output =
       for (dir <- dirs) yield {
@@ -256,6 +282,7 @@ class GcAgent extends Actor {
         Alarm.log(None, None, "沒有資料匯入!", dataPeriod)
     }
   }
+
   override def postStop = {
 
   }
