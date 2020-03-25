@@ -49,6 +49,7 @@ object GcAgent {
           SiemensPlcConfig(host, mapping.toMap)
         }
       Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
+      Logger.info(s"${plcConfig.toString}")
       GcConfig(idx, inputDir, selector, plcConfig)
     }
   }

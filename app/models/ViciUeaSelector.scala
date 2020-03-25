@@ -15,7 +15,8 @@ case class SetStreamNum(v: Int)
 
 class ViciUeaSelector(gcName: String, config: Configuration) extends SelectorModel {
   val max = config.getInt("max").get
-  val worker = Akka.system.actorOf(Props(new UeaSelectorWorker(this)), name = "selectorAgent")
+  val comPort = config.getInt("com").get
+  val worker = Akka.system.actorOf(Props(new UeaSelectorWorker(this)), name = s"selector_${gcName}")
 
   def getGcName = gcName
 
@@ -36,12 +37,12 @@ class ViciUeaSelector(gcName: String, config: Configuration) extends SelectorMod
 }
 
 class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
-  val max = current.configuration.getInt("selector.viciUea.max").get
+  val max = selector.max
   for (id <- 1 to max) {
     Monitor.getMonitorValueByName(selector.getGcName, id)
   }
 
-  val comPort = Play.current.configuration.getInt("selector.viciUea.com").get
+  val comPort = selector.comPort
   Logger.info(s"UEA is set to ${comPort}")
   val serial = SerialComm.open(comPort)
 

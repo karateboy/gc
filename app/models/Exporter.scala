@@ -110,6 +110,7 @@ object Exporter {
   def writePlc(data: Record.RecordList) = {
     val tokens = data.monitor.split(":")
     val gcName = tokens(0)
+    Logger.debug(s"writePLC gcName = ${gcName}")
     for {gcConfig <- GcAgent.gcConfigList.find(gcConfig => gcConfig.gcName == gcName)
          plcConfig <- gcConfig.plcConfig
          } {
@@ -123,6 +124,7 @@ object Exporter {
           val entry = plcConfig.exportMap(mtData.mtName)
           connector.write(DaveArea.DB, entry.db, entry.offset,
             ByteBuffer.allocate(4).putFloat(mtData.value.toFloat).array())
+          Logger.debug(s"write PLC ${mtData.mtName} DB${entry.db} ${entry.offset} ${mtData.value}")
         }
       }
       connector.close()
@@ -146,7 +148,10 @@ object Exporter {
         }
 
       val dateTime = new DateTime(data.time)
-      if (latestDateTime < dateTime) {
+      //if (latestDateTime < dateTime) {
+      if (true) {
+        Logger.info(s"export Data ${dateTime.toString}")
+
         latestDateTime = dateTime
 
         //Export to modbus
