@@ -2,12 +2,14 @@ package models
 
 import play.api._
 import java.nio.file.{Files, Paths, StandardOpenOption}
+import java.util.Date
 
 import play.api.Play.current
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.github.nscala_time.time.Imports._
 
+import scala.collection.JavaConverters._
 import scala.concurrent._
 import ModelHelper._
 import com.github.s7connector.api.factory.S7ConnectorFactory
@@ -110,7 +112,8 @@ object Exporter {
   def writePlc(data: Record.RecordList) = {
     val tokens = data.monitor.split(":")
     val gcName = tokens(0)
-    Logger.debug(s"writePLC gcName = ${gcName}")
+    Logger.info(s"write PLC ${gcName}")
+
     for {gcConfig <- GcAgent.gcConfigList.find(gcConfig => gcConfig.gcName == gcName)
          plcConfig <- gcConfig.plcConfig
          } {
@@ -118,13 +121,39 @@ object Exporter {
         S7ConnectorFactory
           .buildTCPConnector()
           .withHost(plcConfig.host)
-          .build();
+          .build()
+
+      def toHexString(bytes: Seq[Byte]): String = bytes.map("%02X" format _).mkString
+
+
+      if (plcConfig.exportMap.contains("selector")) {
+        import com.github.s7connector.impl.serializer.converter.IntegerConverter
+        val converter = new IntegerConverter()
+        val buffer = new Array[Byte](4)
+        converter.insert(gcConfig.selector.get, buffer, 0, 0, buffer.size)
+
+        val entry = plcConfig.exportMap("selector")
+        connector.write(DaveArea.DB, entry.db, entry.offset, buffer)
+        Logger.info(s"PLC Selector ${gcConfig.selector.get} =>DB${entry.db}.${entry.offset}")
+
+        val readBack = connector.read(DaveArea.DB, entry.db, 4, entry.offset)
+        val v: Integer = converter.extract(classOf[Integer], readBack, 0, 0)
+        Logger.info(s"Selector DB${entry.db}.${entry.offset} read=>" + v)
+      }
+
+      if (plcConfig.exportMap.contains("datetime")) {
+        val dateTime = new DateTime(data.time)
+        val buffer = ByteBuffer.allocate(8).putLong(data.time).array()
+        val entry = plcConfig.exportMap("datetime")
+        connector.write(DaveArea.DB, entry.db, entry.offset, buffer)
+        Logger.info(s"dateTime ${dateTime.toString} =>DB${entry.db}.${entry.offset}")
+      }
       for (mtData <- data.mtDataList) {
         if (plcConfig.exportMap.contains(mtData.mtName)) {
+          val buffer = ByteBuffer.allocate(4).putFloat(mtData.value.toFloat).array()
           val entry = plcConfig.exportMap(mtData.mtName)
-          connector.write(DaveArea.DB, entry.db, entry.offset,
-            ByteBuffer.allocate(4).putFloat(mtData.value.toFloat).array())
-          Logger.debug(s"write PLC ${mtData.mtName} DB${entry.db} ${entry.offset} ${mtData.value}")
+          connector.write(DaveArea.DB, entry.db, entry.offset, buffer)
+          Logger.info(s"${mtData.mtName} ${mtData.value}=>DB${entry.db}.${entry.offset}")
         }
       }
       connector.close()

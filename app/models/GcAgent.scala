@@ -41,10 +41,10 @@ object GcAgent {
         for (config <- config.getConfig("siemens_plc")) yield {
           val host = config.getString("host").get
           val mapping: mutable.Seq[(String, ExportEntry)] = for (mapConfig <- config.getConfigList("mapping").get.asScala) yield {
-            val gas = mapConfig.getString("gas").get
+            val item = mapConfig.getString("item").get
             val db = mapConfig.getInt("db").get
             val offset = mapConfig.getInt("offset").get
-            gas -> ExportEntry(db, offset)
+            item -> ExportEntry(db, offset)
           }
           SiemensPlcConfig(host, mapping.toMap)
         }
