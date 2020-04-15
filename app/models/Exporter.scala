@@ -147,6 +147,7 @@ object Exporter {
         val entry = plcConfig.exportMap("datetime")
         connector.write(DaveArea.DB, entry.db, entry.offset, buffer)
         Logger.info(s"dateTime ${dateTime.toString} =>DB${entry.db}.${entry.offset}")
+        val readBack = connector.read(DaveArea.DB, entry.db, 8, 0)
       }
       for (mtData <- data.mtDataList) {
         if (plcConfig.exportMap.contains(mtData.mtName)) {
@@ -154,6 +155,7 @@ object Exporter {
           val entry = plcConfig.exportMap(mtData.mtName)
           connector.write(DaveArea.DB, entry.db, entry.offset, buffer)
           Logger.info(s"${mtData.mtName} ${mtData.value}=>DB${entry.db}.${entry.offset}")
+          val readBack = connector.read(DaveArea.DB, entry.db, 4, entry.offset)
         }
       }
       connector.close()
@@ -188,7 +190,7 @@ object Exporter {
           writeModbusSlave(data)
 
         //Export to plc if properly configured
-        writePlc(data)
+        //writePlc(data)
 
         buffer += s"InjectionDate, ${data.time}\r"
         val mtStrs = data.mtDataList map { mt_data => s"${mt_data.mtName}, ${mt_data.value}" }

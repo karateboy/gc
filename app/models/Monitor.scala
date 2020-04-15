@@ -93,7 +93,7 @@ object Monitor extends Enumeration {
 
   var map: Map[Value, Monitor] = Map(mList.map { e => Value(e._id) -> e }: _*)
   var mvList = mList.map(mt => Monitor.withName(mt._id))
-  def indParkSet = mvList.map { map(_).gcName }.foldRight(Set.empty[String])((name, set) => set + name)
+  def indParkList = mvList.map { map(_).gcName }.foldRight(Set.empty[String])((name, set) => set + name).toList.sorted
   def indParkMonitor(indParkFilter: Seq[String]) =
     mvList.filter(p => {
       val monitor = Monitor.map(p)

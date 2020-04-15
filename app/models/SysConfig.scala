@@ -1,12 +1,12 @@
 package models
-import play.api.libs.json._
+
 import models.ModelHelper._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.implicitConversions
 import com.github.nscala_time.time.Imports._
 import org.mongodb.scala.model._
 import org.mongodb.scala.bson._
-
+import scala.collection.JavaConverters._
 object SysConfig extends Enumeration {
   val ColName = "sysConfig"
   val collection = MongoDB.database.getCollection(ColName)
@@ -14,10 +14,18 @@ object SysConfig extends Enumeration {
   val valueKey = "value"
   val ALARM_LAST_READ = Value
   val DATA_PERIOD = Value
+  val OPERATION_MODE = Value
+  val GCNAME_LIST = Value
+
+  val LocalMode = 0
+  val RemoteMode = 1
 
   val defaultConfig = Map(
     ALARM_LAST_READ -> Document(valueKey -> DateTime.parse("2019-10-1").toDate()),
-    DATA_PERIOD -> Document(valueKey -> 30))
+    DATA_PERIOD -> Document(valueKey -> 30),
+    OPERATION_MODE -> Document(valueKey -> 0),
+    GCNAME_LIST -> Document(valueKey -> Monitor.indParkList)
+  )
 
   def init(colNames: Seq[String]) {
     if (!colNames.contains(ColName)) {
@@ -89,6 +97,33 @@ object SysConfig extends Enumeration {
 
   def setDataPeriod(min: Int) = {
     val f = upsert(DATA_PERIOD, Document(valueKey -> min))
+    f.failed.foreach(errorHandler)
+    f
+  }
+
+
+  def getOperationMode() = {
+    val f = get(OPERATION_MODE)
+    f.failed.foreach(errorHandler)
+    for (ret <- f)
+      yield ret.asInt32().getValue
+  }
+
+  def setOperationMode(mode: Int) = {
+    val f = upsert(OPERATION_MODE, Document(valueKey -> mode))
+    f.failed.foreach(errorHandler)
+    f
+  }
+
+  def getGcNameList()= {
+    val f = get(GCNAME_LIST)
+    f.failed.foreach(errorHandler)
+    for (ret <- f)
+      yield ret.asArray().getValues.asScala.map(v => v.asString().getValue).toSeq
+  }
+
+  def setGcNameList(nameList : Seq[String]) = {
+    val f = upsert(GCNAME_LIST, Document(valueKey -> nameList))
     f.failed.foreach(errorHandler)
     f
   }

@@ -30,7 +30,9 @@ object Application extends Controller {
         newUserParam.fold(
           error => {
             Logger.error(JsError.toJson(error).toString())
-            Future { BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString())) }
+            Future {
+              BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
+            }
           },
           param => {
             val f = User.newUser(param)
@@ -110,6 +112,7 @@ object Application extends Controller {
   }
 
   import scala.concurrent.ExecutionContext.Implicits.global
+
   def getGroupInfoList = Action {
     val infoList = Group.getInfoList
     implicit val write = Json.writes[GroupInfo]
@@ -124,6 +127,7 @@ object Application extends Controller {
   }
 
   case class EditData(id: String, data: String)
+
   def saveMonitorTypeConfig() = Security.Authenticated {
     implicit request =>
       try {
@@ -170,21 +174,32 @@ object Application extends Controller {
 
   def monitorTypeList = Security.Authenticated {
     implicit request =>
-      val monitorTypes = MonitorType.mtvList map { MonitorType.map }
+      val monitorTypes = MonitorType.mtvList map {
+        MonitorType.map
+      }
       Ok(Json.toJson(monitorTypes))
   }
 
   def monitorList = Security.Authenticated {
     implicit request =>
-      val monitors = Monitor.mvList map { Monitor.map }
+      val monitors = Monitor.mvList map {
+        Monitor.map
+      }
       // val actualMonitors = monitors.filter(m => m._id.toInt <= Selector.model.max)
       Ok(Json.toJson(monitors))
   }
 
-  def gcList = Security.Authenticated {
+  case class GcName(key: String, name: String)
+
+  def gcList = Security.Authenticated.async {
     implicit request =>
-        val gcList = Monitor.indParkSet.toList
-        Ok(Json.toJson(gcList))
+      implicit val writes = Json.writes[GcName]
+
+      for (gcNameList <- SysConfig.getGcNameList()) yield {
+        val gcList = Monitor.indParkList
+        val keyName: Seq[GcName] = gcList.zip(gcNameList).map { entry => GcName(entry._1, entry._2) }
+        Ok(Json.toJson(keyName))
+      }
   }
 
   def indParkList = Security.Authenticated.async {
@@ -204,7 +219,9 @@ object Application extends Controller {
 
   def reportUnitList = Security.Authenticated {
     implicit val ruWrite = Json.writes[ReportUnit]
-    Ok(Json.toJson(ReportUnit.values.toList.sorted.map { ReportUnit.map }))
+    Ok(Json.toJson(ReportUnit.values.toList.sorted.map {
+      ReportUnit.map
+    }))
   }
 
   def updateMonitorType = Security.Authenticated(BodyParsers.parse.json) {
@@ -301,16 +318,20 @@ object Application extends Controller {
   }
 
   //Websocket
+
   import GcWebSocketActor._
-  def gcWebSocket = WebSocket.acceptWithActor[InEvent, OutEvent] { request => out =>
-    GcWebSocketActor.props(out)
+
+  def gcWebSocket = WebSocket.acceptWithActor[InEvent, OutEvent] { request =>
+    out =>
+      GcWebSocketActor.props(out)
   }
 
   def getDataPeriod = Security.Authenticated.async {
     for (ret <- SysConfig.getDataPeriod()) yield Ok(Json.toJson(ret))
   }
 
-  case class ParamInt(value:Int)
+  case class ParamInt(value: Int)
+
   def setDataPeriod = Security.Authenticated.async(BodyParsers.parse.json) {
     implicit request =>
       implicit val reads = Json.reads[ParamInt]
@@ -327,5 +348,11 @@ object Application extends Controller {
             Ok(Json.obj("ok" -> true))
           }
         })
+  }
+
+  def getOperationMode() = Security.Authenticated.async {
+    for (ret <- SysConfig.getOperationMode()) yield {
+      Ok(Json.obj("mode" -> ret))
+    }
   }
 }

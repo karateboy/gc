@@ -5,7 +5,7 @@
         <Form ref="historyTrend" :model="formItem" :rules="rules" :label-width="80">
           <FormItem label="GC" prop="gc">
             <Select v-model="formItem.gc" filterable multiple>
-              <Option v-for="item in gcList" :value="item" :key="item">{{ item }}</Option>
+              <Option v-for="item in gcList" :value="item.key" :key="item.key">{{ item.name }}</Option>
             </Select>
           </FormItem>
           <FormItem label="選擇器" prop="monitors">

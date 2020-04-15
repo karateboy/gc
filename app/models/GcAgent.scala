@@ -244,7 +244,7 @@ class GcAgent extends Actor {
 
       val path = Paths.get(f.getAbsolutePath)
       val dfav = Files.getFileAttributeView(path, classOf[DosFileAttributeView])
-      dfav.setArchive(true)
+      //dfav.setArchive(true)
     }
 
     val dirs = listDirs(gcConfig.inputDir)

@@ -37,7 +37,7 @@ GET      /testAlarm                                                            c
 GET      /GcWebSocket                                                          controllers.Application.gcWebSocket
 GET      /dataPeriod                                                           controllers.Application.getDataPeriod
 POST     /dataPeriod                                                           controllers.Application.setDataPeriod
-	
+GET      /operationMode                                                        controllers.Application.getOperationMode
 # old api
 POST     /User                                                                 controllers.Application.newUser
 GET      /User                                                                 controllers.Application.getAllUsers

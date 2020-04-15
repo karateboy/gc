@@ -53,7 +53,7 @@ object Privilege {
 
   val defaultMonitorFilters = Seq(MonitorFilter("環保署", Seq.empty[String]))
 
-  lazy val defaultPrivilege = Privilege(Monitor.indParkSet.toSeq, MonitorType.values.toSeq, MenuRight.values.toSeq, defaultMonitorFilters)
+  lazy val defaultPrivilege = Privilege(Monitor.indParkList, MonitorType.values.toSeq, MenuRight.values.toSeq, defaultMonitorFilters)
   val emptyPrivilege = Privilege(Seq.empty[String], Seq.empty[MonitorType.Value], Seq.empty[MenuRight.Value], defaultMonitorFilters)
 
   def myMonitorList(email: String) = {

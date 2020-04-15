@@ -14,6 +14,13 @@ export const getGcList = () => {
   })
 }
 
+export const getOperationMode = () => {
+  return axios.request({
+    url: 'operationMode',
+    method: 'get'
+  })
+}
+
 export const getGcMonitorList = () => {
   return axios.request({
     url: 'gc_monitor',

@@ -5,7 +5,7 @@
         <Form ref="historyData" :model="formItem" :rules="rules" :label-width="80">
           <FormItem label="GC" prop="gc">
             <Select v-model="formItem.gc" filterable>
-              <Option v-for="item in gcList" :value="item" :key="item">{{ item }}</Option>
+              <Option v-for="item in gcList" :value="item.key" :key="item.key">{{ item.name }}</Option>
             </Select>
           </FormItem>
           <FormItem label="選擇器" prop="monitor">
@@ -91,6 +91,7 @@ export default {
     getGcList()
       .then(resp => {
         const ret = resp.data;
+        console.log(ret);
         this.gcList.splice(0, this.gcList.length);
         for (let gc of ret) {
           this.gcList.push(gc);
@@ -100,8 +101,6 @@ export default {
 
     getMonitors()
       .then(resp => {
-        const ret = resp.data;
-        console.log(ret);
         this.monitorList.splice(0, this.monitorList.length);
         for (let mt of resp.data) {
           this.monitorList.push(mt);
