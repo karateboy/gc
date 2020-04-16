@@ -1,4 +1,5 @@
 package models
+
 import play.api._
 import EnumUtils._
 import play.api.libs.json._
@@ -9,7 +10,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import org.mongodb.scala.bson._
 import org.mongodb.scala.model._
 
-case class Monitor(_id: String, gcName: String, selector: String, dp_no:String)
+case class Monitor(_id: String, gcName: String, selector: String, dp_no: String)
 
 object Monitor extends Enumeration {
   implicit val monitorRead: Reads[Monitor.Value] = EnumUtils.enumReads(Monitor)
@@ -20,7 +21,7 @@ object Monitor extends Enumeration {
 
   import org.mongodb.scala.bson.codecs.Macros._
   import org.mongodb.scala.bson.codecs.DEFAULT_CODEC_REGISTRY
-  import org.bson.codecs.configuration.CodecRegistries.{ fromRegistries, fromProviders }
+  import org.bson.codecs.configuration.CodecRegistries.{fromRegistries, fromProviders}
 
   import scala.concurrent._
   import scala.concurrent.duration._
@@ -33,9 +34,9 @@ object Monitor extends Enumeration {
   val codecRegistry = fromRegistries(fromProviders(classOf[Monitor]), DEFAULT_CODEC_REGISTRY)
   val collection = MongoDB.database.getCollection[Monitor](colName).withCodecRegistry(codecRegistry)
 
-  def monitorId(gcName:String, selector: Int) = s"$gcName:${selector}"
+  def monitorId(gcName: String, selector: Int) = s"$gcName:${selector}"
 
-  def buildMonitor(gcName:String, selector: Int, dp_no: String) = {
+  def buildMonitor(gcName: String, selector: Int, dp_no: String) = {
     assert(!dp_no.isEmpty)
 
     Monitor(monitorId(gcName, selector), gcName, selector.toString, dp_no)
@@ -68,12 +69,11 @@ object Monitor extends Enumeration {
     Monitor.withName(m._id)
   }
 
-  private def mList: List[Monitor] =
-    {
-      val f = collection.find().toFuture()
-      val ret = waitReadyResult(f)
-      ret.toList
-    }
+  private def mList: List[Monitor] = {
+    val f = collection.find().toFuture()
+    val ret = waitReadyResult(f)
+    ret.toList
+  }
 
   def refresh = {
     val list = mList
@@ -93,7 +93,11 @@ object Monitor extends Enumeration {
 
   var map: Map[Value, Monitor] = Map(mList.map { e => Value(e._id) -> e }: _*)
   var mvList = mList.map(mt => Monitor.withName(mt._id))
-  def indParkList = mvList.map { map(_).gcName }.foldRight(Set.empty[String])((name, set) => set + name).toList.sorted
+
+  def indParkList = mvList.map {
+    map(_).gcName
+  }.foldRight(Set.empty[String])((name, set) => set + name).toList.sorted
+
   def indParkMonitor(indParkFilter: Seq[String]) =
     mvList.filter(p => {
       val monitor = Monitor.map(p)
@@ -106,7 +110,7 @@ object Monitor extends Enumeration {
       monitor.gcName == indPark
     })
 
-  def getMonitorValueByName(gcName:String, selector: Int) = {
+  def getMonitorValueByName(gcName: String, selector: Int) = {
     try {
       val id = monitorId(gcName, selector)
       Monitor.withName(id)
@@ -115,7 +119,7 @@ object Monitor extends Enumeration {
         newMonitor(buildMonitor(gcName, selector, s"$gcName:$selector"))
     }
   }
-  
+
   def format(v: Option[Double]) = {
     if (v.isEmpty)
       "-"
@@ -150,5 +154,13 @@ object Monitor extends Enumeration {
     val f = collection.replaceOne(Filters.equal("_id", m._id), m, ReplaceOptions().upsert(true)).toFuture()
     f.onFailure(errorHandler)
     f
+  }
+
+  def getGcNameMap() = {
+    val gcIdList = Monitor.indParkList
+    for (gcNameList: Seq[String] <- SysConfig.getGcNameList()) yield {
+      val pairs = gcIdList.zip(gcNameList)
+      pairs.toMap
+    }
   }
 }

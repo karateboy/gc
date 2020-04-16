@@ -7,6 +7,7 @@ import com.github.nscala_time.time.Imports._
 import org.mongodb.scala.model._
 import org.mongodb.scala.bson._
 import scala.collection.JavaConverters._
+
 object SysConfig extends Enumeration {
   val ColName = "sysConfig"
   val collection = MongoDB.database.getCollection(ColName)
@@ -16,6 +17,7 @@ object SysConfig extends Enumeration {
   val DATA_PERIOD = Value
   val OPERATION_MODE = Value
   val GCNAME_LIST = Value
+  val STOP_WARN = Value
 
   val LocalMode = 0
   val RemoteMode = 1
@@ -24,7 +26,8 @@ object SysConfig extends Enumeration {
     ALARM_LAST_READ -> Document(valueKey -> DateTime.parse("2019-10-1").toDate()),
     DATA_PERIOD -> Document(valueKey -> 30),
     OPERATION_MODE -> Document(valueKey -> 0),
-    GCNAME_LIST -> Document(valueKey -> Monitor.indParkList)
+    GCNAME_LIST -> Document(valueKey -> Monitor.indParkList),
+    STOP_WARN -> Document(valueKey -> false)
   )
 
   def init(colNames: Seq[String]) {
@@ -33,7 +36,9 @@ object SysConfig extends Enumeration {
       f.onFailure(errorHandler)
     }
 
-    val idSet = values map { _.toString() }
+    val idSet = values map {
+      _.toString()
+    }
     //Clean up unused
     val f1 = collection.deleteMany(Filters.not(Filters.in("_id", idSet.toList: _*))).toFuture()
     f1.onFailure(errorHandler)
@@ -115,15 +120,28 @@ object SysConfig extends Enumeration {
     f
   }
 
-  def getGcNameList()= {
+  def getGcNameList() = {
     val f = get(GCNAME_LIST)
     f.failed.foreach(errorHandler)
     for (ret <- f)
       yield ret.asArray().getValues.asScala.map(v => v.asString().getValue).toSeq
   }
 
-  def setGcNameList(nameList : Seq[String]) = {
+  def setGcNameList(nameList: Seq[String]) = {
     val f = upsert(GCNAME_LIST, Document(valueKey -> nameList))
+    f.failed.foreach(errorHandler)
+    f
+  }
+
+  def getStopWarn() = {
+    val f = get(STOP_WARN)
+    f.failed.foreach(errorHandler)
+    for (ret <- f)
+      yield ret.asBoolean().getValue()
+  }
+
+  def setStopWarn(v: Boolean) = {
+    val f = upsert(STOP_WARN, Document(valueKey -> v))
     f.failed.foreach(errorHandler)
     f
   }

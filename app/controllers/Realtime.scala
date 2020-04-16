@@ -105,18 +105,20 @@ object Realtime extends Controller {
       }
   }
 
-  def getGcMonitors() = Security.Authenticated {
+  def getGcMonitors() = Security.Authenticated.async {
     implicit request =>
       var gcNameMonitorMap = Map.empty[String, Seq[Monitor]]
 
-      for (monitor <- Monitor.mvList map {
-        Monitor.map
-      }) {
-        val gcMonitorList = gcNameMonitorMap.getOrElse(monitor.gcName, Seq.empty[Monitor])
-        gcNameMonitorMap = gcNameMonitorMap + (monitor.gcName -> gcMonitorList.:+(monitor))
+      for (gcNameMap <- Monitor.getGcNameMap()) yield {
+        for (monitor <- Monitor.mvList map {
+          Monitor.map
+        }) {
+          val gcMonitorList = gcNameMonitorMap.getOrElse(gcNameMap(monitor.gcName), Seq.empty[Monitor])
+          gcNameMonitorMap = gcNameMonitorMap + (gcNameMap(monitor.gcName) -> gcMonitorList.:+(monitor))
+        }
+        Ok(Json.toJson(gcNameMonitorMap))
       }
 
-      Ok(Json.toJson(gcNameMonitorMap))
   }
 
   def getCurrentMonitor() = Security.Authenticated {

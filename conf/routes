@@ -38,6 +38,9 @@ GET      /GcWebSocket                                                          c
 GET      /dataPeriod                                                           controllers.Application.getDataPeriod
 POST     /dataPeriod                                                           controllers.Application.setDataPeriod
 GET      /operationMode                                                        controllers.Application.getOperationMode
+POST     /gc                                                                   controllers.Application.setGcName
+GET      /stopWarn                                                             controllers.Application.getStopWarn
+POST     /stopWarn                                                             controllers.Application.setStopWarn
 # old api
 POST     /User                                                                 controllers.Application.newUser
 GET      /User                                                                 controllers.Application.getAllUsers

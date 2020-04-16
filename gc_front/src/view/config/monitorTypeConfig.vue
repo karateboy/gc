@@ -35,6 +35,29 @@
         </Form>
       </Card>
     </Row>
+    <Row class="margin-top-10">
+      <Card>
+        <p slot="title">
+          <Icon type="ios-keypad"></Icon>GC名稱
+        </p>
+        <can-edit-table
+          refs="gcTable"
+          v-model="gcList"
+          @on-change="handleGcChange"
+          :hover-show="true"
+          :editIncell="true"
+          :columns-list="gcFields"
+        ></can-edit-table>
+      </Card>
+    </Row>
+    <Row class="margin-top-10">
+      <Card>
+        <p slot="title">
+          <Icon type="ios-keypad"></Icon>暫停警報
+        </p>
+        <Checkbox v-model="stopWarn" @on-change="onStopWarn">暫停警報</Checkbox>
+      </Card>
+    </Row>
   </div>
 </template>
 
@@ -90,9 +113,31 @@ export default {
         }
       ],
       monitorTypeList: [],
+      gcList: [],
+      gcFields: [
+        {
+          title: "序號",
+          type: "index",
+          width: 80,
+          align: "center"
+        },
+        {
+          title: "名稱",
+          key: "name",
+          editable: true
+        },
+        {
+          title: "操作",
+          align: "center",
+          width: 200,
+          key: "handle",
+          handle: ["edit"]
+        }
+      ],
       formItem: {
         dataPeriod: 30
-      }
+      },
+      stopWarn: false
     };
   },
   methods: {
@@ -157,11 +202,46 @@ export default {
         .catch(err => {
           alert(err);
         });
+    },
+    getGcList() {
+      axios.get("/gc").then(res => {
+        const ret = res.data;
+        this.gcList.splice(0, this.gcList.length);
+        for (let gc of ret) {
+          this.gcList.push(gc);
+        }
+      });
+    },
+    handleGcChange(val, index) {
+      // let id = this.gcList[index].key;
+      let arg = Object.assign({}, this.gcList[index]);
+      axios.post("/gc", arg).then(res => {
+        const ret = res.data;
+        if (ret.ok) this.$Message.success("成功");
+        else this.$Message.success("失敗");
+      });
+    },
+    getStopWarn() {
+      axios
+        .get("/stopWarn")
+        .then(res => {
+          const ret = res.data;
+          this.stopWarn = ret.stopWarn;
+        })
+        .catch(err => alert(err));
+    },
+    onStopWarn() {
+      axios
+        .post("/stopWarn", { stopWarn: this.stopWarn })
+        .then(res => {})
+        .catch(err => alert(err));
     }
   },
   created() {
     this.getConfig();
     this.getDataPeriod();
+    this.getGcList();
+    this.getStopWarn()
   }
 };
 </script>

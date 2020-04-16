@@ -355,4 +355,55 @@ object Application extends Controller {
       Ok(Json.obj("mode" -> ret))
     }
   }
+
+  def setGcName() = Security.Authenticated.async(BodyParsers.parse.json) {
+    implicit request =>
+      implicit val reads = Json.reads[GcName]
+      val gcParam = request.body.validate[GcName]
+
+      gcParam.fold(
+        error => {
+          Future {
+            Logger.error(JsError.toJson(error).toString())
+            BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
+          }
+        },
+        param => {
+          for (gcList: Seq[String] <- SysConfig.getGcNameList()) yield {
+            val idx = Monitor.indParkList.indexOf(param.key)
+            val newGcList: Seq[String] = gcList.patch(idx, Seq(param.name), 1)
+            SysConfig.setGcNameList(newGcList)
+            Ok(Json.obj("ok" -> true))
+          }
+        })
+  }
+
+  case class StopWarn(stopWarn: Boolean)
+
+  def getStopWarn()= Security.Authenticated.async {
+    implicit request =>
+      implicit val writes = Json.writes[StopWarn]
+      for(stopWarn <- SysConfig.getStopWarn()) yield {
+        Ok(Json.toJson(StopWarn(stopWarn)))
+      }
+  }
+
+  def setStopWarn() = Security.Authenticated.async(BodyParsers.parse.json) {
+    implicit request =>
+      implicit val reads = Json.reads[StopWarn]
+      val ret = request.body.validate[StopWarn]
+
+      ret.fold(
+        error => {
+          Future {
+            Logger.error(JsError.toJson(error).toString())
+            BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
+          }
+        },
+        param => {
+          for (ret <- SysConfig.setStopWarn(param.stopWarn)) yield
+            Ok(Json.obj("ok" -> true))
+        }
+      )
+  }
 }

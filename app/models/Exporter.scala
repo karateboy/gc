@@ -179,8 +179,8 @@ object Exporter {
         }
 
       val dateTime = new DateTime(data.time)
-      //if (latestDateTime < dateTime) {
-      if (true) {
+      if (latestDateTime < dateTime) {
+
         Logger.info(s"export Data ${dateTime.toString}")
 
         latestDateTime = dateTime

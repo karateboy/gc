@@ -277,9 +277,11 @@ class GcAgent extends Actor {
 
   def checkNoDataPeriod = {
     import com.github.nscala_time.time.Imports._
-    val f = SysConfig.getDataPeriod()
-    for (dataPeriod <- f) yield {
-      if ((latestDataTime + dataPeriod.minutes) < DateTime.now)
+
+    for {dataPeriod <- SysConfig.getDataPeriod()
+         stopWarn <- SysConfig.getStopWarn()
+         } yield {
+      if (!stopWarn && (latestDataTime + dataPeriod.minutes) < DateTime.now)
         Alarm.log(None, None, "沒有資料匯入!", dataPeriod)
     }
   }
