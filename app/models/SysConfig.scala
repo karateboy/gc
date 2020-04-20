@@ -22,11 +22,10 @@ object SysConfig extends Enumeration {
   val LocalMode = 0
   val RemoteMode = 1
 
-  val defaultConfig = Map(
+  lazy val defaultConfig = Map(
     ALARM_LAST_READ -> Document(valueKey -> DateTime.parse("2019-10-1").toDate()),
     DATA_PERIOD -> Document(valueKey -> 30),
     OPERATION_MODE -> Document(valueKey -> 0),
-    GCNAME_LIST -> Document(valueKey -> Monitor.indParkList),
     STOP_WARN -> Document(valueKey -> false)
   )
 
@@ -67,11 +66,24 @@ object SysConfig extends Enumeration {
     f.onFailure(errorHandler)
     for (ret <- f) yield {
       val doc =
-        if (ret.isEmpty)
+        if (ret == null)
           defaultConfig(_id)
         else
           ret
       doc("value")
+    }
+  }
+
+  def get(_id: SysConfig.Value, defaultDoc:Document) = {
+    val f = collection.find(Filters.eq("_id", _id.toString())).first().toFuture()
+    f.onFailure(errorHandler)
+    for (ret <- f) yield {
+      val doc =
+        if (ret == null)
+          defaultDoc
+        else
+          ret
+      doc(valueKey)
     }
   }
 
@@ -121,7 +133,7 @@ object SysConfig extends Enumeration {
   }
 
   def getGcNameList() = {
-    val f = get(GCNAME_LIST)
+    val f = get(GCNAME_LIST, Document(valueKey -> Monitor.indParkList))
     f.failed.foreach(errorHandler)
     for (ret <- f)
       yield ret.asArray().getValues.asScala.map(v => v.asString().getValue).toSeq
