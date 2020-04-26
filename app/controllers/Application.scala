@@ -380,10 +380,10 @@ object Application extends Controller {
 
   case class StopWarn(stopWarn: Boolean)
 
-  def getStopWarn()= Security.Authenticated.async {
+  def getStopWarn() = Security.Authenticated.async {
     implicit request =>
       implicit val writes = Json.writes[StopWarn]
-      for(stopWarn <- SysConfig.getStopWarn()) yield {
+      for (stopWarn <- SysConfig.getStopWarn()) yield {
         Ok(Json.toJson(StopWarn(stopWarn)))
       }
   }
@@ -405,5 +405,9 @@ object Application extends Controller {
             Ok(Json.obj("ok" -> true))
         }
       )
+  }
+
+  def redirectRoot(ignore:String) = Action {
+    Redirect("/")
   }
 }

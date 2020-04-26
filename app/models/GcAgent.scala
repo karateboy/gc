@@ -19,7 +19,11 @@ case class ExportEntry(db: Int, offset: Int)
 
 case class SiemensPlcConfig(host: String, exportMap: Map[String, ExportEntry])
 
-case class GcConfig(index: Int, inputDir: String, selector: Selector, plcConfig: Option[SiemensPlcConfig]) {
+case class ComputedMeasureType(_id: String, sum: Seq[String])
+
+case class GcConfig(index: Int, inputDir: String, selector: Selector,
+                    plcConfig: Option[SiemensPlcConfig],
+                    computedMtList: Option[Seq[ComputedMeasureType]]) {
   val gcName = GcAgent.getGcName(index)
 }
 
@@ -37,6 +41,7 @@ object GcAgent {
       val inputDir = config.getString("inputDir", None).get
       Logger.info(config.toString)
       val selector = new Selector(getGcName(idx), config.getConfig("selector").get)
+
       val plcConfig: Option[SiemensPlcConfig] =
         for (config <- config.getConfig("siemens_plc")) yield {
           val host = config.getString("host").get
@@ -48,9 +53,19 @@ object GcAgent {
           }
           SiemensPlcConfig(host, mapping.toMap)
         }
+      val computedTypes: Option[mutable.Buffer[ComputedMeasureType]] =
+        for (configList <- config.getConfigList("computedTypes")) yield {
+          configList.asScala map {
+            config => {
+              val id = config.getString("id").get
+              val sum: mutable.Seq[String] = config.getStringList("sum").get.asScala
+              ComputedMeasureType(id, sum)
+            }
+          }
+        }
       Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
       Logger.info(s"${plcConfig.toString}")
-      GcConfig(idx, inputDir, selector, plcConfig)
+      GcConfig(idx, inputDir, selector, plcConfig, computedTypes)
     }
   }
 
@@ -173,6 +188,26 @@ class GcAgent extends Actor {
             Logger.warn("skip invalid line-> ${rec}", ex)
           }
         }
+
+        def insertComputedTypes = {
+          if(gcConfig.computedMtList.isDefined){
+            for (mtMap <- timeMap.values) {
+              for (computedType <- gcConfig.computedMtList.get) {
+                val computedMt = MonitorType.getMonitorTypeValueByName(computedType._id, "")
+                val values: Seq[Double] = computedType.sum map { mtName =>
+                  val mt = MonitorType.getMonitorTypeValueByName(mtName, "")
+                  if (mtMap.contains(mt))
+                    mtMap(mt)._1
+                  else
+                    0
+                }
+                mtMap.put(computedMt, (values.sum, MonitorStatus.NormalStat))
+              }
+            }
+          }
+        }
+
+        insertComputedTypes
 
         val updateModels =
           for {

@@ -78,3 +78,4 @@ GET      /Record/:monitor/:monitorType/:start/:end                             c
 
 #import Data
 GET      /importEpaXLS                                                         controllers.Application.importEpa103
+GET      /*arg                                                                 controllers.Application.redirectRoot(arg)
