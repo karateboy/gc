@@ -136,8 +136,8 @@ export default {
         "ParentView",
         ...(this.tagNavList.length
           ? this.tagNavList
-              .filter(item => !(item.meta && item.meta.notCache))
-              .map(item => item.name)
+            .filter(item => !(item.meta && item.meta.notCache))
+            .map(item => item.name)
           : [])
       ];
       return list;

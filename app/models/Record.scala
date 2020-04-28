@@ -306,7 +306,7 @@ object Record {
             v = mtDoc.get("v") if v.isDouble()
             s = mtDoc.get("s") if s.isString()
           } yield {
-            MtRecord(mtDesp, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
+            MtRecord(mt.toString, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
           }
         val pdfReport = doc.get("pdfReport").get.asObjectId().getValue
         RecordList(Monitor.map(monitor).dp_no, time.getMillis, mtDataList, pdfReport)

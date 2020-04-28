@@ -193,7 +193,7 @@ class GcAgent extends Actor {
           if(gcConfig.computedMtList.isDefined){
             for (mtMap <- timeMap.values) {
               for (computedType <- gcConfig.computedMtList.get) {
-                val computedMt = MonitorType.getMonitorTypeValueByName(computedType._id, "")
+                val computedMt = MonitorType.getMonitorTypeValueByName(computedType._id, "", 1000)
                 val values: Seq[Double] = computedType.sum map { mtName =>
                   val mt = MonitorType.getMonitorTypeValueByName(mtName, "")
                   if (mtMap.contains(mt))
@@ -279,7 +279,7 @@ class GcAgent extends Actor {
 
       val path = Paths.get(f.getAbsolutePath)
       val dfav = Files.getFileAttributeView(path, classOf[DosFileAttributeView])
-      //dfav.setArchive(true)
+      dfav.setArchive(true)
     }
 
     val dirs = listDirs(gcConfig.inputDir)

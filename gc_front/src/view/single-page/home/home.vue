@@ -95,7 +95,6 @@ export default {
       getRealtimeData()
         .then(resp => {
           const ret = resp.data;
-          console.log(ret);
           this.inforCardData.splice(0, this.inforCardData.length);
           let card = {
             title: "資料時間",

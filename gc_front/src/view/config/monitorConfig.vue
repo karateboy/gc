@@ -50,6 +50,10 @@ export default {
           align: 'center'
         },
         {
+          title: 'GC名稱',
+          key: 'gcName'
+        },
+        {
           title: '通道名稱',
           key: 'dp_no',
           editable: true

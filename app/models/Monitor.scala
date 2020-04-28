@@ -10,7 +10,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import org.mongodb.scala.bson._
 import org.mongodb.scala.model._
 
-case class Monitor(_id: String, gcName: String, selector: String, dp_no: String)
+case class Monitor(_id: String, gcName: String, selector: Int, dp_no: String)
 
 object Monitor extends Enumeration {
   implicit val monitorRead: Reads[Monitor.Value] = EnumUtils.enumReads(Monitor)
@@ -39,7 +39,7 @@ object Monitor extends Enumeration {
   def buildMonitor(gcName: String, selector: Int, dp_no: String) = {
     assert(!dp_no.isEmpty)
 
-    Monitor(monitorId(gcName, selector), gcName, selector.toString, dp_no)
+    Monitor(monitorId(gcName, selector), gcName, selector, dp_no)
   }
 
 
@@ -70,7 +70,7 @@ object Monitor extends Enumeration {
   }
 
   private def mList: List[Monitor] = {
-    val f = collection.find().toFuture()
+    val f = collection.find().sort(Sorts.ascending("gcName", "selector")).toFuture()
     val ret = waitReadyResult(f)
     ret.toList
   }

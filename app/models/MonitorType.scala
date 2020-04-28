@@ -81,24 +81,23 @@ object MonitorType extends Enumeration {
           map = map + (Value(mt._id) -> mt)
       }
     }
-    mtvList = list.sortBy { _.order }.map(mt => MonitorType.withName(mt._id))
+    //mtvList = list.sortBy { _.order }.map(mt => MonitorType.withName(mt._id))
   }
 
   var map: Map[Value, MonitorType] = Map(mtList.map { e => Value(e._id) -> e }: _*)
-  var mtvList = mtList.sortBy { _.order }.map(mt => MonitorType.withName(mt._id))
+  def mtvList = mtList.sortBy { _.order }.map(mt => MonitorType.withName(mt._id))
   def activeMtvList = mtvList
   def realtimeMtvList = mtvList
 
-  def getMonitorTypeValueByName(_id: String, unit: String) = {
+  def getMonitorTypeValueByName(_id: String, unit: String, start:Int = 0) = {
     try {
       MonitorType.withName(_id)
     } catch {
       case _: NoSuchElementException =>
-        val mt = MonitorType(_id = _id, desp = _id, unit = unit, order = mtvList.size)
+        val mt = MonitorType(_id = _id, desp = _id, unit = unit, order = mtvList.size + start)
         newMonitorType(mt)
         val value = Value(mt._id)
-        map = map + (value -> mt)
-        mtvList = mtvList :+ (value)
+        refreshMtv
         value
     }
   }

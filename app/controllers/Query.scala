@@ -9,15 +9,19 @@ import play.api.data._
 import play.api.data.Forms._
 import play.api.libs.ws._
 import play.api.libs.ws.ning.NingAsyncHttpClientConfigBuilder
+
 import scala.concurrent.Future
 import play.api.libs.json._
 import com.github.nscala_time.time.Imports._
 import Highchart._
 import models._
 import models.ModelHelper._
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import models.ObjectIdUtil._
 import java.nio.file.Files
+
+import models.MonitorType.map
 
 case class Stat(
   avg:        Option[Double],
@@ -716,6 +720,8 @@ object Query extends Controller {
       val monitorTypes = monitorTypeStrArray.map { MonitorType.withName }
       val (start, end) = (new DateTime(startLong), new DateTime(endLong))
 
+      Logger.debug(monitorTypeStr)
+
       implicit val cdWrite = Json.writes[CellData]
       implicit val rdWrite = Json.writes[RowData]
       implicit val dtWrite = Json.writes[DataTab]
@@ -732,10 +738,12 @@ object Query extends Controller {
         val rows = recordList map {
           r =>
             val mtCellData = monitorTypes.toSeq map { mt =>
+              Logger.debug(r.mtDataList.toString)
               val mtDataOpt = r.mtDataList.find(mtdt => mtdt.mtName == mt.toString())
               if (mtDataOpt.isDefined) {
                 val mtData = mtDataOpt.get
-                CellData(mtData.value.toString(), "")
+                val mt = MonitorType.withName(mtData.mtName)
+                CellData(MonitorType.format(mt, Some(mtData.value)), "")
               } else {
                 CellData("-", "")
               }
@@ -790,11 +798,17 @@ object Query extends Controller {
       for (recordList <- Record.getLatestRecordListFuture(Record.MinCollection)(10)) yield {
         val rows = recordList map {
           r =>
-            val mtCellData = MonitorType.mtvList map { mt =>
+            implicit val ord  = new Ordering[MonitorType.Value] {
+              override def compare(x: MonitorType.Value, y: MonitorType.Value) : Int = {
+                MonitorType.map(y).order.compareTo(MonitorType.map(x).order)
+              }
+            }
+            val mtCellData = MonitorType.mtvList.sorted map { mt =>
               val mtDataOpt = r.mtDataList.find(mtdt => mtdt.mtName == mt.toString())
               if (mtDataOpt.isDefined) {
-                val mtData = mtDataOpt.get
-                CellData(mtData.value.toString(), "")
+                val mtData: Record.MtRecord = mtDataOpt.get
+                val mt = MonitorType.withName(mtData.mtName)
+                CellData(MonitorType.format(mt, Some(mtData.value)), "")
               } else {
                 CellData("-", "")
               }
@@ -840,7 +854,7 @@ object Query extends Controller {
             alarm <- alarmList
           } yield {
             val monitorDesp = if (alarm.monitor.isDefined)
-              Monitor.map(alarm.monitor.get).selector
+              Monitor.map(alarm.monitor.get).selector.toString
             else
               "-"
             val mtDesp = if (alarm.monitorType.isDefined)

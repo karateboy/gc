@@ -105,6 +105,11 @@ export default {
           editable: true
         },
         {
+          title: "排序",
+          key: "order",
+          editable: true
+        },
+        {
           title: "操作",
           align: "center",
           width: 200,
@@ -174,6 +179,7 @@ export default {
       arg.prec = parseInt(arg.prec);
       arg.std_internal = parseFloat(arg.std_internal);
       arg.std_law = parseFloat(arg.std_law);
+      arg.order = parseInt(arg.order);
 
       setMonitorType(arg)
         .then(resp => {
@@ -241,7 +247,7 @@ export default {
     this.getConfig();
     this.getDataPeriod();
     this.getGcList();
-    this.getStopWarn()
+    this.getStopWarn();
   }
 };
 </script>
