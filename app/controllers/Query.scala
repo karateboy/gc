@@ -817,7 +817,7 @@ object Query extends Controller {
             val cellData = mtCellData.+:(CellData(r.monitor, ""))
             RowData(r.time, cellData, r.pdfReport)
         }
-        val mtColumnNames = MonitorType.mtvList map { MonitorType.map(_).desp }
+        val mtColumnNames = MonitorType.mtvList.sorted map { MonitorType.map(_).desp }
         val columnNames = mtColumnNames.+:("GC/選擇器")
         Ok(Json.toJson(DataTab(columnNames, rows)))
       }
@@ -854,11 +854,11 @@ object Query extends Controller {
             alarm <- alarmList
           } yield {
             val monitorDesp = if (alarm.monitor.isDefined)
-              Monitor.map(alarm.monitor.get).selector.toString
+              alarm.monitor.get
             else
               "-"
             val mtDesp = if (alarm.monitorType.isDefined)
-              MonitorType.map(alarm.monitorType.get).desp
+              alarm.monitorType.get
             else
               "-"
 

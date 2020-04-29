@@ -32,41 +32,51 @@
 </template>
 
 <script>
-import canEditTable from './components/canEditTable.vue';
-import { getMonitors, setMonitor } from '@/api/data';
+import canEditTable from "./components/canEditTable.vue";
+import { getMonitors, setMonitor, getGcList } from "@/api/data";
 
 export default {
-  name: 'monitorConfig',
+  name: "monitorConfig",
   components: {
     canEditTable
+  },
+  mounted() {
+    getGcList().then(res => {
+      const ret = res.data;
+      for (let pair of ret) {
+        this.gcMap.set(pair.key, pair.name);
+      }
+      this.getConfig();
+    });
   },
   data() {
     return {
       columnsList: [
         {
-          title: '序號',
-          type: 'index',
+          title: "序號",
+          type: "index",
           width: 80,
-          align: 'center'
+          align: "center"
         },
         {
-          title: 'GC名稱',
-          key: 'gcName'
+          title: "GC名稱",
+          key: "gcDisplayName"
         },
         {
-          title: '通道名稱',
-          key: 'dp_no',
+          title: "通道名稱",
+          key: "dp_no",
           editable: true
         },
         {
-          title: '操作',
-          align: 'center',
+          title: "操作",
+          align: "center",
           width: 200,
-          key: 'handle',
-          handle: ['edit']
+          key: "handle",
+          handle: ["edit"]
         }
       ],
-      monitorList: []
+      monitorList: [],
+      gcMap: new Map()
     };
   },
   methods: {
@@ -75,6 +85,7 @@ export default {
         .then(resp => {
           this.monitorList.splice(0, this.monitorList.length);
           for (let monitor of resp.data) {
+            monitor.gcDisplayName = this.gcMap.get(monitor.gcName)
             this.monitorList.push(monitor);
           }
         })
@@ -92,7 +103,7 @@ export default {
       this.showCurrentTableData = true;
     },
     handleDel(val, index) {
-      this.$Message.success('删除了第' + (index + 1) + '行測項');
+      this.$Message.success("删除了第" + (index + 1) + "行測項");
     },
     handleCellChange(val, index, key) {
       this.handleChange(val, index);
@@ -110,9 +121,6 @@ export default {
           alert(err);
         });
     }
-  },
-  created() {
-    this.getConfig();
   }
 };
 </script>

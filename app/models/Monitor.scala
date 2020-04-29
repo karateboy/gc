@@ -59,7 +59,6 @@ object Monitor extends Enumeration {
     Logger.debug(s"Create monitor value ${m._id}!")
     val v = Value(m._id)
     map = map + (v -> m)
-    mvList = (v :: mvList.reverse).reverse
 
     val f = collection.insertOne(m).toFuture()
     f.onFailure(errorHandler)
@@ -87,19 +86,17 @@ object Monitor extends Enumeration {
           map = map + (Value(m._id) -> m)
       }
     }
-    mvList = list.map(m => Monitor.withName(m._id))
 
   }
 
   var map: Map[Value, Monitor] = Map(mList.map { e => Value(e._id) -> e }: _*)
-  var mvList = mList.map(mt => Monitor.withName(mt._id))
+  def mvList = mList.map(mt => Monitor.withName(mt._id))
 
   def indParkList = {
     var nameSet = Set.empty[String]
     for(mv <- mvList){
       nameSet += map(mv).gcName
     }
-    Logger.debug(nameSet.toString())
     nameSet.toList.sorted
   }
 

@@ -9,7 +9,7 @@ import play.api._
 import play.api.libs.json._
 import java.util.Date
 
-case class Alarm(time: Date, monitor: Option[Monitor.Value], monitorType: Option[MonitorType.Value], desc: String)
+case class Alarm(time: Date, monitor: Option[String], monitorType: Option[String], desc: String)
 object Alarm {
   implicit val write = Json.writes[Alarm]
   import org.mongodb.scala.model.Filters._
@@ -87,6 +87,7 @@ object Alarm {
   }
 
   private def checkForDuplicatelog(ar: Alarm, noDuplicateMin: Int = 30) = {
+    Logger.debug("check for no duplicate")
     //None blocking...
     import scala.util.{ Try, Success }
     import java.time.Instant
@@ -99,20 +100,22 @@ object Alarm {
     val f1 = collection.countDocuments(and(gte("time", start), lt("time", end),
       equal("monitor", ar.monitor.getOrElse(null)), equal("monitorType", ar.monitorType.getOrElse(null)), equal("desc", ar.desc))).toFuture()
 
-    f1.andThen({
-      case Success(count) =>
-        if (count == 0) {
-          val f2 = collection.insertOne(ar).toFuture()
-          f2.andThen({
-            case Success(x) =>
-              GcWebSocketActor.notifyAllActors
-          })
-        }
-    })
+    for(count <- f1) yield {
+      Logger.debug(s"duplicate ${count}")
+      if(count == 0){
+        val f2 = collection.insertOne(ar).toFuture()
+        f2.andThen({
+          case Success(x) =>
+            GcWebSocketActor.notifyAllActors
+        })
+      }
+    }
 
+    f1.onFailure(errorHandler())
+    f1
   }
 
-  def log(monitor: Option[Monitor.Value], monitorType: Option[MonitorType.Value],
+  def log(monitor: Option[String], monitorType: Option[String],
           desc: String, noDuplicateMin: Int = 30) = {
     import java.time.Instant
     val ar = Alarm(Date.from(Instant.now()), monitor, monitorType, desc)

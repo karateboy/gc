@@ -23,7 +23,7 @@ case class ComputedMeasureType(_id: String, sum: Seq[String])
 
 case class GcConfig(index: Int, inputDir: String, selector: Selector,
                     plcConfig: Option[SiemensPlcConfig],
-                    computedMtList: Option[Seq[ComputedMeasureType]]) {
+                    computedMtList: Option[Seq[ComputedMeasureType]], var latestDataTime: com.github.nscala_time.time.Imports.DateTime) {
   val gcName = GcAgent.getGcName(index)
 }
 
@@ -65,7 +65,8 @@ object GcAgent {
         }
       Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
       Logger.info(s"${plcConfig.toString}")
-      GcConfig(idx, inputDir, selector, plcConfig, computedTypes)
+      GcConfig(idx, inputDir, selector, plcConfig, computedTypes,
+        com.github.nscala_time.time.Imports.DateTime.now())
     }
   }
 
@@ -92,7 +93,7 @@ class GcAgent extends Actor {
       try {
         for (gcConfig <- gcConfigList) {
           processInputPath(gcConfig, parser)
-          checkNoDataPeriod
+          checkNoDataPeriod(gcConfig)
         }
 
 
@@ -104,7 +105,7 @@ class GcAgent extends Actor {
       context.system.scheduler.scheduleOnce(scala.concurrent.duration.Duration(1, scala.concurrent.duration.MINUTES), self, ParseReport)
   }
 
-  var latestDataTime: com.github.nscala_time.time.Imports.DateTime = com.github.nscala_time.time.Imports.DateTime.now()
+  //var latestDataTime: com.github.nscala_time.time.Imports.DateTime = com.github.nscala_time.time.Imports.DateTime.now()
 
   import java.io.File
 
@@ -144,7 +145,7 @@ class GcAgent extends Actor {
         mDates.head
       }
 
-      this.latestDataTime = DateTime.now()
+      gcConfig.latestDataTime = DateTime.now()
 
       def getRecordLines(inputLines: Seq[String]): Seq[String] = {
         val head = inputLines.dropWhile(!_.startsWith("-------")).drop(1)
@@ -310,14 +311,18 @@ class GcAgent extends Actor {
       }
   }
 
-  def checkNoDataPeriod = {
+  def checkNoDataPeriod(gcConfig: GcConfig) = {
     import com.github.nscala_time.time.Imports._
 
     for {dataPeriod <- SysConfig.getDataPeriod()
          stopWarn <- SysConfig.getStopWarn()
          } yield {
-      if (!stopWarn && (latestDataTime + dataPeriod.minutes) < DateTime.now)
-        Alarm.log(None, None, "沒有資料匯入!", dataPeriod)
+
+      if (!stopWarn && (gcConfig.latestDataTime + dataPeriod.minutes) < DateTime.now) {
+        val mv = Monitor.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
+        val monitor = Monitor.map(mv).dp_no
+        Alarm.log(Some(monitor), None, "沒有資料匯入!", dataPeriod)
+      }
     }
   }
 
