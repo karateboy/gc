@@ -37,7 +37,7 @@ object Realtime extends Controller {
 
   def latestValues() = Security.Authenticated.async {
     implicit request =>
-      val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection)(1)
+      val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection, true)(1)
 
       for (records <- latestRecord) yield {
         if (records.isEmpty) {

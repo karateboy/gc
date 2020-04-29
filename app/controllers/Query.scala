@@ -720,8 +720,6 @@ object Query extends Controller {
       val monitorTypes = monitorTypeStrArray.map { MonitorType.withName }
       val (start, end) = (new DateTime(startLong), new DateTime(endLong))
 
-      Logger.debug(monitorTypeStr)
-
       implicit val cdWrite = Json.writes[CellData]
       implicit val rdWrite = Json.writes[RowData]
       implicit val dtWrite = Json.writes[DataTab]
@@ -738,7 +736,6 @@ object Query extends Controller {
         val rows = recordList map {
           r =>
             val mtCellData = monitorTypes.toSeq map { mt =>
-              Logger.debug(r.mtDataList.toString)
               val mtDataOpt = r.mtDataList.find(mtdt => mtdt.mtName == mt.toString())
               if (mtDataOpt.isDefined) {
                 val mtData = mtDataOpt.get
@@ -798,13 +795,8 @@ object Query extends Controller {
       for (recordList <- Record.getLatestRecordListFuture(Record.MinCollection)(10)) yield {
         val rows = recordList map {
           r =>
-            implicit val ord  = new Ordering[MonitorType.Value] {
-              override def compare(x: MonitorType.Value, y: MonitorType.Value) : Int = {
-                MonitorType.map(y).order.compareTo(MonitorType.map(x).order)
-              }
-            }
-            val mtCellData = MonitorType.mtvList.sorted map { mt =>
-              val mtDataOpt = r.mtDataList.find(mtdt => mtdt.mtName == mt.toString())
+            val mtCellData = MonitorType.mtvList map { mt =>
+              val mtDataOpt = r.mtDataList.find(mtdt => mtdt.mtName == mt.toString)
               if (mtDataOpt.isDefined) {
                 val mtData: Record.MtRecord = mtDataOpt.get
                 val mt = MonitorType.withName(mtData.mtName)
@@ -817,7 +809,7 @@ object Query extends Controller {
             val cellData = mtCellData.+:(CellData(r.monitor, ""))
             RowData(r.time, cellData, r.pdfReport)
         }
-        val mtColumnNames = MonitorType.mtvList.sorted map { MonitorType.map(_).desp }
+        val mtColumnNames = MonitorType.mtvList map { MonitorType.map(_).desp }
         val columnNames = mtColumnNames.+:("GC/選擇器")
         Ok(Json.toJson(DataTab(columnNames, rows)))
       }
