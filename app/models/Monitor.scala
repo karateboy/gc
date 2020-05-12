@@ -6,9 +6,12 @@ import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import models.ModelHelper._
 import com.github.nscala_time.time.Imports._
+import org.bson.conversions.Bson
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.mongodb.scala.bson._
 import org.mongodb.scala.model._
+import org.mongodb.scala.result.UpdateResult
 
 case class Monitor(_id: String, gcName: String, selector: Int, dp_no: String)
 
@@ -42,6 +45,32 @@ object Monitor extends Enumeration {
     Monitor(monitorId(gcName, selector), gcName, selector, dp_no)
   }
 
+  def upgradeDb() {
+    val n = waitReadyResult(MongoDB.database.getCollection(colName).countDocuments().toFuture())
+    Logger.debug(s"${n} monitors")
+    if (n == 0)
+      return;
+
+    //Test schema
+    val docs: Seq[Document] = waitReadyResult(MongoDB.database.getCollection(colName).find().toFuture())
+
+    val gcName: Option[BsonValue] = docs(0).get[BsonValue]("gcName")
+    if (gcName.isEmpty) {
+
+      for (doc <- docs) {
+        val gcName = "gc1"
+        val _id = doc("_id").asString().getValue
+        val selector = _id.toInt
+        val new_id = monitorId(gcName, selector)
+        val newMonitor = Monitor(_id = new_id, gcName = gcName, selector = selector, dp_no = doc("dp_no").asString().getValue)
+        waitReadyResult(MongoDB.database.getCollection(colName).deleteOne(Filters.equal("_id", _id)).toFuture())
+        waitReadyResult(collection.insertOne(newMonitor).toFuture())
+        //Update min_data
+        val updateF = MongoDB.database.getCollection(Record.MinCollection).updateMany(Filters.equal("monitor", _id), Updates.set("monitor", new_id)).toFuture()
+        waitReadyResult(updateF)
+      }
+    }
+  }
 
   def init(colNames: Seq[String]) = {
     if (!colNames.contains(colName)) {
@@ -53,6 +82,8 @@ object Monitor extends Enumeration {
 
       waitReadyResult(f)
     }
+    upgradeDb()
+    refresh
   }
 
   def newMonitor(m: Monitor) = {
@@ -89,12 +120,13 @@ object Monitor extends Enumeration {
 
   }
 
-  var map: Map[Value, Monitor] = Map(mList.map { e => Value(e._id) -> e }: _*)
+  var map: Map[Value, Monitor] = Map.empty[Value, Monitor]
+
   def mvList = mList.map(mt => Monitor.withName(mt._id))
 
   def indParkList = {
     var nameSet = Set.empty[String]
-    for(mv <- mvList){
+    for (mv <- mvList) {
       nameSet += map(mv).gcName
     }
     nameSet.toList.sorted
