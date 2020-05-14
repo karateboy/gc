@@ -12,7 +12,6 @@ object Global extends GlobalSettings {
     super.onStart(app)
     MongoDB.init()
     GcAgent.startup()
-    Exporter.exportRealtimeData
   }
 
   override def onStop(app: Application) {

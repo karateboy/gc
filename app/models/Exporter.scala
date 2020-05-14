@@ -32,6 +32,7 @@ object Exporter {
   }
 
   var latestDateTime = new DateTime(0)
+  Logger.info(s"latestDateTime=${latestDateTime.toString()}")
 
   import com.serotonin.modbus4j._
 
@@ -42,7 +43,7 @@ object Exporter {
   val modbusPort = Play.current.configuration.getInt("modbus_port").getOrElse(503)
 
 
-  def writeModbusSlave(data: Record.RecordList) = {
+  def writeModbusSlave(gcConfig: GcConfig, data: Record.RecordList) = {
     import com.serotonin.modbus4j.ip.IpParameters
 
     def connectHost() {
@@ -82,7 +83,7 @@ object Exporter {
       }
 
       //Selector
-      //writeShort(0, Selector.get.toShort)
+      writeShort(0, (gcConfig.selector.get.toShort).toShort)
       for ((mtData, idx) <- data.mtDataList.zipWithIndex) {
         writeDouble(idx * 4 + 1, mtData.value)
       }
@@ -162,10 +163,10 @@ object Exporter {
     }
   }
 
-  def exportRealtimeData = {
+  def exportRealtimeData(gcConfig: GcConfig) = {
     val path = Paths.get(current.path.getAbsolutePath + "/export/realtime.txt")
     var buffer = ""
-    // buffer += s"Selector,${Selector.get}\r"
+    buffer += s"Selector,${gcConfig.selector.get}\n"
     val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection)(1)
 
     for (records <- latestRecord) yield {
@@ -179,15 +180,17 @@ object Exporter {
         }
 
       val dateTime = new DateTime(data.time)
-      if (latestDateTime < dateTime) {
+      if (true) {
 
         Logger.info(s"export Data ${dateTime.toString}")
 
         latestDateTime = dateTime
 
         //Export to modbus
-        if (exportLocalModbus)
-          writeModbusSlave(data)
+        if (exportLocalModbus) {
+          Logger.debug("Export to modbus")
+          writeModbusSlave(gcConfig: GcConfig, data)
+        }
 
         //Export to plc if properly configured
         //writePlc(data)
@@ -198,7 +201,7 @@ object Exporter {
           if (a.length() == 0)
             b
           else
-            a + "\r" + b
+            a + "\n" + b
         })
         buffer += mtDataStr
         val ret = Files.write(path, buffer.getBytes, StandardOpenOption.CREATE, StandardOpenOption.SYNC, StandardOpenOption.TRUNCATE_EXISTING)
