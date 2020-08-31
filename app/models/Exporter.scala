@@ -167,7 +167,7 @@ object Exporter {
     val path = Paths.get(current.path.getAbsolutePath + "/export/realtime.txt")
     var buffer = ""
     buffer += s"Selector,${gcConfig.selector.get}\n"
-    val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection)(1)
+    val latestRecord = Record.getLatestFixedRecordListFuture(Record.MinCollection)(1)
 
     for (records <- latestRecord) yield {
       val data =
