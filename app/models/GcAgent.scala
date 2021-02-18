@@ -1,23 +1,19 @@
 package models
 
-import java.util
-
-import play.api._
 import akka.actor._
+import com.github.s7connector.api.factory.{S7ConnectorFactory, S7SerializerFactory}
+import models.ModelHelper._
+import org.mongodb.scala.model._
 import play.api.Play.current
+import play.api._
 import play.api.libs.concurrent.Akka
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import ModelHelper._
-import org.mongodb.scala.bson._
-import org.mongodb.scala.model._
-
-import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext.Implicits.global
 
 case class ExportEntry(db: Int, offset: Int)
 
-case class SiemensPlcConfig(host: String, exportMap: Map[String, ExportEntry])
+case class SiemensPlcConfig(host: String, exportMap: Map[String, ExportEntry], importMap: Map[String, ExportEntry])
 
 case class ComputedMeasureType(_id: String, sum: Seq[String])
 
@@ -30,10 +26,7 @@ case class GcConfig(index: Int, inputDir: String, selector: Selector,
 import scala.collection.JavaConverters._
 
 object GcAgent {
-
-  case object ParseReport
-
-  def getGcName(idx: Int) = s"gc${idx + 1}"
+  val gcAgent_check_period = Play.current.configuration.getInt("gcAgent_check_period").getOrElse(60)
 
   val gcConfigList: mutable.Seq[GcConfig] = {
     val configList = Play.current.configuration.getConfigList("gcConfigList").get.asScala
@@ -43,15 +36,28 @@ object GcAgent {
       val selector = new Selector(getGcName(idx), config.getConfig("selector").get)
 
       val plcConfig: Option[SiemensPlcConfig] =
-        for (config <- config.getConfig("siemens_plc")) yield {
+        for (config <- config.getConfig("plcConfig")) yield {
           val host = config.getString("host").get
-          val mapping: mutable.Seq[(String, ExportEntry)] = for (mapConfig <- config.getConfigList("mapping").get.asScala) yield {
-            val item = mapConfig.getString("item").get
-            val db = mapConfig.getInt("db").get
-            val offset = mapConfig.getInt("offset").get
-            item -> ExportEntry(db, offset)
+
+          def getMapping(entriesOpt: Option[java.util.List[Configuration]]): Map[String, ExportEntry] = {
+            if (entriesOpt.isEmpty)
+              Map.empty[String, ExportEntry]
+            else {
+              val entries = entriesOpt.get.asScala
+              val pairs =
+                for (entry <- entries) yield {
+                  val item = entry.getString("item").get
+                  val db = entry.getInt("db").get
+                  val offset = entry.getInt("offset").get
+                  item -> ExportEntry(db, offset)
+                }
+              pairs.toMap
+            }
           }
-          SiemensPlcConfig(host, mapping.toMap)
+
+          val exportMap = getMapping(config.getConfigList("exportMap"))
+          val importMap = getMapping(config.getConfigList("importMap"))
+          SiemensPlcConfig(host, exportMap, importMap)
         }
       val computedTypes: Option[mutable.Buffer[ComputedMeasureType]] =
         for (configList <- config.getConfigList("computedTypes")) yield {
@@ -69,8 +75,9 @@ object GcAgent {
         com.github.nscala_time.time.Imports.DateTime.now())
     }
   }
-
   var receiver: ActorRef = _
+
+  def getGcName(idx: Int) = s"gc${idx + 1}"
 
   def startup() = {
     receiver = Akka.system.actorOf(Props(classOf[GcAgent]), name = "gcAgent")
@@ -80,6 +87,8 @@ object GcAgent {
   def parseOutput = {
     receiver ! ParseReport
   }
+
+  case object ParseReport
 }
 
 class GcAgent extends Actor {
@@ -88,32 +97,36 @@ class GcAgent extends Actor {
 
   Logger.info("GcAgent started.")
 
+  val MAX_RETRY_COUNT = 30
+
+  import java.io.File
+
+  var retryMap = Map.empty[String, Int]
+
   def receive = {
     case ParseReport =>
       try {
         for (gcConfig <- gcConfigList) {
           processInputPath(gcConfig, parser)
           checkNoDataPeriod(gcConfig)
+          if (gcConfig.plcConfig.nonEmpty) {
+            readPlcStatus(gcConfig)
+          }
         }
-
-
       } catch {
         case ex: Throwable =>
           Logger.error("process InputPath failed", ex)
       }
-      import scala.concurrent.duration._
-      context.system.scheduler.scheduleOnce(scala.concurrent.duration.Duration(1, scala.concurrent.duration.MINUTES), self, ParseReport)
+      context.system.scheduler.scheduleOnce(scala.concurrent.duration.Duration(gcAgent_check_period, scala.concurrent.duration.SECONDS), self, ParseReport)
+
   }
 
-  //var latestDataTime: com.github.nscala_time.time.Imports.DateTime = com.github.nscala_time.time.Imports.DateTime.now()
-
-  import java.io.File
-
   def parser(gcConfig: GcConfig, reportDir: File): Boolean = {
-    import java.nio.file.{Paths, Files, StandardOpenOption}
-    import java.nio.charset.{StandardCharsets}
-    import scala.collection.JavaConverters._
     import org.mongodb.scala.bson._
+
+    import java.nio.charset.StandardCharsets
+    import java.nio.file.{Files, Paths}
+    import scala.collection.JavaConverters._
     val pdfReportFile =
       reportDir.listFiles().toList.filter(_.getName.toLowerCase.endsWith("pdf")).head
 
@@ -189,49 +202,49 @@ class GcAgent extends Actor {
             Logger.warn("skip invalid line-> ${rec}", ex)
           }
         }
+      } //End of process report.txt
 
-        def insertComputedTypes = {
-          if(gcConfig.computedMtList.isDefined){
-            for (mtMap <- timeMap.values) {
-              for (computedType <- gcConfig.computedMtList.get) {
-                val computedMt = MonitorType.getMonitorTypeValueByName(computedType._id, "", 1000)
-                val values: Seq[Double] = computedType.sum map { mtName =>
-                  val mt = MonitorType.getMonitorTypeValueByName(mtName, "")
-                  if (mtMap.contains(mt))
-                    mtMap(mt)._1
-                  else
-                    0
-                }
-                mtMap.put(computedMt, (values.sum, MonitorStatus.NormalStat))
+      def insertComputedTypes = {
+        if (gcConfig.computedMtList.isDefined) {
+          for (mtMap <- timeMap.values) {
+            for (computedType <- gcConfig.computedMtList.get) {
+              val computedMt = MonitorType.getMonitorTypeValueByName(computedType._id, "", 1000)
+              val values: Seq[Double] = computedType.sum map { mtName =>
+                val mt = MonitorType.getMonitorTypeValueByName(mtName, "")
+                if (mtMap.contains(mt))
+                  mtMap(mt)._1
+                else
+                  0
               }
+              mtMap.put(computedMt, (values.sum, MonitorStatus.NormalStat))
             }
           }
         }
+      }
 
-        insertComputedTypes
+      insertComputedTypes
 
-        val updateModels =
-          for {
-            monitorMap <- recordMap
-            monitor = monitorMap._1
-            timeMaps = monitorMap._2
-            dateTime <- timeMaps.keys.toList.sorted
-            mtMaps = timeMaps(dateTime) if !mtMaps.isEmpty
-            doc = Record.toDocument(monitor, dateTime, mtMaps.toList, pdfReportId)
-            updateList = doc.toList.map(kv => Updates.set(kv._1, kv._2)) if !updateList.isEmpty
-          } yield {
-            UpdateOneModel(
-              Filters.eq("_id", doc("_id")),
-              Updates.combine(updateList: _*), UpdateOptions().upsert(true))
-          }
+      val updateModels =
+        for {
+          monitorMap <- recordMap
+          monitor = monitorMap._1
+          timeMaps = monitorMap._2
+          dateTime <- timeMaps.keys.toList.sorted
+          mtMaps = timeMaps(dateTime) if !mtMaps.isEmpty
+          doc = Record.toDocument(monitor, dateTime, mtMaps.toList, pdfReportId)
+          updateList = doc.toList.map(kv => Updates.set(kv._1, kv._2)) if !updateList.isEmpty
+        } yield {
+          UpdateOneModel(
+            Filters.eq("_id", doc("_id")),
+            Updates.combine(updateList: _*), UpdateOptions().upsert(true))
+        }
 
-        val collection = MongoDB.database.getCollection(Record.MinCollection)
-        val f2 = collection.bulkWrite(updateModels.toList, BulkWriteOptions().ordered(false)).toFuture()
-        f2.onFailure(errorHandler)
-        waitReadyResult(f2)
-        Exporter.exportRealtimeData(gcConfig)
-      } //End of process report.txt
-    }
+      val collection = MongoDB.database.getCollection(Record.MinCollection)
+      val f2 = collection.bulkWrite(updateModels.toList, BulkWriteOptions().ordered(false)).toFuture()
+      f2.onFailure(errorHandler)
+      waitReadyResult(f2)
+      Exporter.exportRealtimeData(gcConfig)
+    } //End of process report.txt
 
     insertRecord
     true
@@ -265,14 +278,8 @@ class GcAgent extends Actor {
     }
   }
 
-  var retryMap = Map.empty[String, Int]
-  val MAX_RETRY_COUNT = 30
-
   def processInputPath(gcConfig: GcConfig, parser: (GcConfig, File) => Boolean) = {
-    import org.apache.commons.io.FileUtils
     import java.io.File
-    import org.apache.commons.io.filefilter.DirectoryFileFilter
-    import scala.collection.JavaConverters._
 
     def setArchive(f: File) {
       import java.nio.file._
@@ -323,6 +330,30 @@ class GcAgent extends Actor {
         val monitor = Monitor.map(mv).dp_no
         Alarm.log(Some(monitor), None, "沒有資料匯入!", dataPeriod)
       }
+    }
+  }
+
+  def readPlcStatus(gcConfig: GcConfig): Unit = {
+
+    gcConfig.plcConfig map {
+      plcConfig =>
+        val connector =
+          S7ConnectorFactory
+            .buildTCPConnector()
+            .withHost(plcConfig.host)
+            .build()
+
+        val serializer = S7SerializerFactory.buildSerializer(connector)
+        if (plcConfig.importMap.contains("selector")) {
+          val entry = plcConfig.importMap("selector")
+          val readBack = serializer.dispense(classOf[SelectorBean], entry.db, entry.offset)
+          if(gcConfig.selector.get != readBack.getPos) {
+            Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
+            Logger.info("selector set =>" + readBack.getPos)
+            gcConfig.selector.set(readBack.getPos)
+          }
+        }
+        connector.close()
     }
   }
 

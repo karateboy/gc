@@ -356,6 +356,31 @@ object Application extends Controller {
     }
   }
 
+  case class OpMode(mode:Int)
+  def putOperationMode= Security.Authenticated.async(BodyParsers.parse.json) {
+    implicit request =>
+      implicit val reads = Json.reads[OpMode]
+      val modeParam = request.body.validate[OpMode]
+
+      modeParam.fold(
+        error => {
+          Future {
+            Logger.error(JsError.toJson(error).toString())
+            BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
+          }
+        },
+        param => {
+          Logger.info(s"set operation mode = ${param.mode}")
+          for(gcConfig <- GcAgent.gcConfigList)
+            Exporter.exportPlc(gcConfig, param.mode)
+
+          for (ret <- SysConfig.setOperationMode(param.mode)) yield {
+            Ok(Json.obj("mode" -> param.mode))
+          }
+        })
+
+  }
+
   def setGcName() = Security.Authenticated.async(BodyParsers.parse.json) {
     implicit request =>
       implicit val reads = Json.reads[GcName]

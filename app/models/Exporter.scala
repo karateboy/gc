@@ -1,21 +1,23 @@
 package models
 
-import play.api._
-import java.nio.file.{Files, Paths, StandardOpenOption}
-import java.util.Date
-
-import play.api.Play.current
-
-import scala.concurrent.ExecutionContext.Implicits.global
 import com.github.nscala_time.time.Imports._
+import com.github.s7connector.api.factory.{S7ConnectorFactory, S7SerializerFactory}
+import models.ModelHelper._
+import play.api.Play.current
+import play.api._
 
-import scala.collection.JavaConverters._
+import java.nio.file.{Files, Paths, StandardOpenOption}
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
-import ModelHelper._
-import com.github.s7connector.api.factory.S7ConnectorFactory
 
 object Exporter {
   val activeMonitorType = List(MonitorType.mtvList: _*)
+  val exportLocalModbus = Play.current.configuration.getBoolean("exportLocalModbus").getOrElse(false)
+  val modbusPort = Play.current.configuration.getInt("modbus_port").getOrElse(503)
+
+  import com.serotonin.modbus4j._
+  var latestDateTime = new DateTime(0)
+  var masterOpt: Option[ModbusMaster] = None
 
   def exportActiveMonitorType = {
     val path = Paths.get(current.path.getAbsolutePath + "/export/activeMonitor.txt")
@@ -31,17 +33,74 @@ object Exporter {
     Files.write(path, ret, StandardOpenOption.CREATE)
   }
 
-  var latestDateTime = new DateTime(0)
-  Logger.info(s"latestDateTime=${latestDateTime.toString()}")
+  def exportPlc(gcConfig: GcConfig, mode:Int) = {
+    val plcConfig = gcConfig.plcConfig.get
+    val connector =
+      S7ConnectorFactory
+        .buildTCPConnector()
+        .withHost(plcConfig.host)
+        .build()
 
-  import com.serotonin.modbus4j._
+    val serializer = S7SerializerFactory.buildSerializer(connector)
 
-  var masterOpt: Option[ModbusMaster] = None
+    if (plcConfig.exportMap.contains("local")) {
+      val entry = plcConfig.exportMap("local")
+      Logger.info(s"isLocal ${mode == 0} =>DB${entry.db}.${entry.offset}")
+      val localBean = new LocalBean()
+      localBean.value = mode == 0
+      serializer.store(localBean, entry.db, entry.offset)
+      val readBack = serializer.dispense(classOf[LocalBean], entry.db, entry.offset)
+      Logger.info("readback =>" + readBack.toString)
+    }
+    connector.close()
+  }
 
-  val exportLocalModbus = Play.current.configuration.getBoolean("exportLocalModbus").getOrElse(false)
+  def exportRealtimeData(gcConfig: GcConfig) = {
+    val path = Paths.get(current.path.getAbsolutePath + "/export/realtime.txt")
+    var buffer = ""
+    buffer += s"Selector,${gcConfig.selector.get}\n"
+    val latestRecord = Record.getLatestFixedRecordListFuture(Record.MinCollection)(1)
 
-  val modbusPort = Play.current.configuration.getInt("modbus_port").getOrElse(503)
+    for (records <- latestRecord) yield {
+      val data =
+        if (records.isEmpty) {
+          import org.mongodb.scala.bson._
+          val mtRecordList = MonitorType.mtvList map { mt => Record.MtRecord(MonitorType.map(mt).desp, 0, MonitorStatus.NormalStat, "") }
+          Record.RecordList("-", DateTime.now().getMillis, mtRecordList, new ObjectId())
+        } else {
+          records.head
+        }
 
+      val dateTime = new DateTime(data.time)
+      if (true) {
+
+        Logger.info(s"export Data ${dateTime.toString}")
+        latestDateTime = dateTime
+
+        //Export to modbus
+        if (exportLocalModbus) {
+          Logger.debug("Export to modbus")
+          writeModbusSlave(gcConfig: GcConfig, data)
+        }
+
+        //Export to plc if properly configured
+        writePlc(data)
+
+        buffer += s"InjectionDate, ${data.time}\r"
+        val mtStrs = data.mtDataList map { mt_data => s"${mt_data.mtName}, ${mt_data.value}" }
+        val mtDataStr = mtStrs.foldLeft("")((a, b) => {
+          if (a.length() == 0)
+            b
+          else
+            a + "\n" + b
+        })
+        buffer += mtDataStr
+        val ret = Files.write(path, buffer.getBytes, StandardOpenOption.CREATE, StandardOpenOption.SYNC, StandardOpenOption.TRUNCATE_EXISTING)
+        true
+      } else
+        false
+    }
+  }
 
   def writeModbusSlave(gcConfig: GcConfig, data: Record.RecordList) = {
     import com.serotonin.modbus4j.ip.IpParameters
@@ -61,10 +120,9 @@ object Exporter {
     }
 
     def writeReg(master: ModbusMaster) = {
-      import com.serotonin.modbus4j.msg._
+      import com.serotonin.modbus4j.code.DataType
       import com.serotonin.modbus4j.locator.BaseLocator
-      import com.serotonin.modbus4j.code.DataType;
-      import java.nio._
+      import com.serotonin.modbus4j.msg._
       val slaveID = 1
 
       def writeShort(offset: Int, value: Short) = {
@@ -107,9 +165,6 @@ object Exporter {
     } onFailure errorHandler
   }
 
-  import com.github.s7connector.api._
-  import java.nio.ByteBuffer
-
   def writePlc(data: Record.RecordList) = {
     val tokens = data.monitor.split(":")
     val gcName = tokens(0)
@@ -124,90 +179,53 @@ object Exporter {
           .withHost(plcConfig.host)
           .build()
 
-      def toHexString(bytes: Seq[Byte]): String = bytes.map("%02X" format _).mkString
-
+      val serializer = S7SerializerFactory.buildSerializer(connector)
 
       if (plcConfig.exportMap.contains("selector")) {
-        import com.github.s7connector.impl.serializer.converter.IntegerConverter
-        val converter = new IntegerConverter()
-        val buffer = new Array[Byte](4)
-        converter.insert(gcConfig.selector.get, buffer, 0, 0, buffer.size)
-
         val entry = plcConfig.exportMap("selector")
-        connector.write(DaveArea.DB, entry.db, entry.offset, buffer)
         Logger.info(s"PLC Selector ${gcConfig.selector.get} =>DB${entry.db}.${entry.offset}")
-
-        val readBack = connector.read(DaveArea.DB, entry.db, 4, entry.offset)
-        val v: Integer = converter.extract(classOf[Integer], readBack, 0, 0)
-        Logger.info(s"Selector DB${entry.db}.${entry.offset} read=>" + v)
+        assert(gcConfig.selector.get <= 15)
+        val selectorBean = new SelectorBean()
+        selectorBean.value = 1 << gcConfig.selector.get
+        serializer.store(selectorBean, entry.db, entry.offset)
+        val readBack = serializer.dispense(classOf[SelectorBean], entry.db, entry.offset)
+        Logger.info("readback =>" + readBack.toString)
       }
 
       if (plcConfig.exportMap.contains("datetime")) {
         val dateTime = new DateTime(data.time)
-        val buffer = ByteBuffer.allocate(8).putLong(data.time).array()
         val entry = plcConfig.exportMap("datetime")
-        connector.write(DaveArea.DB, entry.db, entry.offset, buffer)
         Logger.info(s"dateTime ${dateTime.toString} =>DB${entry.db}.${entry.offset}")
-        val readBack = connector.read(DaveArea.DB, entry.db, 8, 0)
+        val dateTimeBean = new DateTimeBean()
+        dateTimeBean.value = dateTime.toDate
+        serializer.store(dateTimeBean, entry.db, entry.offset)
+        val readBack = serializer.dispense(classOf[DateTimeBean], entry.db, entry.offset)
+        Logger.info("readback =>" + readBack.toString)
       }
+
+      if (plcConfig.exportMap.contains("local")) {
+        val entry = plcConfig.exportMap("local")
+        val mode = waitReadyResult(SysConfig.getOperationMode())
+        Logger.info(s"isLocal ${mode == 0} =>DB${entry.db}.${entry.offset}")
+        val localBean = new LocalBean()
+        localBean.value = mode == 0
+        serializer.store(localBean, entry.db, entry.offset)
+        val readBack = serializer.dispense(classOf[LocalBean], entry.db, entry.offset)
+        Logger.info("readback =>" + readBack.toString)
+      }
+
       for (mtData <- data.mtDataList) {
         if (plcConfig.exportMap.contains(mtData.mtName)) {
-          val buffer = ByteBuffer.allocate(4).putFloat(mtData.value.toFloat).array()
           val entry = plcConfig.exportMap(mtData.mtName)
-          connector.write(DaveArea.DB, entry.db, entry.offset, buffer)
           Logger.info(s"${mtData.mtName} ${mtData.value}=>DB${entry.db}.${entry.offset}")
-          val readBack = connector.read(DaveArea.DB, entry.db, 4, entry.offset)
+          val mtDataBean = new MtDataBean()
+          mtDataBean.value = mtData.value.toFloat
+          serializer.store(mtDataBean, entry.db, entry.offset)
+          val readBack = serializer.dispense(classOf[MtDataBean], entry.db, entry.offset)
+          Logger.info("readback =>" + readBack.toString)
         }
       }
       connector.close()
-    }
-  }
-
-  def exportRealtimeData(gcConfig: GcConfig) = {
-    val path = Paths.get(current.path.getAbsolutePath + "/export/realtime.txt")
-    var buffer = ""
-    buffer += s"Selector,${gcConfig.selector.get}\n"
-    val latestRecord = Record.getLatestFixedRecordListFuture(Record.MinCollection)(1)
-
-    for (records <- latestRecord) yield {
-      val data =
-        if (records.isEmpty) {
-          import org.mongodb.scala.bson._
-          val mtRecordList = MonitorType.mtvList map { mt => Record.MtRecord(MonitorType.map(mt).desp, 0, MonitorStatus.NormalStat, "") }
-          Record.RecordList("-", DateTime.now().getMillis, mtRecordList, new ObjectId())
-        } else {
-          records.head
-        }
-
-      val dateTime = new DateTime(data.time)
-      if (true) {
-
-        Logger.info(s"export Data ${dateTime.toString}")
-
-        latestDateTime = dateTime
-
-        //Export to modbus
-        if (exportLocalModbus) {
-          Logger.debug("Export to modbus")
-          writeModbusSlave(gcConfig: GcConfig, data)
-        }
-
-        //Export to plc if properly configured
-        //writePlc(data)
-
-        buffer += s"InjectionDate, ${data.time}\r"
-        val mtStrs = data.mtDataList map { mt_data => s"${mt_data.mtName}, ${mt_data.value}" }
-        val mtDataStr = mtStrs.foldLeft("")((a, b) => {
-          if (a.length() == 0)
-            b
-          else
-            a + "\n" + b
-        })
-        buffer += mtDataStr
-        val ret = Files.write(path, buffer.getBytes, StandardOpenOption.CREATE, StandardOpenOption.SYNC, StandardOpenOption.TRUNCATE_EXISTING)
-        true
-      } else
-        false
     }
   }
 }

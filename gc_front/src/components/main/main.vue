@@ -7,7 +7,7 @@
       :collapsed-width="64"
       v-model="collapsed"
       class="left-sider"
-      :style="{overflow: 'hidden'}"
+      :style="{ overflow: 'hidden' }"
     >
       <side-menu
         accordion
@@ -19,15 +19,21 @@
       >
         <!-- 需要放在菜单上面的内容，如Logo，写在side-menu标签内部，如下 -->
         <div class="logo-con">
-          <div :class="{ localMode: localMode, remoteMode: !localMode }" @click="toggleLocalMode">
-            <h3>{{operationMode}}</h3>
+          <div
+            :class="{ localMode: localMode, remoteMode: !localMode }"
+            @click="toggleLocalMode"
+          >
+            <h3>{{ operationMode }}</h3>
           </div>
         </div>
       </side-menu>
     </Sider>
     <Layout>
       <Header class="header-con">
-        <header-bar :collapsed="collapsed" @on-coll-change="handleCollapsedChange">
+        <header-bar
+          :collapsed="collapsed"
+          @on-coll-change="handleCollapsedChange"
+        >
           <user :message-unread-count="unreadCount" :user-avatar="userAvatar" />
           <language
             v-if="$config.useI18n"
@@ -52,7 +58,12 @@
             <keep-alive :include="cacheList">
               <router-view />
             </keep-alive>
-            <ABackTop :height="100" :bottom="80" :right="50" container=".content-wrapper"></ABackTop>
+            <ABackTop
+              :height="100"
+              :bottom="80"
+              :right="50"
+              container=".content-wrapper"
+            ></ABackTop>
           </Content>
         </Layout>
       </Content>
@@ -162,16 +173,16 @@ export default {
       "addTag",
       "setLocal",
       "setHomeRoute",
-      "closeTag",
-      "setLocalMode"
+      "closeTag"
     ]),
     ...mapActions([
       "handleLogin",
       "getUnreadMessageCount",
-      "fetchOperationMode"
+      "fetchOperationMode",
+      "setOperationMode"
     ]),
     toggleLocalMode() {
-      this.setLocalMode(!this.localMode);
+      this.setOperationMode(!this.localMode);
     },
     turnToPage(route) {
       let { name, params, query } = {};

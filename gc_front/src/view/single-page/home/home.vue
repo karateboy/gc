@@ -3,9 +3,9 @@
     <Row type="flex" justify="start" :gutter="10">
       <i-col :xs="12" :md="8" :lg="6" style="padding-top:5px;">
         <Card :key="selector._id" :padding="2" shadown>
-          <span class="tag">{{selector.title}}</span>
+          <span class="tag">{{ selector.title }}</span>
           <Divider type="vertical" />
-          <span class="tag_value">{{ selector.dp_no}}</span>
+          <span class="tag_value">{{ selector.dp_no }}</span>
         </Card>
       </i-col>
       <i-col
@@ -17,10 +17,10 @@
         style="padding-top:5px;"
       >
         <Card :key="i" :padding="2" shadown>
-          <span class="tag">{{infor.title}}</span>
+          <span class="tag">{{ infor.title }}</span>
           <Divider type="vertical" />
           <span class="tag_value">
-            <strong>{{ infor.text}}</strong>
+            <strong>{{ infor.text }}</strong>
           </span>
         </Card>
       </i-col>
@@ -37,7 +37,8 @@
             size="small"
             style="margin-right: 5px"
             @click="showPdfReport(index)"
-          >報表</Button>
+            >報表</Button
+          >
         </template>
       </Table>
     </Row>
@@ -92,78 +93,71 @@ export default {
   },
   methods: {
     reloadData() {
-      getRealtimeData()
-        .then(resp => {
-          const ret = resp.data;
-          this.inforCardData.splice(0, this.inforCardData.length);
+      getRealtimeData().then(resp => {
+        const ret = resp.data;
+        this.inforCardData.splice(0, this.inforCardData.length);
+        let card = {
+          title: "資料時間",
+          icon: "ios-time",
+          text: moment(ret.time).format("M-D HH:mm"),
+          color: "#ff9900"
+        };
+        this.inforCardData.push(card);
+        for (let mtData of ret.mtDataList) {
           let card = {
-            title: "資料時間",
-            icon: "ios-time",
-            text: moment(ret.time).format("M-D HH:mm"),
+            title: mtData.mtName,
+            icon: "ios-flask",
+            text: mtData.text,
             color: "#ff9900"
           };
           this.inforCardData.push(card);
-          for (let mtData of ret.mtDataList) {
-            let card = {
-              title: mtData.mtName,
-              icon: "ios-flask",
-              text: mtData.text,
-              color: "#ff9900"
-            };
-            this.inforCardData.push(card);
-          }
-          this.selector.dp_no = ret.monitor;
-        })
-        .catch(err => {
-          alert(err);
-        });
+        }
+        this.selector.dp_no = ret.monitor;
+      });
 
-      getLast10Data()
-        .then(resp => {
-          const ret = resp.data;
-          this.columns.splice(0, this.columns.length);
-          this.rows.splice(0, this.rows.length);
-          this.columns.push({
-            title: "日期",
-            key: "date",
-            sortable: true
-          });
-          for (let i = 0; i < ret.columnNames.length; i++) {
-            let col = {
-              title: ret.columnNames[i],
-              key: `col${i}`,
-              sortable: true
-            };
-            this.columns.push(col);
-          }
-          // setup for report column
-          this.columns.push({
-            title: "動作",
-            slot: "action",
-            width: 150,
-            align: "center"
-          });
-          for (let row of ret.rows) {
-            let rowData = {
-              date: new moment(row.date).format("lll"),
-              cellClassName: {}
-            };
-            for (let c = 0; c < row.cellData.length; c++) {
-              let key = `col${c}`;
-              rowData[key] = row.cellData[c].v;
-              rowData.cellClassName[key] = row.cellData[c].cellClassName;
-              if (baseUrl.length !== 0) {
-                rowData.pdfUrl = `${baseUrl}pdfReport/${row.pdfReport}`;
-              } else {
-                rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
-              }
-            }
-            this.rows.push(rowData);
-          }
-        })
-        .catch(err => {
-          alert(err);
+      getLast10Data().then(resp => {
+        const ret = resp.data;
+        this.columns.splice(0, this.columns.length);
+        this.rows.splice(0, this.rows.length);
+        this.columns.push({
+          title: "日期",
+          key: "date",
+          sortable: true
         });
+        for (let i = 0; i < ret.columnNames.length; i++) {
+          let col = {
+            title: ret.columnNames[i],
+            key: `col${i}`,
+            sortable: true
+          };
+          this.columns.push(col);
+        }
+        // setup for report column
+        this.columns.push({
+          title: "動作",
+          slot: "action",
+          width: 150,
+          align: "center"
+        });
+        for (let row of ret.rows) {
+          let rowData = {
+            date: new moment(row.date).format("lll"),
+            cellClassName: {}
+          };
+          for (let c = 0; c < row.cellData.length; c++) {
+            let key = `col${c}`;
+            rowData[key] = row.cellData[c].v;
+            rowData.cellClassName[key] = row.cellData[c].cellClassName;
+            if (baseUrl.length !== 0) {
+              rowData.pdfUrl = `${baseUrl}pdfReport/${row.pdfReport}`;
+            } else {
+              rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
+            }
+          }
+          this.rows.push(rowData);
+        }
+      });
+
       this.timer = setTimeout(this.reloadData, 30000);
     },
     showPdfReport(idx) {
