@@ -16,6 +16,7 @@ object Exporter {
   val modbusPort = Play.current.configuration.getInt("modbus_port").getOrElse(503)
 
   import com.serotonin.modbus4j._
+
   var latestDateTime = new DateTime(0)
   var masterOpt: Option[ModbusMaster] = None
 
@@ -33,7 +34,7 @@ object Exporter {
     Files.write(path, ret, StandardOpenOption.CREATE)
   }
 
-  def exportPlc(gcConfig: GcConfig, mode:Int) = {
+  def exportPlc(gcConfig: GcConfig, mode: Int) = {
     val plcConfig = gcConfig.plcConfig.get
     val connector =
       S7ConnectorFactory
@@ -61,44 +62,33 @@ object Exporter {
     buffer += s"Selector,${gcConfig.selector.get}\n"
     val latestRecord = Record.getLatestFixedRecordListFuture(Record.MinCollection)(1)
 
-    for (records <- latestRecord) yield {
-      val data =
-        if (records.isEmpty) {
-          import org.mongodb.scala.bson._
-          val mtRecordList = MonitorType.mtvList map { mt => Record.MtRecord(MonitorType.map(mt).desp, 0, MonitorStatus.NormalStat, "") }
-          Record.RecordList("-", DateTime.now().getMillis, mtRecordList, new ObjectId())
-        } else {
-          records.head
-        }
+    for (records <- latestRecord if records.nonEmpty) yield {
+      val data = records.head
 
       val dateTime = new DateTime(data.time)
-      if (true) {
 
-        Logger.info(s"export Data ${dateTime.toString}")
-        latestDateTime = dateTime
+      Logger.info(s"export Data ${dateTime.toString}")
+      latestDateTime = dateTime
 
-        //Export to modbus
-        if (exportLocalModbus) {
-          Logger.debug("Export to modbus")
-          writeModbusSlave(gcConfig: GcConfig, data)
-        }
+      //Export to modbus
+      if (exportLocalModbus) {
+        Logger.debug("Export to modbus")
+        writeModbusSlave(gcConfig: GcConfig, data)
+      }
 
-        //Export to plc if properly configured
-        writePlc(data)
+      //Export to plc if properly configured
+      writePlc(data)
 
-        buffer += s"InjectionDate, ${data.time}\r"
-        val mtStrs = data.mtDataList map { mt_data => s"${mt_data.mtName}, ${mt_data.value}" }
-        val mtDataStr = mtStrs.foldLeft("")((a, b) => {
-          if (a.length() == 0)
-            b
-          else
-            a + "\n" + b
-        })
-        buffer += mtDataStr
-        val ret = Files.write(path, buffer.getBytes, StandardOpenOption.CREATE, StandardOpenOption.SYNC, StandardOpenOption.TRUNCATE_EXISTING)
-        true
-      } else
-        false
+      buffer += s"InjectionDate, ${data.time}\r"
+      val mtStrs = data.mtDataList map { mt_data => s"${mt_data.mtName}, ${mt_data.value}" }
+      val mtDataStr = mtStrs.foldLeft("")((a, b) => {
+        if (a.length() == 0)
+          b
+        else
+          a + "\n" + b
+      })
+      buffer += mtDataStr
+      Files.write(path, buffer.getBytes, StandardOpenOption.CREATE, StandardOpenOption.SYNC, StandardOpenOption.TRUNCATE_EXISTING)
     }
   }
 
@@ -166,9 +156,9 @@ object Exporter {
   }
 
   def writePlc(data: Record.RecordList) = {
-    val tokens = data.monitor.split(":")
-    val gcName = tokens(0)
-    Logger.info(s"write PLC ${gcName}")
+    val selector: Monitor = Monitor.map(Monitor.withName(data.monitor))
+    val gcName = selector.gcName
+    Logger.info(s"write PLC ${selector.dp_no}")
 
     for {gcConfig <- GcAgent.gcConfigList.find(gcConfig => gcConfig.gcName == gcName)
          plcConfig <- gcConfig.plcConfig

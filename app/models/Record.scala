@@ -496,7 +496,7 @@ object Record {
       for {
         doc <- docs
         time = doc("time").asDateTime()
-        monitor = Monitor.withName(doc("monitor").asString().getValue)
+        monitor = doc("monitor").asString().getValue
       } yield {
         val mtDataList =
           for {
@@ -524,7 +524,7 @@ object Record {
           new ObjectId()
         else
           doc.get("pdfReport").get.asObjectId().getValue
-        RecordList(Monitor.map(monitor).dp_no, time.getMillis, mtDataList, pdfReport)
+        RecordList(monitor, time.getMillis, mtDataList, pdfReport)
       }
     }
   }
