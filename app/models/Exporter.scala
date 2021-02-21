@@ -155,6 +155,28 @@ object Exporter {
     } onFailure errorHandler
   }
 
+  def notifyAlarm(gcConfig: GcConfig, alarm:Boolean): Unit ={
+    for(plcConfig <- gcConfig.plcConfig){
+      val connector =
+        S7ConnectorFactory
+          .buildTCPConnector()
+          .withHost(plcConfig.host)
+          .build()
+
+      val serializer = S7SerializerFactory.buildSerializer(connector)
+      if (plcConfig.exportMap.contains("alarm")) {
+        val entry = plcConfig.exportMap("alarm")
+        Logger.info(s"PLC alarm ${gcConfig.selector.get} =>DB${entry.db}.${entry.offset}")
+        val alarmBean = new AlarmBean()
+        alarmBean.value = alarm
+        serializer.store(alarmBean, entry.db, entry.offset)
+        val readBack = serializer.dispense(classOf[SelectorBean], entry.db, entry.offset)
+        Logger.info("readback =>" + readBack.toString)
+      }
+      connector.close()
+    }
+  }
+
   def writePlc(data: Record.RecordList) = {
     val selector: Monitor = Monitor.map(Monitor.withName(data.monitor))
     val gcName = selector.gcName
@@ -170,17 +192,6 @@ object Exporter {
           .build()
 
       val serializer = S7SerializerFactory.buildSerializer(connector)
-
-      if (plcConfig.exportMap.contains("selector")) {
-        val entry = plcConfig.exportMap("selector")
-        Logger.info(s"PLC Selector ${gcConfig.selector.get} =>DB${entry.db}.${entry.offset}")
-        assert(gcConfig.selector.get <= 15)
-        val selectorBean = new SelectorBean()
-        selectorBean.value = 1 << gcConfig.selector.get
-        serializer.store(selectorBean, entry.db, entry.offset)
-        val readBack = serializer.dispense(classOf[SelectorBean], entry.db, entry.offset)
-        Logger.info("readback =>" + readBack.toString)
-      }
 
       if (plcConfig.exportMap.contains("datetime")) {
         val dateTime = new DateTime(data.time)

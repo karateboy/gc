@@ -185,7 +185,11 @@ class GcAgent extends Actor {
           val name = rec.substring(51).trim()
           assert(!name.contains(" "))
           assert(!name.contains("|"))
+          assert(!name.contains("="))
+          assert(!name.contains("-"))
           assert(!name.isEmpty())
+          assert(name.charAt(0).isLetter)
+
           val monitorType = MonitorType.getMonitorTypeValueByName(name, "")
           val mtMap = timeMap.getOrElseUpdate(mDate, Map.empty[MonitorType.Value, (Double, String)])
 
@@ -329,6 +333,7 @@ class GcAgent extends Actor {
         val mv = Monitor.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
         val monitor = Monitor.map(mv).dp_no
         Alarm.log(Some(monitor), None, "沒有資料匯入!", dataPeriod)
+        Exporter.notifyAlarm(gcConfig, true)
       }
     }
   }
