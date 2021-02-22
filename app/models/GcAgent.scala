@@ -1,6 +1,7 @@
 package models
 
 import akka.actor._
+import com.github.s7connector.api.S7Connector
 import com.github.s7connector.api.factory.{S7ConnectorFactory, S7SerializerFactory}
 import models.ModelHelper._
 import org.mongodb.scala.model._
@@ -81,15 +82,18 @@ object GcAgent {
   def getGcName(idx: Int) = s"gc${idx + 1}"
 
   def startup() = {
+    // Init export local mode to PLC
+    for(mode <- SysConfig.getOperationMode()){
+      for (gcConfig <- gcConfigList)
+        Exporter.exportLocalModeToPLC(gcConfig, mode)
+    }
+
     receiver = Akka.system.actorOf(Props(classOf[GcAgent]), name = "gcAgent")
     receiver ! ParseReport
   }
 
-  def parseOutput = {
-    receiver ! ParseReport
-  }
-
   case object ParseReport
+
 }
 
 class GcAgent extends Actor {
@@ -108,11 +112,24 @@ class GcAgent extends Actor {
     case ParseReport =>
       try {
         for (gcConfig <- gcConfigList) {
-          processInputPath(gcConfig, parser)
-          checkNoDataPeriod(gcConfig)
-          if (gcConfig.plcConfig.nonEmpty) {
-            readPlcStatus(gcConfig)
+          val parserThread = new Thread{
+            override def run {
+              processInputPath(gcConfig, parser)
+            }
           }
+          parserThread.start()
+
+
+          val checkThread = new Thread {
+            override def run {
+              checkNoDataPeriod(gcConfig)
+              for(operationMode <- SysConfig.getOperationMode()){
+                if(operationMode == 1 && gcConfig.plcConfig.nonEmpty) //remote mode
+                  readPlcStatus(gcConfig)
+              }
+            }
+          }
+          checkThread.start
         }
       } catch {
         case ex: Throwable =>
@@ -316,7 +333,7 @@ class GcAgent extends Actor {
                 setArchive(dir)
               }
             } else {
-              Logger.warn(s"${absPath} is not ready...", ex)
+              Logger.warn(s"${absPath} is not ready...")
               retryMap += (absPath -> 1)
             }
         }
@@ -340,36 +357,44 @@ class GcAgent extends Actor {
   }
 
   def readPlcStatus(gcConfig: GcConfig): Unit = {
-
     gcConfig.plcConfig map {
       plcConfig =>
-        val connector =
-          S7ConnectorFactory
-            .buildTCPConnector()
-            .withHost(plcConfig.host)
-            .build()
+        var connectorOpt: Option[S7Connector] = None
+        try {
+          connectorOpt =
+            Some(S7ConnectorFactory
+              .buildTCPConnector()
+              .withHost(plcConfig.host)
+              .build())
 
-        val serializer = S7SerializerFactory.buildSerializer(connector)
-        if (plcConfig.importMap.contains("selector")) {
-          val entry = plcConfig.importMap("selector")
-          if(entry.bitOffset == 0 || entry.bitOffset == 12){
-            val readBack = serializer.dispense(classOf[SelectorBean], entry.db, entry.offset)
-            if(gcConfig.selector.get != readBack.getPos) {
-              Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
-              Logger.info("selector set =>" + readBack.getPos)
-              gcConfig.selector.set(readBack.getPos)
-            }
-          }else if(entry.bitOffset == 8){
-            val readBack = serializer.dispense(classOf[Selector8Bean], entry.db, entry.offset)
-            if(gcConfig.selector.get != readBack.getPos) {
-              Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
-              Logger.info("selector set =>" + readBack.getPos)
-              gcConfig.selector.set(readBack.getPos)
+          for (connector <- connectorOpt) {
+            val serializer = S7SerializerFactory.buildSerializer(connector)
+            if (plcConfig.importMap.contains("selector")) {
+              val entry = plcConfig.importMap("selector")
+              if (entry.bitOffset == 0 || entry.bitOffset == 12) {
+                val readBack = serializer.dispense(classOf[SelectorBean], entry.db, entry.offset)
+                if (gcConfig.selector.get != readBack.getPos) {
+                  Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
+                  Logger.info("selector set =>" + readBack.getPos)
+                  gcConfig.selector.set(readBack.getPos)
+                }
+              } else if (entry.bitOffset == 8) {
+                val readBack = serializer.dispense(classOf[Selector8Bean], entry.db, entry.offset)
+                if (gcConfig.selector.get != readBack.getPos) {
+                  Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
+                  Logger.info("selector set =>" + readBack.getPos)
+                  gcConfig.selector.set(readBack.getPos)
+                }
+              }
             }
           }
-
+        } catch {
+          case ex: Exception =>
+        } finally {
+          for (connector <- connectorOpt) {
+            connector.close()
+          }
         }
-        connector.close()
     }
   }
 

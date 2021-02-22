@@ -372,7 +372,7 @@ object Application extends Controller {
         param => {
           Logger.info(s"set operation mode = ${param.mode}")
           for(gcConfig <- GcAgent.gcConfigList)
-            Exporter.exportPlc(gcConfig, param.mode)
+            Exporter.exportLocalModeToPLC(gcConfig, param.mode)
 
           for (ret <- SysConfig.setOperationMode(param.mode)) yield {
             Ok(Json.obj("mode" -> param.mode))
