@@ -53,7 +53,8 @@ class GcWebSocketActor(out: ActorRef) extends Actor {
          evt.msgType match{
            case "alarmRead" =>
              Logger.info(s"alarm read!")
-             SysConfig.setAlarmLastRead()           
+             SysConfig.setAlarmLastRead()
+             Exporter.notifyAlarm(false)
          }
       }
     case msg: String =>

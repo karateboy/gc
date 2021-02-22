@@ -25,7 +25,8 @@ class ViciUeaSelector(gcName: String, config: Configuration) extends SelectorMod
   def getStreamNum(): Int = streamNum
 
   def setStreamNum(v: Int) {
-    worker ! SetStreamNum(v)
+    if(v <= max)
+      worker ! SetStreamNum(v)
   }
 
   val canSetStream = true

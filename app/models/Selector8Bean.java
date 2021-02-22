@@ -3,7 +3,7 @@ package models;
 import com.github.s7connector.api.annotation.S7Variable;
 import com.github.s7connector.impl.utils.S7Type;
 
-public class SelectorBean {
+public class Selector8Bean {
     @S7Variable(byteOffset = 0, bitOffset = 0, type = S7Type.BOOL)
     public boolean p1;
 
@@ -28,18 +28,6 @@ public class SelectorBean {
     @S7Variable(byteOffset = 0, bitOffset = 7, type = S7Type.BOOL)
     public boolean p8;
 
-    @S7Variable(byteOffset = 1, bitOffset = 0, type = S7Type.BOOL)
-    public boolean p9;
-
-    @S7Variable(byteOffset = 1, bitOffset = 1, type = S7Type.BOOL)
-    public boolean p10;
-
-    @S7Variable(byteOffset = 1, bitOffset = 2, type = S7Type.BOOL)
-    public boolean p11;
-
-    @S7Variable(byteOffset = 1, bitOffset = 3, type = S7Type.BOOL)
-    public boolean p12;
-
     @Override
     public String toString() {
         return Integer.toString(getPos(), 2);
@@ -62,14 +50,6 @@ public class SelectorBean {
             v =7;
         if(p8)
             v =8;
-        if(p9)
-            v =9;
-        if(p10)
-            v =10;
-        if(p11)
-            v =11;
-        if(p12)
-            v =12;
 
         return v;
     }

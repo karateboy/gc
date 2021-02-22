@@ -5,8 +5,10 @@ import com.github.s7connector.api.factory.{S7ConnectorFactory, S7SerializerFacto
 import models.ModelHelper._
 import play.api.Play.current
 import play.api._
-
 import java.nio.file.{Files, Paths, StandardOpenOption}
+
+import com.github.s7connector.api.S7Serializer
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 
@@ -47,11 +49,7 @@ object Exporter {
     if (plcConfig.exportMap.contains("local")) {
       val entry = plcConfig.exportMap("local")
       Logger.info(s"isLocal ${mode == 0} =>DB${entry.db}.${entry.offset}")
-      val localBean = new LocalBean()
-      localBean.value = mode == 0
-      serializer.store(localBean, entry.db, entry.offset)
-      val readBack = serializer.dispense(classOf[LocalBean], entry.db, entry.offset)
-      Logger.info("readback =>" + readBack.toString)
+      setBit(serializer, entry.db, entry.offset, entry.bitOffset, mode == 0)
     }
     connector.close()
   }
@@ -155,6 +153,12 @@ object Exporter {
     } onFailure errorHandler
   }
 
+  def notifyAlarm(alarm:Boolean):Unit={
+    for(gcConfig <- GcAgent.gcConfigList){
+      notifyAlarm(gcConfig, alarm)
+    }
+  }
+
   def notifyAlarm(gcConfig: GcConfig, alarm:Boolean): Unit ={
     for(plcConfig <- gcConfig.plcConfig){
       val connector =
@@ -166,17 +170,50 @@ object Exporter {
       val serializer = S7SerializerFactory.buildSerializer(connector)
       if (plcConfig.exportMap.contains("alarm")) {
         val entry = plcConfig.exportMap("alarm")
-        Logger.info(s"PLC alarm ${gcConfig.selector.get} =>DB${entry.db}.${entry.offset}")
-        val alarmBean = new AlarmBean()
-        alarmBean.value = alarm
-        serializer.store(alarmBean, entry.db, entry.offset)
-        val readBack = serializer.dispense(classOf[SelectorBean], entry.db, entry.offset)
-        Logger.info("readback =>" + readBack.toString)
+        Logger.info(s"PLC alarm ${!alarm} =>DB${entry.db}.${entry.offset}.${entry.bitOffset}")
+        setBit(serializer, entry.db, entry.offset, entry.bitOffset, !alarm)
       }
       connector.close()
     }
   }
 
+  def setBit(serializer:S7Serializer, db:Int, byteOffset: Int, bitOffset:Int, v:Boolean)={
+    bitOffset match {
+      case 0 =>
+        val bean = new Bit0Bean()
+        bean.value = v
+        serializer.store(bean, db, byteOffset)
+      case 1 =>
+        val bean = new Bit1Bean()
+        bean.value = v
+        serializer.store(bean, db, byteOffset)
+      case 2 =>
+        val bean = new Bit2Bean()
+        bean.value = v
+        serializer.store(bean, db, byteOffset)
+      case 3 =>
+        val bean = new Bit3Bean()
+        bean.value = v
+        serializer.store(bean, db, byteOffset)
+      case 4 =>
+        val bean = new Bit4Bean()
+        bean.value = v
+        serializer.store(bean, db, byteOffset)
+      case 5 =>
+        val bean = new Bit5Bean()
+        bean.value = v
+        serializer.store(bean, db, byteOffset)
+      case 6 =>
+        val bean = new Bit6Bean()
+        bean.value = v
+        serializer.store(bean, db, byteOffset)
+      case 7 =>
+        val bean = new Bit7Bean()
+        bean.value = v
+        serializer.store(bean, db, byteOffset)
+    }
+
+  }
   def writePlc(data: Record.RecordList) = {
     val selector: Monitor = Monitor.map(Monitor.withName(data.monitor))
     val gcName = selector.gcName
@@ -191,7 +228,7 @@ object Exporter {
           .withHost(plcConfig.host)
           .build()
 
-      val serializer = S7SerializerFactory.buildSerializer(connector)
+      val serializer: S7Serializer = S7SerializerFactory.buildSerializer(connector)
 
       if (plcConfig.exportMap.contains("datetime")) {
         val dateTime = new DateTime(data.time)
@@ -200,19 +237,13 @@ object Exporter {
         val dateTimeBean = new DateTimeBean()
         dateTimeBean.value = dateTime.toDate
         serializer.store(dateTimeBean, entry.db, entry.offset)
-        val readBack = serializer.dispense(classOf[DateTimeBean], entry.db, entry.offset)
-        Logger.info("readback =>" + readBack.toString)
       }
 
       if (plcConfig.exportMap.contains("local")) {
         val entry = plcConfig.exportMap("local")
         val mode = waitReadyResult(SysConfig.getOperationMode())
-        Logger.info(s"isLocal ${mode == 0} =>DB${entry.db}.${entry.offset}")
-        val localBean = new LocalBean()
-        localBean.value = mode == 0
-        serializer.store(localBean, entry.db, entry.offset)
-        val readBack = serializer.dispense(classOf[LocalBean], entry.db, entry.offset)
-        Logger.info("readback =>" + readBack.toString)
+        Logger.info(s"isLocal ${mode == 0} =>DB${entry.db}.${entry.offset}.${entry.bitOffset}")
+        setBit(serializer, entry.db, entry.offset, entry.bitOffset, mode == 0)
       }
 
       for (mtData <- data.mtDataList) {
@@ -222,8 +253,6 @@ object Exporter {
           val mtDataBean = new MtDataBean()
           mtDataBean.value = mtData.value.toFloat
           serializer.store(mtDataBean, entry.db, entry.offset)
-          val readBack = serializer.dispense(classOf[MtDataBean], entry.db, entry.offset)
-          Logger.info("readback =>" + readBack.toString)
         }
       }
       connector.close()

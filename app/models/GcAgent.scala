@@ -11,7 +11,7 @@ import play.api.libs.concurrent.Akka
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
-case class ExportEntry(db: Int, offset: Int)
+case class ExportEntry(db: Int, offset: Int, bitOffset: Int)
 
 case class SiemensPlcConfig(host: String, exportMap: Map[String, ExportEntry], importMap: Map[String, ExportEntry])
 
@@ -49,7 +49,8 @@ object GcAgent {
                   val item = entry.getString("item").get
                   val db = entry.getInt("db").get
                   val offset = entry.getInt("offset").get
-                  item -> ExportEntry(db, offset)
+                  val bitOffset = entry.getInt("bitOffset").getOrElse(0)
+                  item -> ExportEntry(db, offset, bitOffset)
                 }
               pairs.toMap
             }
@@ -351,12 +352,22 @@ class GcAgent extends Actor {
         val serializer = S7SerializerFactory.buildSerializer(connector)
         if (plcConfig.importMap.contains("selector")) {
           val entry = plcConfig.importMap("selector")
-          val readBack = serializer.dispense(classOf[SelectorBean], entry.db, entry.offset)
-          if(gcConfig.selector.get != readBack.getPos) {
-            Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
-            Logger.info("selector set =>" + readBack.getPos)
-            gcConfig.selector.set(readBack.getPos)
+          if(entry.bitOffset == 0 || entry.bitOffset == 12){
+            val readBack = serializer.dispense(classOf[SelectorBean], entry.db, entry.offset)
+            if(gcConfig.selector.get != readBack.getPos) {
+              Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
+              Logger.info("selector set =>" + readBack.getPos)
+              gcConfig.selector.set(readBack.getPos)
+            }
+          }else if(entry.bitOffset == 8){
+            val readBack = serializer.dispense(classOf[Selector8Bean], entry.db, entry.offset)
+            if(gcConfig.selector.get != readBack.getPos) {
+              Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
+              Logger.info("selector set =>" + readBack.getPos)
+              gcConfig.selector.set(readBack.getPos)
+            }
           }
+
         }
         connector.close()
     }
