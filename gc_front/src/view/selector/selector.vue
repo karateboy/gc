@@ -11,9 +11,10 @@
             :type="buttonType(item._id)"
             :icon="buttonIcon(item._id)"
             @click="setSelector(item._id)"
+            :disabled="!localMode"
           >
-            <p>{{`通道${item.selector}`}}</p>
-            {{item.dp_no}}
+            <p>{{ `通道${item.selector}` }}</p>
+            {{ item.dp_no }}
           </Button>
         </ButtonGroup>
       </Card>
@@ -24,28 +25,29 @@
 </style>
 <script>
 import InforCard from "_c/info-card";
+import { mapState } from "vuex";
 
 import {
   getCurrentMonitor,
   setCurrentMonitor,
-  getGcMonitorList
+  getGcMonitorList,
 } from "@/api/data";
 
 export default {
   name: "selector",
   components: {
-    InforCard
+    InforCard,
   },
   mounted() {
     getGcMonitorList()
-      .then(resp => {
+      .then((resp) => {
         const ret = resp.data;
         for (let gc in ret) {
           this.gcList.push(gc);
           this.gcMonitorList.push(ret[gc]);
         }
       })
-      .catch(err => alert(err));
+      .catch((err) => alert(err));
 
     this.refreshCurrentSelector();
   },
@@ -55,10 +57,12 @@ export default {
       monitorList: [],
       gcMonitorList: [],
       current_selector: [],
-      spinShow: false
+      spinShow: false,
     };
   },
-  computed: {},
+  computed: {
+    ...mapState(["localMode"]),
+  },
   methods: {
     buttonType(id) {
       if (this.current_selector.indexOf(id) !== -1) return "success";
@@ -71,29 +75,29 @@ export default {
     setSelector(current) {
       this.spinShow = true;
       setCurrentMonitor(current)
-        .then(resp => {
+        .then((resp) => {
           this.spinShow = false;
           this.$Message.success("切換成功");
           this.refreshCurrentSelector();
         })
-        .catch(err => {
+        .catch((err) => {
           this.spinShow = false;
           alert(err);
         });
     },
     refreshCurrentSelector() {
       getCurrentMonitor()
-        .then(resp => {
+        .then((resp) => {
           const ret = resp.data;
           this.current_selector.splice(0, this.current_selector.length);
           for (let selector of ret) {
             this.current_selector.push(selector._id);
           }
         })
-        .catch(err => {
+        .catch((err) => {
           alert(err);
         });
-    }
-  }
+    },
+  },
 };
 </script>

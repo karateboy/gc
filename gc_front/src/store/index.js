@@ -30,12 +30,13 @@ export default new Vuex.Store({
         mode = 1
       }
 
+      this.commit("setLocalMode", payload)
       axios.put("/operationMode",
         {
           mode
         }
       ).then(res => {
-        this.commit("setLocalMode", mode === 0)
+        this.commit("setLocalMode", payload)
       })
     }
   },

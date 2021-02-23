@@ -17,7 +17,8 @@ module.exports = {
     "space-before-function-paren": 'off',
     "new-cap":'off',
     "semi":'off',
-    "quotes":'off'
+    "quotes":'off',
+    'comma-dangle': 'off'
   },
   parserOptions: {
     parser: 'babel-eslint'

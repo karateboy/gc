@@ -83,7 +83,7 @@ object GcAgent {
 
   def startup() = {
     // Init export local mode to PLC
-    for(mode <- SysConfig.getOperationMode()){
+    for (mode <- SysConfig.getOperationMode()) {
       for (gcConfig <- gcConfigList)
         Exporter.exportLocalModeToPLC(gcConfig, mode)
     }
@@ -112,7 +112,7 @@ class GcAgent extends Actor {
     case ParseReport =>
       try {
         for (gcConfig <- gcConfigList) {
-          val parserThread = new Thread{
+          val parserThread = new Thread {
             override def run {
               processInputPath(gcConfig, parser)
             }
@@ -123,8 +123,8 @@ class GcAgent extends Actor {
           val checkThread = new Thread {
             override def run {
               checkNoDataPeriod(gcConfig)
-              for(operationMode <- SysConfig.getOperationMode()){
-                if(operationMode == 1 && gcConfig.plcConfig.nonEmpty) //remote mode
+              for (operationMode <- SysConfig.getOperationMode()) {
+                if (operationMode == 1 && gcConfig.plcConfig.nonEmpty) //remote mode
                   readPlcStatus(gcConfig)
               }
             }
@@ -313,31 +313,30 @@ class GcAgent extends Actor {
     }
 
     val dirs = listDirs(gcConfig.inputDir)
-    val output =
-      for (dir <- dirs) yield {
-        val absPath = dir.getAbsolutePath
-        if (!retryMap.contains(absPath))
-          Logger.info(s"Processing ${absPath}")
+    for (dir <- dirs) yield {
+      val absPath = dir.getAbsolutePath
+      if (!retryMap.contains(absPath))
+        Logger.info(s"Processing ${absPath}")
 
-        try {
-          if (parser(gcConfig, dir))
-            setArchive(dir)
-        } catch {
-          case ex: Throwable =>
-            if (retryMap.contains(absPath)) {
-              if (retryMap(absPath) + 1 <= MAX_RETRY_COUNT) {
-                retryMap += (absPath -> (retryMap(absPath) + 1))
-              } else {
-                Logger.info(s"$absPath reach max retries. Give up!")
-                retryMap -= absPath
-                setArchive(dir)
-              }
+      try {
+        if (parser(gcConfig, dir))
+          setArchive(dir)
+      } catch {
+        case ex: Throwable =>
+          if (retryMap.contains(absPath)) {
+            if (retryMap(absPath) + 1 <= MAX_RETRY_COUNT) {
+              retryMap += (absPath -> (retryMap(absPath) + 1))
             } else {
-              Logger.warn(s"${absPath} is not ready...")
-              retryMap += (absPath -> 1)
+              Logger.info(s"$absPath reach max retries. Give up!")
+              retryMap -= absPath
+              setArchive(dir)
             }
-        }
+          } else {
+            Logger.warn(s"${absPath} is not ready...")
+            retryMap += (absPath -> 1)
+          }
       }
+    }
   }
 
   def checkNoDataPeriod(gcConfig: GcConfig) = {
@@ -371,21 +370,32 @@ class GcAgent extends Actor {
             val serializer = S7SerializerFactory.buildSerializer(connector)
             if (plcConfig.importMap.contains("selector")) {
               val entry = plcConfig.importMap("selector")
-              if (entry.bitOffset == 0 || entry.bitOffset == 12) {
-                val readBack = serializer.dispense(classOf[SelectorBean], entry.db, entry.offset)
-                if (gcConfig.selector.get != readBack.getPos) {
-                  Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
-                  Logger.info("selector set =>" + readBack.getPos)
-                  gcConfig.selector.set(readBack.getPos)
+                def notifyPLC(pos:Int)={
+                  if (plcConfig.exportMap.contains("selector")) {
+                    val entry = plcConfig.exportMap("selector")
+                    Logger.info(s"set selector ${pos} =>DB${entry.db}.${entry.offset}.${entry.bitOffset}")
+                    val mtDataBean = new MtDataBean()
+                    mtDataBean.value = pos.toFloat
+                    serializer.store(mtDataBean, entry.db, entry.offset)
+                  }
                 }
-              } else if (entry.bitOffset == 8) {
-                val readBack = serializer.dispense(classOf[Selector8Bean], entry.db, entry.offset)
-                if (gcConfig.selector.get != readBack.getPos) {
-                  Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
-                  Logger.info("selector set =>" + readBack.getPos)
-                  gcConfig.selector.set(readBack.getPos)
+                if (entry.bitOffset == 0 || entry.bitOffset == 12) {
+                  val readBack = serializer.dispense(classOf[SelectorBean], entry.db, entry.offset)
+                  if (gcConfig.selector.get != readBack.getPos) {
+                    Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
+                    Logger.info("selector set =>" + readBack.getPos)
+                    gcConfig.selector.set(readBack.getPos)
+                    notifyPLC(readBack.getPos)
+                  }
+                } else if (entry.bitOffset == 8) {
+                  val readBack = serializer.dispense(classOf[Selector8Bean], entry.db, entry.offset)
+                  if (gcConfig.selector.get != readBack.getPos) {
+                    Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
+                    Logger.info("selector set =>" + readBack.getPos)
+                    gcConfig.selector.set(readBack.getPos)
+                    notifyPLC(readBack.getPos)
+                  }
                 }
-              }
             }
           }
         } catch {

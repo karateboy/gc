@@ -68,7 +68,7 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
       try {
         val ret = serial.getLine2
         if (!ret.isEmpty) {
-          val cpNum = Integer.valueOf(ret.head.substring(2), 10).toInt
+          val cpNum = Integer.valueOf(ret.head.trim.substring(2), 10).toInt
           if (cpNum != selector.getStreamNum()) {
             Logger.info(s"Selector stream number change to $cpNum")
             selector.modifyStreamNum(cpNum)

@@ -141,6 +141,7 @@ object Realtime extends Controller {
       Logger.info(s"$gcName Selector set to ${selector}")
       for (config <- GcAgent.gcConfigList.find(config => config.gcName == gcName)) {
         config.selector.set(selector)
+        Exporter.notifySelectorChange(config, selector)
       }
 
       import java.util.Timer
