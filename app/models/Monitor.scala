@@ -197,4 +197,8 @@ object Monitor extends Enumeration {
       pairs.toMap
     }
   }
+
+  def getMonitorsByGcName(gcName:String) = {
+    mList filter { m => m.gcName == gcName}
+  }
 }

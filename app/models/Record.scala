@@ -478,7 +478,7 @@ object Record {
     }
   }
 
-  def getLatestFixedRecordListFuture(colName: String, rename: Boolean = false)(limit: Int) = {
+  def getLatestFixedRecordListFuture(colName: String, monitors:Seq[String])(limit: Int) = {
     import org.mongodb.scala.bson._
     import org.mongodb.scala.model._
     import org.mongodb.scala.model.Sorts._
@@ -489,7 +489,7 @@ object Record {
       MonitorType.BFName(_)
     }
     val proj = Projections.include(projFields: _*)
-    val f = col.find(Filters.exists("_id")).projection(proj).sort(descending("time")).limit(limit).toFuture()
+    val f = col.find(Filters.in("monitor", monitors:_*)).projection(proj).sort(descending("time")).limit(limit).toFuture()
     for {
       docs <- f
     } yield {
@@ -509,14 +509,8 @@ object Record {
               val mtDoc = mtDocOpt.get.asDocument()
               val v = mtDoc.get("v")
               val s = mtDoc.get("s")
-              if (rename)
-                MtRecord(mtDesp, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
-              else
                 MtRecord(mt.toString, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
             } else {
-              if (rename)
-                MtRecord(mtDesp, 0, MonitorStatus.NormalStat, MonitorType.formatWithUnit(mt, Some(0)))
-              else
                 MtRecord(mt.toString, 0, MonitorStatus.NormalStat, MonitorType.formatWithUnit(mt, Some(0)))
             }
           }
