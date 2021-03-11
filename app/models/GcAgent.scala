@@ -28,6 +28,7 @@ import scala.collection.JavaConverters._
 
 object GcAgent {
   val gcAgent_check_period = Play.current.configuration.getInt("gcAgent_check_period").getOrElse(60)
+  val export_period = Play.current.configuration.getInt("export_period").getOrElse(60)
 
   val gcConfigList: mutable.Seq[GcConfig] = {
     val configList = Play.current.configuration.getConfigList("gcConfigList").get.asScala
@@ -93,7 +94,7 @@ object GcAgent {
   }
 
   case object ParseReport
-
+  case object ExportData
 }
 
 class GcAgent extends Actor {
@@ -137,6 +138,21 @@ class GcAgent extends Actor {
       }
       context.system.scheduler.scheduleOnce(scala.concurrent.duration.Duration(gcAgent_check_period, scala.concurrent.duration.SECONDS), self, ParseReport)
 
+    case ExportData =>
+      try {
+        for (gcConfig <- gcConfigList) {
+          val parserThread = new Thread {
+            override def run {
+              Exporter.exportRealtimeData(gcConfig)
+            }
+          }
+          parserThread.start()
+        }
+      } catch {
+        case ex: Throwable =>
+          Logger.error("export data failed", ex)
+      }
+      context.system.scheduler.scheduleOnce(scala.concurrent.duration.Duration(export_period, scala.concurrent.duration.SECONDS), self, ExportData)
   }
 
   def parser(gcConfig: GcConfig, reportDir: File): Boolean = {
