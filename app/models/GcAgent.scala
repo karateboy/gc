@@ -109,6 +109,9 @@ class GcAgent extends Actor {
 
   var retryMap = Map.empty[String, Int]
 
+  self ! ExportData
+
+  var counter = 0
   def receive = {
     case ParseReport =>
       try {
@@ -140,13 +143,12 @@ class GcAgent extends Actor {
 
     case ExportData =>
       try {
+        counter += 1
+        var pos = -1
         for (gcConfig <- gcConfigList) {
-          val parserThread = new Thread {
-            override def run {
-              Exporter.exportRealtimeData(gcConfig)
-            }
-          }
-          parserThread.start()
+          pos += 1
+          if(pos == counter % gcConfigList.size)
+            Exporter.exportRealtimeData(gcConfig)
         }
       } catch {
         case ex: Throwable =>
