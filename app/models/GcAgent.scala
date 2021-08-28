@@ -16,10 +16,13 @@ case class ExportEntry(db: Int, offset: Int, bitOffset: Int)
 
 case class SiemensPlcConfig(host: String, exportMap: Map[String, ExportEntry], importMap: Map[String, ExportEntry])
 
+case class AoEntry(idx: Int, min:Double, max:Double)
+case class AoConfig(host: String, exportMap: Map[String, AoEntry])
 case class ComputedMeasureType(_id: String, sum: Seq[String])
 
 case class GcConfig(index: Int, inputDir: String, selector: Selector,
                     plcConfig: Option[SiemensPlcConfig],
+                    aoConfigList: Option[Seq[AoConfig]],
                     computedMtList: Option[Seq[ComputedMeasureType]], var latestDataTime: com.github.nscala_time.time.Imports.DateTime) {
   val gcName = GcAgent.getGcName(index)
 }
@@ -62,6 +65,7 @@ object GcAgent {
           val importMap = getMapping(config.getConfigList("importMap"))
           SiemensPlcConfig(host, exportMap, importMap)
         }
+
       val computedTypes: Option[mutable.Buffer[ComputedMeasureType]] =
         for (configList <- config.getConfigList("computedTypes")) yield {
           configList.asScala map {
@@ -72,9 +76,35 @@ object GcAgent {
             }
           }
         }
+
+      val aoConfigs: Option[Seq[AoConfig]] =
+        for (configList <- config.getConfigList("aoConfigs")) yield {
+          def getAoConfig(config: Configuration):AoConfig={
+            val host = config.getString("host").get
+            def getMapping(entriesOpt: Option[java.util.List[Configuration]]): Map[String, AoEntry] = {
+              if (entriesOpt.isEmpty)
+                Map.empty[String, AoEntry]
+              else {
+                val entries = entriesOpt.get.asScala
+                val pairs =
+                  for ((entry, idx) <- entries.zipWithIndex) yield {
+                    val item = entry.getString("item").get
+                    val min = entry.getDouble("min").get
+                    val max = entry.getDouble("max").get
+                    item -> AoEntry(idx, min, max)
+                  }
+                pairs.toMap
+              }
+            }
+            val exportMap = getMapping(config.getConfigList("exportMap"))
+            AoConfig(host, exportMap)
+          }
+          configList.asScala map { getAoConfig }
+        }
+
       Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
       Logger.info(s"${plcConfig.toString}")
-      GcConfig(idx, inputDir, selector, plcConfig, computedTypes,
+      GcConfig(idx, inputDir, selector, plcConfig, aoConfigs, computedTypes,
         com.github.nscala_time.time.Imports.DateTime.now())
     }
   }

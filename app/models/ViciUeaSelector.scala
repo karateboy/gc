@@ -102,6 +102,7 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
   }
 
   override def postStop() {
+    serial.close
     timer.cancel()
   }
 }
