@@ -16,8 +16,10 @@ case class ExportEntry(db: Int, offset: Int, bitOffset: Int)
 
 case class SiemensPlcConfig(host: String, exportMap: Map[String, ExportEntry], importMap: Map[String, ExportEntry])
 
-case class AoEntry(idx: Int, min:Double, max:Double)
+case class AoEntry(idx: Int, min: Double, max: Double)
+
 case class AoConfig(host: String, exportMap: Map[String, AoEntry])
+
 case class ComputedMeasureType(_id: String, sum: Seq[String])
 
 case class GcConfig(index: Int, inputDir: String, selector: Selector,
@@ -79,8 +81,9 @@ object GcAgent {
 
       val aoConfigs: Option[Seq[AoConfig]] =
         for (configList <- config.getConfigList("aoConfigs")) yield {
-          def getAoConfig(config: Configuration):AoConfig={
+          def getAoConfig(config: Configuration): AoConfig = {
             val host = config.getString("host").get
+
             def getMapping(entriesOpt: Option[java.util.List[Configuration]]): Map[String, AoEntry] = {
               if (entriesOpt.isEmpty)
                 Map.empty[String, AoEntry]
@@ -96,10 +99,14 @@ object GcAgent {
                 pairs.toMap
               }
             }
+
             val exportMap = getMapping(config.getConfigList("exportMap"))
             AoConfig(host, exportMap)
           }
-          configList.asScala map { getAoConfig }
+
+          configList.asScala map {
+            getAoConfig
+          }
         }
 
       Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
@@ -124,6 +131,7 @@ object GcAgent {
   }
 
   case object ParseReport
+
   case object ExportData
 }
 
@@ -142,6 +150,7 @@ class GcAgent extends Actor {
   self ! ExportData
 
   var counter = 0
+
   def receive = {
     case ParseReport =>
       try {
@@ -177,7 +186,7 @@ class GcAgent extends Actor {
         var pos = -1
         for (gcConfig <- gcConfigList) {
           pos += 1
-          if(pos == counter % gcConfigList.size)
+          if (pos == counter % gcConfigList.size)
             Exporter.exportRealtimeData(gcConfig)
         }
       } catch {
@@ -243,12 +252,8 @@ class GcAgent extends Actor {
       val rLines = getRecordLines(lines)
       for (rec <- rLines) {
         try {
-          val retTime = rec.substring(0, 7).trim()
-          val recType = rec.substring(8, 14).trim()
-          val area = rec.substring(15, 25).trim()
-          val ppm = rec.substring(37, 47).trim()
-          val grp = rec.substring(48, 50).trim()
-          val name = rec.substring(51).trim()
+          val ppm = rec.substring(40, 50).trim()
+          val name = rec.substring(54).trim()
           assert(!name.contains(" "))
           assert(!name.contains("|"))
           assert(!name.contains("="))
@@ -309,11 +314,15 @@ class GcAgent extends Actor {
             Updates.combine(updateList: _*), UpdateOptions().upsert(true))
         }
 
-      val collection = MongoDB.database.getCollection(Record.MinCollection)
-      val f2 = collection.bulkWrite(updateModels.toList, BulkWriteOptions().ordered(false)).toFuture()
-      f2.onFailure(errorHandler)
-      waitReadyResult(f2)
-      Exporter.exportRealtimeData(gcConfig)
+      if (updateModels.nonEmpty) {
+        val collection = MongoDB.database.getCollection(Record.MinCollection)
+        val f2 = collection.bulkWrite(updateModels.toList, BulkWriteOptions().ordered(false)).toFuture()
+        f2.onFailure(errorHandler)
+        f2 onSuccess {
+          case _ =>
+            Exporter.exportRealtimeData(gcConfig)
+        }
+      }
     } //End of process report.txt
 
     insertRecord
@@ -418,32 +427,34 @@ class GcAgent extends Actor {
             val serializer = S7SerializerFactory.buildSerializer(connector)
             if (plcConfig.importMap.contains("selector")) {
               val entry = plcConfig.importMap("selector")
-                def notifyPLC(pos:Int)={
-                  if (plcConfig.exportMap.contains("selector")) {
-                    val entry = plcConfig.exportMap("selector")
-                    Logger.info(s"set selector ${pos} =>DB${entry.db}.${entry.offset}.${entry.bitOffset}")
-                    val mtDataBean = new MtDataBean()
-                    mtDataBean.value = pos.toFloat
-                    serializer.store(mtDataBean, entry.db, entry.offset)
-                  }
+
+              def notifyPLC(pos: Int) = {
+                if (plcConfig.exportMap.contains("selector")) {
+                  val entry = plcConfig.exportMap("selector")
+                  Logger.info(s"set selector ${pos} =>DB${entry.db}.${entry.offset}.${entry.bitOffset}")
+                  val mtDataBean = new MtDataBean()
+                  mtDataBean.value = pos.toFloat
+                  serializer.store(mtDataBean, entry.db, entry.offset)
                 }
-                if (entry.bitOffset == 0 || entry.bitOffset == 12) {
-                  val readBack = serializer.dispense(classOf[SelectorBean], entry.db, entry.offset)
-                  if (gcConfig.selector.get != readBack.getPos) {
-                    Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
-                    Logger.info("selector set =>" + readBack.getPos)
-                    gcConfig.selector.set(readBack.getPos)
-                    notifyPLC(readBack.getPos)
-                  }
-                } else if (entry.bitOffset == 8) {
-                  val readBack = serializer.dispense(classOf[Selector8Bean], entry.db, entry.offset)
-                  if (gcConfig.selector.get != readBack.getPos) {
-                    Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
-                    Logger.info("selector set =>" + readBack.getPos)
-                    gcConfig.selector.set(readBack.getPos)
-                    notifyPLC(readBack.getPos)
-                  }
+              }
+
+              if (entry.bitOffset == 0 || entry.bitOffset == 12) {
+                val readBack = serializer.dispense(classOf[SelectorBean], entry.db, entry.offset)
+                if (gcConfig.selector.get != readBack.getPos) {
+                  Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
+                  Logger.info("selector set =>" + readBack.getPos)
+                  gcConfig.selector.set(readBack.getPos)
+                  notifyPLC(readBack.getPos)
                 }
+              } else if (entry.bitOffset == 8) {
+                val readBack = serializer.dispense(classOf[Selector8Bean], entry.db, entry.offset)
+                if (gcConfig.selector.get != readBack.getPos) {
+                  Logger.info(s"PLC Selector DB${entry.db}.${entry.offset} => selector")
+                  Logger.info("selector set =>" + readBack.getPos)
+                  gcConfig.selector.set(readBack.getPos)
+                  notifyPLC(readBack.getPos)
+                }
+              }
             }
           }
         } catch {
