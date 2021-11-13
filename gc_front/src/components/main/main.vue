@@ -23,7 +23,7 @@
             :class="{ localMode: localMode, remoteMode: !localMode }"
             @click="toggleLocalMode"
           >
-            <h3>{{ operationMode }}</h3>
+            <strong class="inner">{{ operationMode }}</strong>
           </div>
         </div>
       </side-menu>
@@ -38,10 +38,10 @@
           <language
             v-if="$config.useI18n"
             @on-lang-change="setLocal"
-            style="margin-right: 10px;"
+            style="margin-right: 10px"
             :lang="local"
           />
-          <fullscreen v-model="isFullscreen" style="margin-right: 10px;" />
+          <fullscreen v-model="isFullscreen" style="margin-right: 10px" />
         </header-bar>
       </Header>
       <Content class="main-content-con">
@@ -77,6 +77,8 @@
   text-align: center;
   font-size: 20px;
   background-color: lightblue;
+  border: 1px solid #000;
+  line-height: 5vh;
   cursor: pointer;
 }
 
@@ -87,24 +89,30 @@
   color: whitesmoke;
   font-size: 20px;
   background-color: maroon;
+  border: 1px solid #000;
+  line-height: 5vh;
   cursor: pointer;
+}
+
+.inner {
+  display: inline-block;
 }
 </style>
 <script>
-import SideMenu from "./components/side-menu";
-import HeaderBar from "./components/header-bar";
-import TagsNav from "./components/tags-nav";
-import User from "./components/user";
-import ABackTop from "./components/a-back-top";
-import Fullscreen from "./components/fullscreen";
-import Language from "./components/language";
-import ErrorStore from "./components/error-store";
-import { mapMutations, mapActions, mapGetters, mapState } from "vuex";
-import { getNewTagList, routeEqual } from "@/libs/util";
-import routers from "@/router/routers";
-import "./main.less";
+import SideMenu from './components/side-menu';
+import HeaderBar from './components/header-bar';
+import TagsNav from './components/tags-nav';
+import User from './components/user';
+import ABackTop from './components/a-back-top';
+import Fullscreen from './components/fullscreen';
+import Language from './components/language';
+import ErrorStore from './components/error-store';
+import { mapMutations, mapActions, mapGetters, mapState } from 'vuex';
+import { getNewTagList, routeEqual } from '@/libs/util';
+import routers from '@/router/routers';
+import './main.less';
 export default {
-  name: "Main",
+  name: 'Main',
   components: {
     SideMenu,
     HeaderBar,
@@ -113,25 +121,25 @@ export default {
     Fullscreen,
     ErrorStore,
     User,
-    ABackTop
+    ABackTop,
   },
   data() {
     return {
       collapsed: false,
-      isFullscreen: false
+      isFullscreen: false,
     };
   },
   computed: {
-    ...mapState(["localMode"]),
-    ...mapGetters(["errorCount"]),
+    ...mapState(['localMode']),
+    ...mapGetters(['errorCount']),
     operationMode() {
       if (this.collapsed) {
-        if (this.localMode) return "本機";
-        else return "遠端";
+        if (this.localMode) return '本機';
+        else return '遠端';
       }
 
-      if (this.localMode) return "本機模式";
-      else return "遠端模式";
+      if (this.localMode) return '本機模式';
+      else return '遠端模式';
     },
     tagNavList() {
       return this.$store.state.app.tagNavList;
@@ -144,12 +152,12 @@ export default {
     },
     cacheList() {
       const list = [
-        "ParentView",
+        'ParentView',
         ...(this.tagNavList.length
           ? this.tagNavList
             .filter(item => !(item.meta && item.meta.notCache))
             .map(item => item.name)
-          : [])
+          : []),
       ];
       return list;
     },
@@ -164,50 +172,50 @@ export default {
     },
     unreadCount() {
       return this.$store.state.user.unreadCount;
-    }
+    },
   },
   methods: {
     ...mapMutations([
-      "setBreadCrumb",
-      "setTagNavList",
-      "addTag",
-      "setLocal",
-      "setHomeRoute",
-      "closeTag"
+      'setBreadCrumb',
+      'setTagNavList',
+      'addTag',
+      'setLocal',
+      'setHomeRoute',
+      'closeTag',
     ]),
     ...mapActions([
-      "handleLogin",
-      "getUnreadMessageCount",
-      "fetchOperationMode",
-      "setOperationMode"
+      'handleLogin',
+      'getUnreadMessageCount',
+      'fetchOperationMode',
+      'setOperationMode',
     ]),
     toggleLocalMode() {
       this.setOperationMode(!this.localMode);
     },
     turnToPage(route) {
       let { name, params, query } = {};
-      if (typeof route === "string") name = route;
+      if (typeof route === 'string') name = route;
       else {
         name = route.name;
         params = route.params;
         query = route.query;
       }
-      if (name.indexOf("isTurnByHref_") > -1) {
-        window.open(name.split("_")[1]);
+      if (name.indexOf('isTurnByHref_') > -1) {
+        window.open(name.split('_')[1]);
         return;
       }
       this.$router.push({
         name,
         params,
-        query
+        query,
       });
     },
     handleCollapsedChange(state) {
       this.collapsed = state;
     },
     handleCloseTag(res, type, route) {
-      if (type !== "others") {
-        if (type === "all") {
+      if (type !== 'others') {
+        if (type === 'all') {
           this.turnToPage(this.$config.homeName);
         } else {
           if (routeEqual(this.$route, route)) {
@@ -219,19 +227,19 @@ export default {
     },
     handleClick(item) {
       this.turnToPage(item);
-    }
+    },
   },
   watch: {
     $route(newRoute) {
       const { name, query, params, meta } = newRoute;
       this.addTag({
         route: { name, query, params, meta },
-        type: "push"
+        type: 'push',
       });
       this.setBreadCrumb(newRoute);
       this.setTagNavList(getNewTagList(this.tagNavList, newRoute));
       this.$refs.sideMenu.updateOpenName(newRoute.name);
-    }
+    },
   },
   mounted() {
     /**
@@ -241,7 +249,7 @@ export default {
     this.setHomeRoute(routers);
     const { name, params, query, meta } = this.$route;
     this.addTag({
-      route: { name, params, query, meta }
+      route: { name, params, query, meta },
     });
     this.setBreadCrumb(this.$route);
     // 设置初始语言
@@ -249,12 +257,12 @@ export default {
     // 如果当前打开页面不在标签栏中，跳到homeName页
     if (!this.tagNavList.find(item => item.name === this.$route.name)) {
       this.$router.push({
-        name: this.$config.homeName
+        name: this.$config.homeName,
       });
     }
     // 获取未读消息条数
     this.getUnreadMessageCount();
     this.fetchOperationMode();
-  }
+  },
 };
 </script>

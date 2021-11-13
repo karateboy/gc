@@ -1,29 +1,33 @@
 <template>
   <div>
     <Row type="flex" justify="start" :gutter="10">
-      <i-col :xs="12" :md="8" :lg="6" style="padding-top:5px;">
-        <Card :key="selector._id" :padding="2" shadown>
-          <span class="tag">{{ selector.title }}</span>
-          <Divider type="vertical" />
-          <span class="tag_value">{{ selector.dp_no }}</span>
+      <Col :xs="12" :md="8" :lg="6" style="padding-top: 5px">
+        <Card :key="selector._id" :padding="2" shadow class="tag">
+          <Row type="flex">
+            <Col span="8">
+              <strong>{{ selector.title }}</strong>
+            </Col>
+            <Col span="16" class="tag_value">{{ selector.dp_no }}</Col>
+          </Row>
         </Card>
-      </i-col>
-      <i-col
+      </Col>
+      <Col
         :xs="12"
         :md="8"
         :lg="6"
         v-for="(infor, i) in inforCardData"
         :key="`infor-${i}`"
-        style="padding-top:5px;"
+        style="padding-top: 5px"
       >
-        <Card :key="i" :padding="2" shadown>
-          <span class="tag">{{ infor.title }}</span>
-          <Divider type="vertical" />
-          <span class="tag_value">
-            <strong>{{ infor.text }}</strong>
-          </span>
+        <Card :key="i" :padding="2" shadow class="tag">
+          <Row type="flex" >
+            <Col span="8">
+              <strong>{{ infor.title }}</strong>
+            </Col>
+            <Col span="16" class="tag_value">{{ infor.text }}</Col>
+          </Row>
         </Card>
-      </i-col>
+      </Col>
     </Row>
     <Divider dashed />
     <Row>
@@ -32,11 +36,7 @@
           <strong>{{ row.name }}</strong>
         </template>
         <template slot-scope="{ row, index }" slot="action">
-          <Button
-            type="primary"
-            size="small"
-            style="margin-right: 5px"
-            @click="showPdfReport(index)"
+          <Button type="primary" size="large" @click="showPdfReport(index)"
             >報表</Button
           >
         </template>
@@ -46,12 +46,17 @@
 </template>
 <style scoped>
 .tag {
+  text-align: center;
+  padding: 3px;
   font-size: 20px;
   background-color: #ffbf00;
 }
 
 .tag_value {
+  text-align: center;
+  border-radius: 4px;
   font-size: 20px;
+  background-color: white;
 }
 
 .verticalLine {
@@ -59,33 +64,33 @@
 }
 </style>
 <script>
-import InforCard from "_c/info-card";
-import config from "@/config";
-import moment from "moment";
+import InforCard from '_c/info-card';
+import config from '@/config';
+import moment from 'moment';
 
-import { getRealtimeData, getLast10Data } from "@/api/data";
+import { getRealtimeData, getLast10Data } from '@/api/data';
 const baseUrl =
-  process.env.NODE_ENV === "development"
+  process.env.NODE_ENV === 'development'
     ? config.baseUrl.dev
     : config.baseUrl.pro;
 export default {
-  name: "home",
+  name: 'home',
   components: {
-    InforCard
+    InforCard,
   },
   data() {
     return {
       selector: {
-        _id: "default",
-        dp_no: "#2",
-        icon: "ios-speedometer",
-        color: "#ff0000",
-        title: "GC/選樣器"
+        _id: 'default',
+        dp_no: '#2',
+        icon: 'ios-speedometer',
+        color: '#ff0000',
+        title: 'GC/選樣器',
       },
       inforCardData: [],
       timer: undefined,
       columns: [],
-      rows: []
+      rows: [],
     };
   },
   mounted() {
@@ -97,18 +102,18 @@ export default {
         const ret = resp.data;
         this.inforCardData.splice(0, this.inforCardData.length);
         let card = {
-          title: "資料時間",
-          icon: "ios-time",
-          text: moment(ret.time).format("M-D HH:mm"),
-          color: "#ff9900"
+          title: '資料時間',
+          icon: 'ios-time',
+          text: moment(ret.time).format('M-D HH:mm'),
+          color: '#ff9900',
         };
         this.inforCardData.push(card);
         for (let mtData of ret.mtDataList) {
           let card = {
             title: mtData.mtName,
-            icon: "ios-flask",
+            icon: 'ios-flask',
             text: mtData.text,
-            color: "#ff9900"
+            color: '#ff9900',
           };
           this.inforCardData.push(card);
         }
@@ -120,29 +125,29 @@ export default {
         this.columns.splice(0, this.columns.length);
         this.rows.splice(0, this.rows.length);
         this.columns.push({
-          title: "日期",
-          key: "date",
-          sortable: true
+          title: '日期',
+          key: 'date',
+          sortable: true,
         });
         for (let i = 0; i < ret.columnNames.length; i++) {
           let col = {
             title: ret.columnNames[i],
             key: `col${i}`,
-            sortable: true
+            sortable: true,
           };
           this.columns.push(col);
         }
         // setup for report column
         this.columns.push({
-          title: "動作",
-          slot: "action",
+          title: '動作',
+          slot: 'action',
           width: 150,
-          align: "center"
+          align: 'center',
         });
         for (let row of ret.rows) {
           let rowData = {
-            date: new moment(row.date).format("lll"),
-            cellClassName: {}
+            date: new moment(row.date).format('lll'),
+            cellClassName: {},
           };
           for (let c = 0; c < row.cellData.length; c++) {
             let key = `col${c}`;
@@ -163,11 +168,11 @@ export default {
     showPdfReport(idx) {
       let url = this.rows[idx].pdfUrl;
       window.open(url);
-    }
+    },
   },
   destroyed() {
     clearTimeout(this.timer);
-  }
+  },
 };
 </script>
 

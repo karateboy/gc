@@ -29,6 +29,7 @@
         <transition-group name="taglist-moving-animation">
           <Tag
             type="dot"
+            class="tag"
             v-for="(item, index) in list"
             ref="tagsPageOpened"
             :key="`tag-nav-${index}`"
@@ -45,7 +46,12 @@
     </div>
   </div>
 </template>
-
+<style scoped>
+.tag {
+  font-size: 18px;
+  font-weight: 400;
+}
+</style>
 <script>
 import { showTitle, routeEqual } from '@/libs/util'
 import beforeClose from '@/router/before-close'

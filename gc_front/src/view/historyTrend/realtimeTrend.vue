@@ -7,7 +7,7 @@
         <Row>
             <Col>
                 <Card>
-                    <Form ref="realtimeTrend" :model="formItem" :rules="rules" :label-width="80">
+                    <Form ref="realtimeTrend" :model="formItem" :rules="rules" :label-width="120">
                         <FormItem label="測站" prop="monitors">
                             <Select v-model="formItem.monitors" filterable multiple>
                                 <Option v-for="item in monitorList" :value="item._id" :key="item._id">{{ item.dp_no }}</Option>
@@ -24,7 +24,7 @@
                             </Select>
                         </FormItem>
                         <FormItem>
-                            <Button type="primary" @click="handleSubmit">查詢</Button>
+                            <Button type="primary" size="large" @click="handleSubmit">查詢</Button>
                             <Button type="ghost" style="margin-left: 8px" @click="handleReset('realtimeTrend')">取消</Button>
                             <Button type="ghost" style="margin-left: 8px" icon="document" :disabled="!downloadable" @click="downloadExcel">下載Excel</Button>
                         </FormItem>

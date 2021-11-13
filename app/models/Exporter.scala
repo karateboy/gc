@@ -253,12 +253,16 @@ object Exporter {
                   if(mtData.value > aoEntry.max)
                     Logger.error(s"${mtData.mtName} ${mtData.value} is larger than AO max => D${aoEntry.idx} ${aoEntry.max}")
 
-                  if(mtData.value < aoEntry.min)
+                  if(mtData.value < aoEntry.min) {
                     Logger.error(s"${mtData.mtName} ${mtData.value} is less than AO min => D${aoEntry.idx} ${aoEntry.min}")
-
-                  val value: Int = (mtData.value / (aoEntry.max - aoEntry.min) * 4096).toInt
-                  Logger.info(s"${mtData.mtName} ${mtData.value} => D${aoEntry.idx} ${offset} ${value}")
-                  master.setValue(locator, value)
+                    master.setValue(locator, 0)
+                  }else if(mtData.value >= aoEntry.max){
+                    Logger.error(s"${mtData.mtName} ${mtData.value} is exceed AO max => D${aoEntry.idx} ${aoEntry.max}")
+                    master.setValue(locator, 4096 - 1)
+                  }else{
+                    val value: Int = ((mtData.value - aoEntry.min) / (aoEntry.max - aoEntry.min) * 4096).toInt
+                    master.setValue(locator, value)
+                  }
                 }
                 master.destroy()
               }

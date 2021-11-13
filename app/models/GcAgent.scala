@@ -11,6 +11,8 @@ import play.api.libs.concurrent.Akka
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{Future, blocking}
 
 case class ExportEntry(db: Int, offset: Int, bitOffset: Int)
 
@@ -155,16 +157,14 @@ class GcAgent extends Actor {
     case ParseReport =>
       try {
         for (gcConfig <- gcConfigList) {
-          val parserThread = new Thread {
-            override def run {
+          Future{
+            blocking{
               processInputPath(gcConfig, parser)
             }
           }
-          parserThread.start()
 
-
-          val checkThread = new Thread {
-            override def run {
+          Future{
+            blocking{
               checkNoDataPeriod(gcConfig)
               for (operationMode <- SysConfig.getOperationMode()) {
                 if (operationMode == 1 && gcConfig.plcConfig.nonEmpty) //remote mode
@@ -172,13 +172,12 @@ class GcAgent extends Actor {
               }
             }
           }
-          checkThread.start
         }
       } catch {
         case ex: Throwable =>
           Logger.error("process InputPath failed", ex)
       }
-      context.system.scheduler.scheduleOnce(scala.concurrent.duration.Duration(gcAgent_check_period, scala.concurrent.duration.SECONDS), self, ParseReport)
+      context.system.scheduler.scheduleOnce(FiniteDuration(gcAgent_check_period, scala.concurrent.duration.SECONDS), self, ParseReport)
 
     case ExportData =>
       try {
@@ -229,6 +228,7 @@ class GcAgent extends Actor {
             val splitPoint = pattern.indexOf("M")
             val pattern1 = pattern.take(splitPoint + 1)
             DateTime.parse(pattern1, DateTimeFormat.forPattern("M/d/YYYY h:m:s a").withLocale(Locale.US))
+              .withSecondOfMinute(0).withMillisOfSecond(0)
           }
         mDates.head
       }
@@ -252,8 +252,11 @@ class GcAgent extends Actor {
       val rLines = getRecordLines(lines)
       for (rec <- rLines) {
         try {
-          val ppm = rec.substring(40, 50).trim()
-          val name = rec.substring(54).trim()
+          val tokens = rec.split("\\s+")
+          val ppm = tokens.reverse(1)
+          val name = tokens.reverse(0)
+          //val ppm = rec.substring(40, 50).trim()
+          //val name = rec.substring(54).trim()
           assert(!name.contains(" "))
           assert(!name.contains("|"))
           assert(!name.contains("="))
@@ -270,7 +273,6 @@ class GcAgent extends Actor {
             case _: NumberFormatException =>
               0.0
           }
-
           mtMap.put(monitorType, (mtValue, MonitorStatus.NormalStat))
         } catch {
           case ex: Exception => {
