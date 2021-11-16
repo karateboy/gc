@@ -27,10 +27,11 @@ case class ComputedMeasureType(_id: String, sum: Seq[String])
 case class GcConfig(index: Int, inputDir: String, selector: Selector,
                     plcConfig: Option[SiemensPlcConfig],
                     aoConfigList: Option[Seq[AoConfig]],
+                    haloKaConfig : Option[HaloKaConfig],
                     computedMtList: Option[Seq[ComputedMeasureType]], var latestDataTime: com.github.nscala_time.time.Imports.DateTime) {
   val gcName = GcAgent.getGcName(index)
 }
-
+case class HaloKaConfig(com:Int, speed:Int, MonitorType:String)
 import scala.collection.JavaConverters._
 
 object GcAgent {
@@ -111,9 +112,17 @@ object GcAgent {
           }
         }
 
+      val haloKaConfig : Option[HaloKaConfig] =
+        for (config <- config.getConfig("haloKaConfig")) yield {
+          val com = config.getInt("com").get
+          val speed = config.getInt("speed").get
+          val monitorType = config.getString("monitorType").get
+          HaloKaConfig(com, speed, monitorType)
+        }
+
       Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
       Logger.info(s"${plcConfig.toString}")
-      GcConfig(idx, inputDir, selector, plcConfig, aoConfigs, computedTypes,
+      GcConfig(idx, inputDir, selector, plcConfig, aoConfigs, haloKaConfig, computedTypes,
         com.github.nscala_time.time.Imports.DateTime.now())
     }
   }
@@ -130,6 +139,11 @@ object GcAgent {
 
     receiver = Akka.system.actorOf(Props(classOf[GcAgent]), name = "gcAgent")
     receiver ! ParseReport
+    for (gcConfig <- gcConfigList){
+      for(haloKaConfig<- gcConfig.haloKaConfig){
+        Akka.system.actorOf(HaloKaAgent.prof(haloKaConfig, gcConfig), name = s"haloKaAgent${gcConfig.index}")
+      }
+    }
   }
 
   case object ParseReport

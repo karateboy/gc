@@ -79,6 +79,22 @@ object Record {
     doc
   }
 
+  def toDocument(monitor: Monitor.Value, dt: DateTime,
+                 dataList: List[(MonitorType.Value, (Double, String))]) = {
+    import org.mongodb.scala.bson._
+    val bdt: BsonDateTime = dt
+    var doc = Document("_id" -> getDocKey(monitor, dt), "time" -> bdt, "monitor" -> monitor.toString)
+    for {
+      data <- dataList
+      mt = data._1
+      (v, s) = data._2
+    } {
+      doc = doc ++ Document(MonitorType.BFName(mt) -> Document("v" -> v, "s" -> s))
+    }
+
+    doc
+  }
+
   def insertRecord(doc: Document)(colName: String) = {
     val col = MongoDB.database.getCollection(colName)
     val f = col.insertOne(doc).toFuture()
@@ -101,7 +117,6 @@ object Record {
 
     val f = col.updateOne(equal("_id", doc("_id")), combine(updateList: _*), UpdateOptions().upsert(true)).toFuture()
     f.onFailure(errorHandler)
-
     f
   }
 

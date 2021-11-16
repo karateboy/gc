@@ -32,7 +32,7 @@ case class SerialComm(port: SerialPort, is: SerialInputStream, os: SerialOutputS
     splitLine(readBuffer)
   }
 
-  def getLine2 = {
+  def getLine2: List[String] = {
     def splitLine(buf: Array[Byte]): List[String] = {
       val idx = buf.indexOf('\n'.toByte)
       if (idx == -1) {
@@ -78,12 +78,15 @@ case class SerialComm(port: SerialPort, is: SerialInputStream, os: SerialOutputS
 }
 
 object SerialComm {
-  def open(n: Int) = {
+  def open(n: Int): SerialComm =
+    open(n, SerialPort.BAUDRATE_9600)
+
+  def open(n: Int, speed:Int): SerialComm = {
     val port = new SerialPort(s"COM${n}")
     if (!port.openPort())
       throw new Exception(s"Failed to open COM$n")
 
-    port.setParams(SerialPort.BAUDRATE_9600,
+    port.setParams(speed,
       SerialPort.DATABITS_8,
       SerialPort.STOPBITS_1,
       SerialPort.PARITY_NONE); //Set params. Also you can set params by this string: serialPort.setParams(9600, 8, 1, 0);
