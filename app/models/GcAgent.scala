@@ -404,10 +404,8 @@ class GcAgent extends Actor {
               retryMap -= absPath
               setArchive(dir)
             }
-          } else {
-            Logger.warn(s"${absPath} is not ready...")
+          } else
             retryMap += (absPath -> 1)
-          }
       }
     }
   }

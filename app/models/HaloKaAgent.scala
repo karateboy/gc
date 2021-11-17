@@ -41,7 +41,7 @@ class HaloKaAgent(config: HaloKaConfig, gcConfig: GcConfig) extends Actor {
         blocking {
           try {
             for (serial <- serialOpt) {
-              val readCmd = s"CONC\n"
+              val readCmd = s"CONC\r"
               serial.os.write(readCmd.getBytes())
 
               var ret = serial.getLine2
@@ -53,9 +53,16 @@ class HaloKaAgent(config: HaloKaConfig, gcConfig: GcConfig) extends Actor {
                 }
                 ret = serial.getLine2
               }
-              if (!ret.isEmpty) {
-                val value = ret.head.trim.toDouble
-                insertRecord(value)
+              if (ret.nonEmpty) {
+                try{
+                  val value = ret.head.trim.toDouble
+                  insertRecord(value)
+                }catch{
+                  case ex:Throwable=>
+                    Logger.info(ex.getMessage)
+                    self ! ReadData
+                }
+
               }
             }
           } catch {

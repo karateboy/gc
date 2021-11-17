@@ -26,6 +26,7 @@ POST     /monitor_type                                                         c
 GET      /history_data                                                         controllers.Query.historyData(monitor:String, monitorTypes: String, start: Long, end: Long)
 GET      /history_data/excel                                                   controllers.Query.historyDataExcel(monitor:String, monitorTypes: String, start: Long, end: Long)
 GET      /pdfReport/:id                                                        controllers.Query.pdfReport(id:String)
+GET      /excelForm/:pdfId                                                     controllers.Query.excelForm(pdfId)
 GET      /history_trend                                                        controllers.Query.historyTrendChart2(monitors: String, monitorTypes: String, start: Long, end: Long)
 GET      /realtime_data                                                        controllers.Realtime.latestValues	
 GET      /current_monitor                                                      controllers.Realtime.getCurrentMonitor

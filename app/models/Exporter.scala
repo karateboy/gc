@@ -82,7 +82,6 @@ object Exporter {
 
       val dateTime = new DateTime(data.time)
 
-      Logger.info(s"export Data ${dateTime.toString}")
       latestDateTime = dateTime
 
       //Export to modbus

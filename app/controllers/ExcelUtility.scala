@@ -1,15 +1,14 @@
 package controllers
-import play.api._
-import play.api.Play.current
-import controllers._
+
+import com.github.nscala_time.time.Imports._
 import models._
 import org.apache.poi.openxml4j.opc._
-import org.apache.poi.xssf.usermodel._
-import com.github.nscala_time.time.Imports._
-import java.io._
-import java.nio.file.Files
-import java.nio.file._
 import org.apache.poi.ss.usermodel._
+import org.apache.poi.xssf.usermodel._
+import play.api.Play.current
+
+import java.io._
+import java.nio.file._
 
 object ExcelUtility {
   val docRoot = "/report_template/"
@@ -73,17 +72,16 @@ object ExcelUtility {
     import MonitorStatus._
     val info = MonitorStatus.getTagInfo(tag)
     info.statusType match {
-      case StatusType.Internal =>
-        {
-          if (isValid(tag))
-            normalStyle
-          else if (isCalbration(tag))
-            abnormalStyles(0)
-          else if (isMaintenance(tag))
-            abnormalStyles(1)
-          else
-            abnormalStyles(2)
-        }
+      case StatusType.Internal => {
+        if (isValid(tag))
+          normalStyle
+        else if (isCalbration(tag))
+          abnormalStyles(0)
+        else if (isMaintenance(tag))
+          abnormalStyles(1)
+        else
+          abnormalStyles(2)
+      }
       case StatusType.Auto =>
         abnormalStyles(3)
       case StatusType.Manual =>
@@ -92,6 +90,7 @@ object ExcelUtility {
   }
 
   import controllers.Highchart._
+
   def exportChartData(chart: HighchartData, monitorTypes: Array[MonitorType.Value]): File = {
     val precArray = monitorTypes.map { mt => MonitorType.map(mt).prec }
     exportChartData(chart, precArray)
@@ -185,13 +184,12 @@ object ExcelUtility {
     val dateRow = sheet.createRow(1)
     val legendRow = sheet.getRow(2)
 
-    val fgColors =
-      {
-        val seqColors =
-          for (col <- 3 to 7)
-            yield legendRow.getCell(col).getCellStyle.getFillForegroundXSSFColor
-        seqColors.toArray
-      }
+    val fgColors = {
+      val seqColors =
+        for (col <- 3 to 7)
+          yield legendRow.getCell(col).getCellStyle.getFillForegroundXSSFColor
+      seqColors.toArray
+    }
 
     val periodMap = Record.getRecordMap(Record.HourCollection)(MonitorType.mtvList, monitor, reportDate, reportDate + 1.day)
     val mtTimeMap = periodMap.map { pair =>
@@ -214,7 +212,9 @@ object ExcelUtility {
         sheet.getRow(3).createCell(col).setCellValue(MonitorType.map(mt).desp)
       }
       val normalStyleList = MonitorType.activeMtvList map createStyle
-      val abnormalStyleList = MonitorType.activeMtvList map { createColorStyle(fgColors, _) }
+      val abnormalStyleList = MonitorType.activeMtvList map {
+        createColorStyle(fgColors, _)
+      }
 
       for {
         hour <- 0 to 23
@@ -289,7 +289,7 @@ object ExcelUtility {
     }
     val dateStyle = wb.createCellStyle()
     dateStyle.setDataFormat(format.getFormat("yyyy-mm-dd hh:mm"))
-    
+
     for ((r, rowNum) <- recordList.zip(1 to recordList.size)) {
       val row = sheet.createRow(rowNum)
       val dateCell = row.createCell(0)
@@ -307,6 +307,67 @@ object ExcelUtility {
       }
     }
 
+    wb.setActiveSheet(0)
+    finishExcel(reportFilePath, pkg, wb)
+  }
+
+  def excelForm(map: Map[Monitor.Value, (DateTime, Map[MonitorType.Value, Record])]) = {
+    implicit val (reportFilePath, pkg, wb) = prepareTemplate("form.xlsx")
+    val format = wb.createDataFormat();
+    var sheet = wb.getSheetAt(0)
+    for (entry <- map) {
+      val monitor = entry._1
+      val (dt, mtMap) = entry._2
+
+      sheet.getRow(7).getCell(9).setCellValue(dt.toDate())
+      sheet.getRow(8).getCell(9).setCellValue(dt.toDate())
+      var mt = MonitorType.getMonitorTypeValueByName("O2", "")
+      if (mtMap.contains(mt))
+        sheet.getRow(18).getCell(4).setCellValue(mtMap(mt).value)
+
+      mt = MonitorType.getMonitorTypeValueByName("H2O", "")
+      if (mtMap.contains(mt))
+        sheet.getRow(19).getCell(4).setCellValue(mtMap(mt).value)
+    }
+    sheet = wb.getSheetAt(1)
+    for (entry <- map) {
+      val monitor = entry._1
+      val (dt, mtMap) = entry._2
+
+      sheet.getRow(7).getCell(9).setCellValue(dt.toDate())
+      sheet.getRow(8).getCell(9).setCellValue(dt.toDate())
+      var mt = MonitorType.getMonitorTypeValueByName("H2O", "")
+      if (mtMap.contains(mt))
+        sheet.getRow(18).getCell(4).setCellValue(mtMap(mt).value)
+
+      mt = MonitorType.getMonitorTypeValueByName("CO", "")
+      if (mtMap.contains(mt))
+        sheet.getRow(19).getCell(4).setCellValue(mtMap(mt).value)
+
+      mt = MonitorType.getMonitorTypeValueByName("CO2", "")
+      if (mtMap.contains(mt))
+        sheet.getRow(20).getCell(4).setCellValue(mtMap(mt).value)
+
+      mt = MonitorType.getMonitorTypeValueByName("H2", "")
+      if (mtMap.contains(mt))
+        sheet.getRow(21).getCell(4).setCellValue(mtMap(mt).value)
+
+      mt = MonitorType.getMonitorTypeValueByName("N2", "")
+      if (mtMap.contains(mt))
+        sheet.getRow(22).getCell(4).setCellValue(mtMap(mt).value)
+
+      mt = MonitorType.getMonitorTypeValueByName("Ar", "")
+      if (mtMap.contains(mt))
+        sheet.getRow(23).getCell(4).setCellValue(mtMap(mt).value)
+
+      mt = MonitorType.getMonitorTypeValueByName("C3H8", "")
+      val mt2 = MonitorType.getMonitorTypeValueByName("CH4", "")
+      if (mtMap.contains(mt) && mtMap.contains(mt2)) {
+        val c3h8 = mtMap(mt).value
+        val ch4 = mtMap(mt2).value
+        sheet.getRow(20).getCell(4).setCellValue(ch4 + c3h8)
+      }
+    }
     wb.setActiveSheet(0)
     finishExcel(reportFilePath, pkg, wb)
   }

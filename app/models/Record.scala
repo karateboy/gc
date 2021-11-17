@@ -5,9 +5,12 @@ import com.github.nscala_time.time.Imports._
 import models.ModelHelper._
 import models._
 import models.ObjectIdUtil._
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.mongodb.scala._
 import org.mongodb.scala.bson._
+import org.mongodb.scala.model.Filters.equal
+import org.mongodb.scala.model.Projections.include
 
 case class Record(monitor: Monitor.Value, time: DateTime, value: Double, status: String)
 
@@ -348,7 +351,10 @@ object Record {
     import org.mongodb.scala.model.Filters._
 
     val mtList = MonitorType.activeMtvList
-    val filter = and(equal("monitor", monitor.toString), gte("time", startTime.toDate()), lt("time", endTime.toDate()))
+    val filter = and(equal("monitor", monitor.toString),
+      exists("pdfReport"),
+      gte("time", startTime.toDate()),
+      lt("time", endTime.toDate()))
     getRecordListFuture2(colName)(filter)(mtList)
   }
 
@@ -412,7 +418,6 @@ object Record {
     import org.mongodb.scala.model.Projections._
     import org.mongodb.scala.model.Sorts._
 
-    val mtList = MonitorType.activeMtvList
     val col = MongoDB.database.getCollection(colName)
     val projFields = "monitor" :: "time" :: MonitorType.mtvList.map {
       MonitorType.BFName(_)
@@ -460,7 +465,7 @@ object Record {
       MonitorType.BFName(_)
     }
     val proj = Projections.include(projFields: _*)
-    val f = col.find(Filters.exists("_id")).projection(proj).sort(descending("time")).limit(limit).toFuture()
+    val f = col.find(Filters.exists("pdfReport")).projection(proj).sort(descending("time")).limit(limit).toFuture()
     for {
       docs <- f
     } yield {
@@ -569,5 +574,41 @@ object Record {
     for (pairs <- Future.sequence(futureList)) yield {
       pairs.flatMap(x => x).toMap
     }
+  }
+
+  def getRecordWithPdfID(pdfId:ObjectId): Future[Map[Monitor.Value, (DateTime, Map[MonitorType.Value, Record])]] = {
+    val col = MongoDB.database.getCollection(Record.MinCollection)
+    val projFields = "monitor" :: "time" :: MonitorType.mtvList.map {
+      MonitorType.BFName(_)
+    }
+
+    val proj = include(projFields: _*)
+    val f = col.find(equal("pdfReport", pdfId)).projection(proj).toFuture()
+    val pairsF =
+      for {
+        docs <- f
+      } yield {
+        for {
+          doc <- docs
+          m = Monitor.withName(doc("monitor").asString().getValue)
+          time = doc("time").asDateTime().toDateTime()
+        } yield {
+          val pair =
+            for {
+              mt <- MonitorType.mtvList
+              mtBFName = MonitorType.BFName(mt)
+              mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument()
+              mtDoc = mtDocOpt.get.asDocument()
+              v = mtDoc.get("v") if v.isDouble()
+              s = mtDoc.get("s") if s.isString()
+            } yield {
+              mt -> Record(m, time, v.asDouble().doubleValue(), s.asString().getValue)
+            }
+          m -> (time, pair.toMap)
+        }
+      }
+
+    for (pairs <- pairsF) yield
+      pairs.toMap
   }
 }

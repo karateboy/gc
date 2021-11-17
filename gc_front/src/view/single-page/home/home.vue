@@ -20,7 +20,7 @@
         style="padding-top: 5px"
       >
         <Card :key="i" :padding="2" shadow class="tag">
-          <Row type="flex" >
+          <Row type="flex">
             <Col span="8">
               <strong>{{ infor.title }}</strong>
             </Col>
@@ -36,9 +36,26 @@
           <strong>{{ row.name }}</strong>
         </template>
         <template slot-scope="{ row, index }" slot="action">
-          <Button type="primary" size="large" @click="showPdfReport(index)"
-            >報表</Button
-          >
+          <table>
+            <tbody>
+              <tr>
+                <td>
+                  <Button
+                    type="primary"
+                    size="large"
+                    @click="showPdfReport(index)"
+                    >pdf</Button
+                  >
+                </td>
+                <td>
+                  <Button type="info" size="large" @click="downloadForm(index)"
+                    >表單</Button
+                  >
+                </td>
+              </tr>
+              <tr></tr>
+            </tbody>
+          </table>
         </template>
       </Table>
     </Row>
@@ -141,7 +158,6 @@ export default {
         this.columns.push({
           title: '動作',
           slot: 'action',
-          width: 150,
           align: 'center',
         });
         for (let row of ret.rows) {
@@ -149,15 +165,18 @@ export default {
             date: new moment(row.date).format('lll'),
             cellClassName: {},
           };
+          if (baseUrl.length !== 0) {
+            rowData.pdfUrl = `${baseUrl}pdfReport/${row.pdfReport}`;
+            rowData.excelUrl = `${baseUrl}excelForm/${row.pdfReport}`;
+          } else {
+            rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
+            rowData.excelUrl = `${baseUrl}excelForm/${row.pdfReport}`;
+          }
+
           for (let c = 0; c < row.cellData.length; c++) {
             let key = `col${c}`;
             rowData[key] = row.cellData[c].v;
             rowData.cellClassName[key] = row.cellData[c].cellClassName;
-            if (baseUrl.length !== 0) {
-              rowData.pdfUrl = `${baseUrl}pdfReport/${row.pdfReport}`;
-            } else {
-              rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
-            }
           }
           this.rows.push(rowData);
         }
@@ -167,6 +186,10 @@ export default {
     },
     showPdfReport(idx) {
       let url = this.rows[idx].pdfUrl;
+      window.open(url);
+    },
+    downloadForm(idx) {
+      let url = this.rows[idx].excelUrl;
       window.open(url);
     },
   },

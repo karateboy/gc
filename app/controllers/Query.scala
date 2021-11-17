@@ -871,6 +871,16 @@ object Query extends Controller {
     for (ret <- f) yield {
       Ok(ret.content).as("application/pdf")
     }
+  }
 
+  def excelForm(pdfId:String) = Security.Authenticated.async {
+    val f = Record.getRecordWithPdfID(new ObjectId(pdfId))
+    for(map<-f) yield {
+      val excelFile = ExcelUtility.excelForm(map)
+
+      Ok.sendFile(excelFile, fileName = _ =>
+        play.utils.UriEncoding.encodePathSegment("報表.xlsx", "UTF-8"),
+        onClose = () => { Files.deleteIfExists(excelFile.toPath()) })
+    }
   }
 }
