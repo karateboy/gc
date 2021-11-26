@@ -234,6 +234,11 @@ class GcAgent extends Actor {
       val lines =
         Files.readAllLines(Paths.get(reportDir.getAbsolutePath + "/Report.txt"), StandardCharsets.UTF_16LE).asScala
 
+      val sampleName = lines.find(line=>line.startsWith("Sample Name:")).map(line=>{
+        val tokens = line.split(":")
+        tokens(1).trim()
+      })
+
       val mDate = {
         val mDates =
           for (line <- lines if (line.startsWith("Injection Date"))) yield {
@@ -322,7 +327,7 @@ class GcAgent extends Actor {
           timeMaps = monitorMap._2
           dateTime <- timeMaps.keys.toList.sorted
           mtMaps = timeMaps(dateTime) if !mtMaps.isEmpty
-          doc = Record.toDocument(monitor, dateTime, mtMaps.toList, pdfReportId)
+          doc = Record.toDocument(monitor, dateTime, mtMaps.toList, pdfReportId, sampleName)
           updateList = doc.toList.map(kv => Updates.set(kv._1, kv._2)) if !updateList.isEmpty
         } yield {
           UpdateOneModel(

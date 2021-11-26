@@ -67,10 +67,11 @@ object Record {
   }
 
   def toDocument(monitor: Monitor.Value, dt: DateTime,
-                 dataList: List[(MonitorType.Value, (Double, String))], pdfReport: ObjectId) = {
+                 dataList: List[(MonitorType.Value, (Double, String))], pdfReport: ObjectId, sampleName:Option[String]) = {
     import org.mongodb.scala.bson._
     val bdt: BsonDateTime = dt
-    var doc = Document("_id" -> getDocKey(monitor, dt), "time" -> bdt, "monitor" -> monitor.toString, "pdfReport" -> pdfReport)
+    var doc = Document("_id" -> getDocKey(monitor, dt), "time" -> bdt, "monitor" -> monitor.toString,
+      "pdfReport" -> pdfReport, "sampleName"->sampleName)
     for {
       data <- dataList
       mt = data._1
@@ -576,9 +577,9 @@ object Record {
     }
   }
 
-  def getRecordWithPdfID(pdfId:ObjectId): Future[Map[Monitor.Value, (DateTime, Map[MonitorType.Value, Record])]] = {
+  def getRecordWithPdfID(pdfId:ObjectId): Future[Map[Monitor.Value, (DateTime, Option[String], Map[MonitorType.Value, Record])]] = {
     val col = MongoDB.database.getCollection(Record.MinCollection)
-    val projFields = "monitor" :: "time" :: MonitorType.mtvList.map {
+    val projFields = "monitor" :: "time" :: "sampleName"::MonitorType.mtvList.map {
       MonitorType.BFName(_)
     }
 
@@ -592,6 +593,7 @@ object Record {
           doc <- docs
           m = Monitor.withName(doc("monitor").asString().getValue)
           time = doc("time").asDateTime().toDateTime()
+          sampleName = doc.get("sampleName").map(_.asString().getValue)
         } yield {
           val pair =
             for {
@@ -604,7 +606,7 @@ object Record {
             } yield {
               mt -> Record(m, time, v.asDouble().doubleValue(), s.asString().getValue)
             }
-          m -> (time, pair.toMap)
+          m -> (time, sampleName, pair.toMap)
         }
       }
 

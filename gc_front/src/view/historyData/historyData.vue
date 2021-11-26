@@ -78,13 +78,29 @@
             <strong>{{ row.name }}</strong>
           </template>
           <template slot-scope="{ row, index }" slot="action">
-            <Button
-              type="primary"
-              size="small"
-              style="margin-right: 5px"
-              @click="showPdfReport(index)"
-              >報表</Button
-            >
+            <table>
+              <tbody>
+                <tr>
+                  <td>
+                    <Button
+                      type="primary"
+                      size="large"
+                      @click="showPdfReport(index)"
+                      >PDF</Button
+                    >
+                  </td>
+                  <td>
+                    <Button
+                      type="info"
+                      size="large"
+                      @click="downloadForm(index)"
+                      >報告</Button
+                    >
+                  </td>
+                </tr>
+                <tr></tr>
+              </tbody>
+            </table>
           </template>
         </Table>
       </Card>
@@ -252,7 +268,11 @@ export default {
               rowData.cellClassName[key] = row.cellData[c].cellClassName;
               if (baseUrl.length !== 0) {
                 rowData.pdfUrl = `${baseUrl}pdfReport/${row.pdfReport}`;
-              } else rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
+                rowData.excelUrl = `${baseUrl}excelForm/${row.pdfReport}`;
+              } else {
+                rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
+                rowData.excelUrl = `${baseUrl}excelForm/${row.pdfReport}`;
+              }
             }
             this.rows.push(rowData);
           }
@@ -263,6 +283,10 @@ export default {
     },
     showPdfReport(idx) {
       let url = this.rows[idx].pdfUrl;
+      window.open(url);
+    },
+    downloadForm(idx) {
+      let url = this.rows[idx].excelUrl;
       window.open(url);
     },
     downloadExcel() {

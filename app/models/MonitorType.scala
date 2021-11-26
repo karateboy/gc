@@ -89,7 +89,7 @@ object MonitorType extends Enumeration {
   def activeMtvList = mtvList
   def realtimeMtvList = mtvList
 
-  def getMonitorTypeValueByName(_id: String, unit: String, start:Int = 0) = {
+  def getMonitorTypeValueByName(_id: String, unit: String = "", start:Int = 0) = {
     try {
       MonitorType.withName(_id)
     } catch {

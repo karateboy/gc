@@ -1,14 +1,16 @@
-package controllers
+package models
 
 import com.github.nscala_time.time.Imports._
-import models._
-import org.apache.poi.openxml4j.opc._
-import org.apache.poi.ss.usermodel._
-import org.apache.poi.xssf.usermodel._
+import controllers.Query
+import org.apache.poi.openxml4j.opc.OPCPackage
+import org.apache.poi.ss.usermodel.Row.MissingCellPolicy
+import org.apache.poi.ss.usermodel.{BorderStyle, FillPatternType, IndexedColors}
+import org.apache.poi.xssf.usermodel.{XSSFCellStyle, XSSFColor, XSSFSheet, XSSFWorkbook}
+import play.api.Logger
 import play.api.Play.current
 
-import java.io._
-import java.nio.file._
+import java.io.{File, FileInputStream, FileOutputStream}
+import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 
 object ExcelUtility {
   val docRoot = "/report_template/"
@@ -311,63 +313,97 @@ object ExcelUtility {
     finishExcel(reportFilePath, pkg, wb)
   }
 
-  def excelForm(map: Map[Monitor.Value, (DateTime, Map[MonitorType.Value, Record])]) = {
+  def excelForm(map: Map[Monitor.Value, (DateTime, Option[String], Map[MonitorType.Value, Record])]) = {
     implicit val (reportFilePath, pkg, wb) = prepareTemplate("form.xlsx")
-    val format = wb.createDataFormat();
-    var sheet = wb.getSheetAt(0)
     for (entry <- map) {
-      val monitor = entry._1
-      val (dt, mtMap) = entry._2
-
-      sheet.getRow(7).getCell(9).setCellValue(dt.toDate())
-      sheet.getRow(8).getCell(9).setCellValue(dt.toDate())
-      var mt = MonitorType.getMonitorTypeValueByName("O2", "")
-      if (mtMap.contains(mt))
-        sheet.getRow(18).getCell(4).setCellValue(mtMap(mt).value)
-
-      mt = MonitorType.getMonitorTypeValueByName("H2O", "")
-      if (mtMap.contains(mt))
-        sheet.getRow(19).getCell(4).setCellValue(mtMap(mt).value)
-    }
-    sheet = wb.getSheetAt(1)
-    for (entry <- map) {
-      val monitor = entry._1
-      val (dt, mtMap) = entry._2
-
-      sheet.getRow(7).getCell(9).setCellValue(dt.toDate())
-      sheet.getRow(8).getCell(9).setCellValue(dt.toDate())
-      var mt = MonitorType.getMonitorTypeValueByName("H2O", "")
-      if (mtMap.contains(mt))
-        sheet.getRow(18).getCell(4).setCellValue(mtMap(mt).value)
-
-      mt = MonitorType.getMonitorTypeValueByName("CO", "")
-      if (mtMap.contains(mt))
-        sheet.getRow(19).getCell(4).setCellValue(mtMap(mt).value)
-
-      mt = MonitorType.getMonitorTypeValueByName("CO2", "")
-      if (mtMap.contains(mt))
-        sheet.getRow(20).getCell(4).setCellValue(mtMap(mt).value)
-
-      mt = MonitorType.getMonitorTypeValueByName("H2", "")
-      if (mtMap.contains(mt))
-        sheet.getRow(21).getCell(4).setCellValue(mtMap(mt).value)
-
-      mt = MonitorType.getMonitorTypeValueByName("N2", "")
-      if (mtMap.contains(mt))
-        sheet.getRow(22).getCell(4).setCellValue(mtMap(mt).value)
-
-      mt = MonitorType.getMonitorTypeValueByName("Ar", "")
-      if (mtMap.contains(mt))
-        sheet.getRow(23).getCell(4).setCellValue(mtMap(mt).value)
-
-      mt = MonitorType.getMonitorTypeValueByName("C3H8", "")
-      val mt2 = MonitorType.getMonitorTypeValueByName("CH4", "")
-      if (mtMap.contains(mt) && mtMap.contains(mt2)) {
-        val c3h8 = mtMap(mt).value
-        val ch4 = mtMap(mt2).value
-        sheet.getRow(20).getCell(4).setCellValue(ch4 + c3h8)
+      val (dt, sampleNameOpt, mtMap) = entry._2
+      var sheet: XSSFSheet = wb.getSheetAt(0)
+      def fillMtContent(mtName:String, rowN:Int, cellN:Int, limitN:Int): Unit ={
+        val mt = MonitorType.getMonitorTypeValueByName(mtName)
+        if (mtMap.contains(mt)) {
+          val limit = try {
+            sheet.getRow(rowN).getCell(limitN).
+            getStringCellValue.replaceAll("^\\d+", "").toDouble
+          }catch{
+            case _:Throwable=>
+              0d
+          }
+          if(mtMap(mt).value == 0 || mtMap(mt).value < limit)
+            sheet.getRow(rowN).getCell(cellN).setCellValue("< 偵測極限")
+          else
+            sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value)
+        }
       }
+      def fillSheetUPO(): Unit ={
+        val sheet = wb.getSheetAt(0)
+        sheet.getRow(10).getCell(4).setCellValue(dt.toString("YYYY/MM/dd"))
+        sheet.getRow(11).getCell(4).setCellValue(dt.toString("YYYY/MM/dd"))
+        for(sampleName<-sampleNameOpt)
+          sheet.getRow(12).getCell(5).setCellValue(sampleName)
+
+        fillMtContent("H2O", 16, 4, 9)
+        fillMtContent("CO", 17, 4, 9)
+        fillMtContent("CO2", 18, 4, 9)
+        fillMtContent("H2", 19, 4, 9)
+        fillMtContent("N2", 20, 4, 9)
+        fillMtContent("Ar", 21, 4, 9)
+      }
+
+      def fillSheetWithAr(sheetN:Int) = {
+        sheet = wb.getSheetAt(sheetN)
+        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        for(sampleName<-sampleNameOpt)
+          sheet.getRow(13).getCell(9).setCellValue(sampleName)
+
+        fillMtContent("H2O", 18, 4, 9)
+        fillMtContent("CO", 19, 4, 9)
+        fillMtContent("CO2", 20, 4, 9)
+        fillMtContent("H2", 21, 4, 9)
+        fillMtContent("N2", 22, 4, 9)
+        fillMtContent("Ar", 23, 4, 9)
+      }
+
+      def fillSheetWithoutAr(sheetN:Int) = {
+        sheet = wb.getSheetAt(sheetN)
+        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        for(sampleName<-sampleNameOpt)
+          sheet.getRow(13).getCell(9).setCellValue(sampleName)
+
+        fillMtContent("H2O", 18, 4, 9)
+        fillMtContent("CO", 19, 4, 9)
+        fillMtContent("CO2", 20, 4, 9)
+        fillMtContent("H2", 21, 4, 9)
+        fillMtContent("N2", 22, 4, 9)
+      }
+      def fillSheetWithCh4(sheetN:Int) = {
+        sheet = wb.getSheetAt(sheetN)
+        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        for(sampleName<-sampleNameOpt)
+          sheet.getRow(13).getCell(9).setCellValue(sampleName)
+
+        fillMtContent("H2O", 18, 4, 9)
+        fillMtContent("CO", 19, 4, 9)
+        fillMtContent("CO2", 20, 4, 9)
+        fillMtContent("H2", 21, 4, 9)
+        fillMtContent("N2", 22, 4, 9)
+        fillMtContent("CH4", 24, 4, 9)
+      }
+
+      fillSheetUPO()
+      fillSheetWithAr(1)
+      fillSheetWithoutAr(2)
+      fillSheetWithAr(3)
+      fillSheetWithAr(4)
+      fillSheetWithAr(5)
+      fillSheetWithAr(6)
+      fillSheetWithAr(7)
+      fillSheetWithCh4(8)
+      fillSheetWithoutAr(9)
     }
+
     wb.setActiveSheet(0)
     finishExcel(reportFilePath, pkg, wb)
   }

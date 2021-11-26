@@ -44,12 +44,12 @@
                     type="primary"
                     size="large"
                     @click="showPdfReport(index)"
-                    >pdf</Button
+                    >PDF</Button
                   >
                 </td>
                 <td>
                   <Button type="info" size="large" @click="downloadForm(index)"
-                    >表單</Button
+                    >報告</Button
                   >
                 </td>
               </tr>

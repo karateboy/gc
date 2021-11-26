@@ -879,7 +879,7 @@ object Query extends Controller {
       val excelFile = ExcelUtility.excelForm(map)
 
       Ok.sendFile(excelFile, fileName = _ =>
-        play.utils.UriEncoding.encodePathSegment("報表.xlsx", "UTF-8"),
+        play.utils.UriEncoding.encodePathSegment("報告.xlsx", "UTF-8"),
         onClose = () => { Files.deleteIfExists(excelFile.toPath()) })
     }
   }
