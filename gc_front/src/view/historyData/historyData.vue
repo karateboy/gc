@@ -90,12 +90,12 @@
                     >
                   </td>
                   <td>
-                    <Button
+                    <!-- <Button
                       type="info"
                       size="large"
                       @click="downloadForm(index)"
                       >報告</Button
-                    >
+                    > -->
                   </td>
                 </tr>
                 <tr></tr>

@@ -263,6 +263,17 @@ class GcAgent extends Actor {
         else
           ret ++ getRecordLines(remain)
       }
+      def getPosHint(inputLines: Seq[String]): List[Int] = {
+        val head = inputLines.dropWhile(!_.startsWith("-------")).take(1)
+        def getPos(from:Int): List[Int]= {
+          val pos = head.indexOf('|', from)
+          if(pos == -1)
+            Nil
+          else
+            pos :: getPos(pos +1)
+        }
+        getPos(0)
+      }
 
       import scala.collection.mutable.Map
       val recordMap = Map.empty[Monitor.Value, Map[DateTime, Map[MonitorType.Value, (Double, String)]]]
@@ -272,7 +283,13 @@ class GcAgent extends Actor {
       for (rec <- rLines) {
         try {
           val tokens = rec.split("\\s+")
-          val ppm = tokens.reverse(1)
+          val ppm = try{
+            tokens.reverse(1).toInt
+            tokens.reverse(2)
+          }catch{
+            case _: NumberFormatException =>
+              tokens.reverse(1)
+          }
           val name = tokens.reverse(0)
           //val ppm = rec.substring(40, 50).trim()
           //val name = rec.substring(54).trim()

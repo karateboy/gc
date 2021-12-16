@@ -48,9 +48,9 @@
                   >
                 </td>
                 <td>
-                  <Button type="info" size="large" @click="downloadForm(index)"
+                  <!-- <Button type="info" size="large" @click="downloadForm(index)"
                     >報告</Button
-                  >
+                  > -->
                 </td>
               </tr>
               <tr></tr>
