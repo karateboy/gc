@@ -3,10 +3,8 @@ package models
 import com.github.nscala_time.time.Imports._
 import controllers.Query
 import org.apache.poi.openxml4j.opc.OPCPackage
-import org.apache.poi.ss.usermodel.Row.MissingCellPolicy
 import org.apache.poi.ss.usermodel.{BorderStyle, FillPatternType, IndexedColors}
 import org.apache.poi.xssf.usermodel.{XSSFCellStyle, XSSFColor, XSSFSheet, XSSFWorkbook}
-import play.api.Logger
 import play.api.Play.current
 
 import java.io.{File, FileInputStream, FileOutputStream}
@@ -318,27 +316,52 @@ object ExcelUtility {
     for (entry <- map) {
       val (dt, sampleNameOpt, mtMap) = entry._2
       var sheet: XSSFSheet = wb.getSheetAt(0)
-      def fillMtContent(mtName:String, rowN:Int, cellN:Int, limitN:Int): Unit ={
+
+      def fillMtContent(mtName: String, rowN: Int, cellN: Int, limitN: Int): Unit = {
         val mt = MonitorType.getMonitorTypeValueByName(mtName)
+        var limitStr = ""
         if (mtMap.contains(mt)) {
           val limit = try {
-            sheet.getRow(rowN).getCell(limitN).
-            getStringCellValue.replaceAll("^\\d+", "").toDouble
-          }catch{
-            case _:Throwable=>
+            limitStr = sheet.getRow(rowN).getCell(limitN).
+              getStringCellValue
+            limitStr.replaceAll("^\\d+", "").toDouble
+          } catch {
+            case _: Throwable =>
               0d
           }
-          if(mtMap(mt).value == 0 || mtMap(mt).value < limit)
-            sheet.getRow(rowN).getCell(cellN).setCellValue("< 偵測極限")
+          if (mtMap(mt).value == 0 || mtMap(mt).value < limit)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
           else
             sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value)
         }
       }
-      def fillSheetUPO(): Unit ={
+
+      def fillThcContent(rowN: Int, cellN: Int, limitN: Int): Unit = {
+        val ch4 = MonitorType.getMonitorTypeValueByName("CH4")
+        val c3h8 = MonitorType.getMonitorTypeValueByName("C3H8")
+        var limitStr = ""
+        if (mtMap.contains(ch4) && mtMap.contains(c3h8)) {
+          val limit = try {
+            limitStr = sheet.getRow(rowN).getCell(limitN).
+              getStringCellValue
+            limitStr.replaceAll("^\\d+", "").toDouble
+          } catch {
+            case _: Throwable =>
+              0d
+          }
+          val sum = mtMap(ch4).value + mtMap(c3h8).value
+          if (sum == 0 || sum < limit)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
+          else
+            sheet.getRow(rowN).getCell(cellN).setCellValue(sum)
+        }
+      }
+
+      def fillSheetUPO(): Unit = {
         val sheet = wb.getSheetAt(0)
         sheet.getRow(10).getCell(4).setCellValue(dt.toString("YYYY/MM/dd"))
         sheet.getRow(11).getCell(4).setCellValue(dt.toString("YYYY/MM/dd"))
-        for(sampleName<-sampleNameOpt)
+        for (sampleName <- sampleNameOpt)
           sheet.getRow(12).getCell(5).setCellValue(sampleName)
 
         fillMtContent("H2O", 16, 4, 9)
@@ -347,13 +370,14 @@ object ExcelUtility {
         fillMtContent("H2", 19, 4, 9)
         fillMtContent("N2", 20, 4, 9)
         fillMtContent("Ar", 21, 4, 9)
+        fillThcContent(22, 4, 9)
       }
 
-      def fillSheetWithAr(sheetN:Int) = {
+      def fillSheetWithAr(sheetN: Int) = {
         sheet = wb.getSheetAt(sheetN)
         sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
         sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        for(sampleName<-sampleNameOpt)
+        for (sampleName <- sampleNameOpt)
           sheet.getRow(13).getCell(9).setCellValue(sampleName)
 
         fillMtContent("H2O", 18, 4, 9)
@@ -362,13 +386,14 @@ object ExcelUtility {
         fillMtContent("H2", 21, 4, 9)
         fillMtContent("N2", 22, 4, 9)
         fillMtContent("Ar", 23, 4, 9)
+        fillThcContent(24, 4, 9)
       }
 
-      def fillSheetWithoutAr(sheetN:Int) = {
+      def fillSheetWithoutAr(sheetN: Int) = {
         sheet = wb.getSheetAt(sheetN)
         sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
         sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        for(sampleName<-sampleNameOpt)
+        for (sampleName <- sampleNameOpt)
           sheet.getRow(13).getCell(9).setCellValue(sampleName)
 
         fillMtContent("H2O", 18, 4, 9)
@@ -376,12 +401,14 @@ object ExcelUtility {
         fillMtContent("CO2", 20, 4, 9)
         fillMtContent("H2", 21, 4, 9)
         fillMtContent("N2", 22, 4, 9)
+        fillThcContent(23, 4, 9)
       }
-      def fillSheetWithCh4(sheetN:Int) = {
+
+      def fillSheetWithCh4(sheetN: Int) = {
         sheet = wb.getSheetAt(sheetN)
         sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
         sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        for(sampleName<-sampleNameOpt)
+        for (sampleName <- sampleNameOpt)
           sheet.getRow(13).getCell(9).setCellValue(sampleName)
 
         fillMtContent("H2O", 18, 4, 9)
@@ -389,6 +416,7 @@ object ExcelUtility {
         fillMtContent("CO2", 20, 4, 9)
         fillMtContent("H2", 21, 4, 9)
         fillMtContent("N2", 22, 4, 9)
+        fillThcContent(23, 4, 9)
         fillMtContent("CH4", 24, 4, 9)
       }
 
