@@ -28,7 +28,7 @@
     "simplemde": "^1.11.2",
     "sortablejs": "^1.7.0",
     "tree-table-vue": "^1.1.0",
-    "urijs": "^1.19.1",
+    "urijs": "^1.19.9",
     "v-org-tree": "^1.0.6",
     "vue": "2.x",
     "vue-i18n": "^7.8.0",
