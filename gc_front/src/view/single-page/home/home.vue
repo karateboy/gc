@@ -1,6 +1,6 @@
 <template>
   <div>
-    <Row type="flex" justify="start" :gutter="10">
+    <Row type="flex" justify="start" :gutter="10" v-show="showGcSelector">
       <Col :xs="12" :md="8" :lg="6" style="padding-top: 5px">
         <ButtonGroup title="GC切換顯示">
           <Button
@@ -143,6 +143,11 @@ export default {
         this.reloadData();
       })
       .catch(err => alert(err));
+  },
+  computed: {
+    showGcSelector() {
+      return this.gcList.length > 1;
+    },
   },
   methods: {
     buttonType(id) {
