@@ -28,11 +28,11 @@ GET      /history_data/excel                                                   c
 GET      /pdfReport/:id                                                        controllers.Query.pdfReport(id:String)
 GET      /excelForm/:pdfId                                                     controllers.Query.excelForm(pdfId)
 GET      /history_trend                                                        controllers.Query.historyTrendChart2(monitors: String, monitorTypes: String, start: Long, end: Long)
-GET      /realtime_data                                                        controllers.Realtime.latestValues	
+GET      /realtime_data                                                        controllers.Realtime.latestValues(gcFilter)
 GET      /current_monitor                                                      controllers.Realtime.getCurrentMonitor
 POST     /current_monitor                                                      controllers.Realtime.setCurrentMonitor(monitorId:String)
 GET      /gc_monitor                                                           controllers.Realtime.getGcMonitors
-GET      /last10_data                                                          controllers.Query.last10Data()	
+GET      /last10_data                                                          controllers.Query.last10Data(gcFilter)
 GET      /alarm                                                                controllers.Query.alarmData(start: Long, end: Long)
 GET      /testAlarm                                                            controllers.Application.testAlarm	
 GET      /GcWebSocket                                                          controllers.Application.gcWebSocket

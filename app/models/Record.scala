@@ -455,7 +455,8 @@ object Record {
     }
   }
 
-  def getLatestRecordListFuture(colName: String, rename: Boolean = false)(limit: Int) = {
+  def getLatestRecordListFuture(colName: String, monitors:Seq[String],
+                                rename: Boolean = false)(limit: Int) = {
     import org.mongodb.scala.bson._
     import org.mongodb.scala.model._
     import org.mongodb.scala.model.Sorts._
@@ -466,7 +467,8 @@ object Record {
       MonitorType.BFName(_)
     }
     val proj = Projections.include(projFields: _*)
-    val f = col.find(Filters.exists("pdfReport")).projection(proj).sort(descending("time")).limit(limit).toFuture()
+    val filters = Filters.and(Filters.exists("pdfReport"), Filters.in("_id.monitor", monitors:_*))
+    val f = col.find(filters).projection(proj).sort(descending("time")).limit(limit).toFuture()
     for {
       docs <- f
     } yield {

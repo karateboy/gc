@@ -201,4 +201,10 @@ object Monitor extends Enumeration {
   def getMonitorsByGcName(gcName:String) = {
     mList filter { m => m.gcName == gcName}
   }
+
+  def getMonitorByGcFilter(gcFilter:String): Seq[String] = if (gcFilter.isEmpty)
+    Monitor.map.values.map(_._id).toSeq
+  else
+    Monitor.map.values.filter(m => if (gcFilter.isEmpty) true else m.gcName == gcFilter).map(_._id).toSeq
+
 }

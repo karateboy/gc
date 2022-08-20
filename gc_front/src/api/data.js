@@ -61,10 +61,11 @@ export const getAlarm = ({ start, end }) => {
     }
   })
 }
-export const getLast10Data = () => {
+export const getLast10Data = (gcFilter) => {
   return axios.request({
     url: 'last10_data',
-    method: 'get'
+    method: 'get',
+    params: { gcFilter }
   })
 }
 
@@ -78,11 +79,11 @@ export const getHistoryTrend = ({ monitors, monitorTypes, start, end }) => {
   })
 }
 
-export const getRealtimeData = () => {
+export const getRealtimeData = (gcFilter) => {
   return axios.request({
     url: 'realtime_data',
     method: 'get',
-    params: {}
+    params: { gcFilter }
   })
 }
 

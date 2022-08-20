@@ -2,6 +2,25 @@
   <div>
     <Row type="flex" justify="start" :gutter="10">
       <Col :xs="12" :md="8" :lg="6" style="padding-top: 5px">
+        <ButtonGroup title="GC切換顯示">
+          <Button
+            class="btnStyle"
+            v-for="gc in gcList"
+            :key="gc.key"
+            :type="buttonType(gc.key)"
+            :icon="buttonIcon(gc.key)"
+            @click="
+              gcFilter = gc.key;
+              reloadData();
+            "
+          >
+            <h3>{{ gc.name }}</h3>
+          </Button>
+        </ButtonGroup>
+      </Col>
+    </Row>
+    <Row type="flex" justify="start" :gutter="10">
+      <Col :xs="12" :md="8" :lg="6" style="padding-top: 5px">
         <Card :key="selector._id" :padding="2" shadow class="tag">
           <Row type="flex">
             <Col span="8">
@@ -85,7 +104,7 @@ import InforCard from '_c/info-card';
 import config from '@/config';
 import moment from 'moment';
 
-import { getRealtimeData, getLast10Data } from '@/api/data';
+import { getGcList, getRealtimeData, getLast10Data } from '@/api/data';
 const baseUrl =
   process.env.NODE_ENV === 'development'
     ? config.baseUrl.dev
@@ -108,14 +127,37 @@ export default {
       timer: undefined,
       columns: [],
       rows: [],
+      gcList: [],
+      gcFilter: '',
     };
   },
-  mounted() {
-    this.reloadData();
+  async mounted() {
+    getGcList()
+      .then(resp => {
+        const ret = resp.data;
+        this.gcList.splice(0, this.gcList.length);
+        for (let gc of ret) {
+          this.gcList.push(gc);
+        }
+        if (this.gcList.length !== 0) this.gcFilter = this.gcList[0].key;
+        this.reloadData();
+      })
+      .catch(err => alert(err));
   },
   methods: {
+    buttonType(id) {
+      if (this.gcFilter === id) return 'success';
+      else return 'default';
+    },
+    buttonIcon(id) {
+      if (this.gcFilter === id) {
+        return 'md-checkbox-outline';
+      }
+
+      return 'md-square-outline';
+    },
     reloadData() {
-      getRealtimeData().then(resp => {
+      getRealtimeData(this.gcFilter).then(resp => {
         const ret = resp.data;
         this.inforCardData.splice(0, this.inforCardData.length);
         let card = {
@@ -137,7 +179,7 @@ export default {
         this.selector.dp_no = ret.monitor;
       });
 
-      getLast10Data().then(resp => {
+      getLast10Data(this.gcFilter).then(resp => {
         const ret = resp.data;
         this.columns.splice(0, this.columns.length);
         this.rows.splice(0, this.rows.length);

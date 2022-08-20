@@ -1,37 +1,26 @@
 package controllers
-import play.api._
-import play.api.mvc._
-import play.api.libs.json._
-import play.api.libs.functional.syntax._
-import play.api.libs.json.Json
-import play.api.Play.current
-import play.api.data._
-import play.api.data.Forms._
-import play.api.libs.ws._
-import play.api.libs.ws.ning.NingAsyncHttpClientConfigBuilder
 
-import scala.concurrent.Future
-import play.api.libs.json._
 import com.github.nscala_time.time.Imports._
-import Highchart._
-import models._
+import controllers.Highchart._
 import models.ModelHelper._
+import models._
+import play.api._
+import play.api.libs.json.Json
+import play.api.mvc._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import models.ObjectIdUtil._
 import java.nio.file.Files
-
-import models.MonitorType.map
+import scala.concurrent.ExecutionContext.Implicits.global
+import ObjectIdUtil._
 
 case class Stat(
-  avg:        Option[Double],
-  min:        Option[Double],
-  max:        Option[Double],
-  count:      Int,
-  total:      Int,
-  overCount:  Int,
-  hour_count: Option[Int]    = None,
-  hour_total: Option[Int]    = None) {
+                 avg: Option[Double],
+                 min: Option[Double],
+                 max: Option[Double],
+                 count: Int,
+                 total: Int,
+                 overCount: Int,
+                 hour_count: Option[Int] = None,
+                 hour_total: Option[Int] = None) {
   val effectPercent = {
     if (total > 0)
       Some(count.toDouble * 100 / total)
@@ -58,14 +47,6 @@ case class Stat(
 }
 
 object Query extends Controller {
-  def windAvg(sum_sin: Double, sum_cos: Double) = {
-    val degree = Math.toDegrees(Math.atan2(sum_sin, sum_cos))
-    if (degree >= 0)
-      degree
-    else
-      degree + 360
-  }
-
   def windAvg(windSpeed: Seq[Record], windDir: Seq[Record]): Double = {
     if (windSpeed.length != windDir.length)
       Logger.error(s"windSpeed #=${windSpeed.length} windDir #=${windDir.length}")
@@ -76,6 +57,14 @@ object Query extends Controller {
     windAvg(wind_sin, wind_cos)
   }
 
+  def windAvg(sum_sin: Double, sum_cos: Double) = {
+    val degree = Math.toDegrees(Math.atan2(sum_sin, sum_cos))
+    if (degree >= 0)
+      degree
+    else
+      degree + 360
+  }
+
   def windAvg(windSpeed: List[Double], windDir: List[Double]): Double = {
     if (windSpeed.length != windDir.length)
       Logger.error(s"windSpeed #=${windSpeed.length} windDir #=${windDir.length}")
@@ -84,19 +73,6 @@ object Query extends Controller {
     val wind_sin = windRecord.map(v => v._1 * Math.sin(Math.toRadians(v._2))).sum
     val wind_cos = windRecord.map(v => v._1 * Math.cos(Math.toRadians(v._2))).sum
     windAvg(wind_sin, wind_cos)
-  }
-
-  def getPeriods(start: DateTime, endTime: DateTime, d: Period): List[DateTime] = {
-    import scala.collection.mutable.ListBuffer
-
-    val buf = ListBuffer[DateTime]()
-    var current = start
-    while (current < endTime) {
-      buf.append(current)
-      current += d
-    }
-
-    buf.toList
   }
 
   def getPeriodCount(start: DateTime, endTime: DateTime, p: Period) = {
@@ -110,73 +86,6 @@ object Query extends Controller {
     count
   }
 
-  def getPeriodReportMap(monitor: Monitor.Value, mt: MonitorType.Value, tabType: TableType.Value, period: Period,
-                         statusFilter: MonitorStatusFilter.Value = MonitorStatusFilter.ValidData)(start: DateTime, end: DateTime) = {
-    val recordList = Record.getRecordMap(TableType.mapCollection(tabType))(List(mt), monitor, start, end)(mt)
-    def periodSlice(period_start: DateTime, period_end: DateTime) = {
-      recordList.dropWhile { _.time < period_start }.takeWhile { _.time < period_end }
-    }
-    val pairs =
-      if (period.getHours == 1) {
-        recordList.filter { r => MonitorStatusFilter.isMatched(statusFilter, r.status) }.map { r => r.time -> r.value }
-      } else {
-        for {
-          period_start <- getPeriods(start, end, period)
-          records = periodSlice(period_start, period_start + period) if records.length > 0
-        } yield {
-          val values = records.map { r => r.value }
-          period_start -> values.sum / values.length
-        }
-      }
-
-    Map(pairs: _*)
-  }
-
-  def getPeriodBoxReport(monitor: Monitor.Value, mt: MonitorType.Value, tabType: TableType.Value, period: Period,
-                         statusFilter: MonitorStatusFilter.Value = MonitorStatusFilter.ValidData)(start: DateTime, end: DateTime) = {
-    val recordList = Record.getRecordMap(TableType.mapCollection(tabType))(List(mt), monitor, start, end)(mt)
-    def periodSlice(period_start: DateTime, period_end: DateTime) = {
-      recordList.dropWhile { _.time < period_start }.takeWhile { _.time < period_end }
-    }
-    val data =
-      if (period.getHours == 1) {
-        recordList.filter { r => MonitorStatusFilter.isMatched(statusFilter, r.status) }.map { r => r.value }
-      } else {
-        for {
-          period_start <- getPeriods(start, end, period)
-          records = periodSlice(period_start, period_start + period) if records.length > 0
-        } yield {
-          val values = records.map { r => r.value }
-          values.sum / values.length
-        }
-      }
-    val sorted = data.sorted
-    val min = if (sorted.length >= 1)
-      Some(sorted.head)
-    else
-      None
-    val max = if (sorted.length >= 1)
-      Some(sorted.last)
-    else
-      None
-    val med = if (sorted.length >= 3)
-      Some(sorted(sorted.length / 2))
-    else
-      None
-
-    val low_q = if (sorted.length >= 4)
-      Some(sorted(sorted.length / 4))
-    else
-      None
-
-    val high_q = if (sorted.length >= 4)
-      Some(sorted(sorted.length * 3 / 4))
-    else
-      None
-
-    Seq(min, low_q, med, high_q, max)
-  }
-
   def getPeriodStatReportMap(recordListMap: Map[MonitorType.Value, Seq[Record]], period: Period, statusFilter: List[String] = List("010"))(start: DateTime, end: DateTime) = {
     val mTypes = recordListMap.keys.toList
 
@@ -185,7 +94,11 @@ object Query extends Controller {
     }
 
     def periodSlice(recordList: Seq[Record], period_start: DateTime, period_end: DateTime) = {
-      recordList.dropWhile { _.time < period_start }.takeWhile { _.time < period_end }
+      recordList.dropWhile {
+        _.time < period_start
+      }.takeWhile {
+        _.time < period_end
+      }
     }
 
     def getPeriodStat(records: Seq[Record], mt: MonitorType.Value, period_start: DateTime) = {
@@ -199,7 +112,9 @@ object Query extends Controller {
         val count = records.filter { r => statusFilter.contains(r.status) }.length
         val total = new Duration(period_start, period_start + period).getStandardHours.toInt
         val overCount = if (MonitorType.map(mt).std_law.isDefined) {
-          values.count { _ > MonitorType.map(mt).std_law.get }
+          values.count {
+            _ > MonitorType.map(mt).std_law.get
+          }
         } else
           0
 
@@ -215,6 +130,7 @@ object Query extends Controller {
           overCount = overCount)
       }
     }
+
     val pairs = {
       for {
         mt <- mTypes
@@ -231,6 +147,65 @@ object Query extends Controller {
     }
 
     Map(pairs: _*)
+  }
+
+  def historyTrendChart(monitorStr: String, monitorTypeStr: String, reportUnitStr: String,
+                        startLong: Long, endLong: Long, outputTypeStr: String) = Security.Authenticated {
+    implicit request =>
+
+      val monitorStrArray = java.net.URLDecoder.decode(monitorStr, "UTF-8").split(':')
+      val monitors = monitorStrArray.map {
+        Monitor.withName
+      }
+
+      val monitorTypeStrArray = monitorTypeStr.split(':')
+      val monitorTypes = monitorTypeStrArray.map {
+        MonitorType.withName
+      }
+      val reportUnit = ReportUnit.withName(reportUnitStr)
+      val statusFilter = MonitorStatusFilter.ValidData
+      val (tabType, start, end) =
+        if (reportUnit == ReportUnit.Hour || reportUnit == ReportUnit.Min || reportUnit == ReportUnit.TenMin) {
+          val tab = if (reportUnit == ReportUnit.Hour)
+            TableType.hour
+          else
+            TableType.min
+
+          (tab, new DateTime(startLong), new DateTime(endLong))
+        } else if (reportUnit == ReportUnit.Day) {
+          (TableType.hour, new DateTime(startLong), new DateTime(endLong))
+        } else {
+          (TableType.hour, new DateTime(startLong), new DateTime(endLong))
+        }
+
+      val outputType = OutputType.withName(outputTypeStr)
+
+      val chart = trendHelper(monitors, monitorTypes, tabType, reportUnit, start, end)(statusFilter)
+
+      if (outputType == OutputType.excel) {
+        import java.nio.file.Files
+        def allMoniotorTypes = {
+          val mts =
+            for (i <- 1 to monitors.length) yield monitorTypes
+
+          mts.flatMap { x => x }
+        }
+
+        val excelFile = ExcelUtility.exportChartData(chart, allMoniotorTypes.toArray)
+        val downloadFileName =
+          if (chart.downloadFileName.isDefined)
+            chart.downloadFileName.get
+          else
+            chart.title("text")
+
+        Ok.sendFile(excelFile, fileName = _ =>
+          play.utils.UriEncoding.encodePathSegment(downloadFileName + ".xlsx", "UTF-8"),
+          onClose = () => {
+            Files.deleteIfExists(excelFile.toPath())
+          })
+      } else {
+        Results.Ok(Json.toJson(chart))
+      }
   }
 
   def trendHelper(monitors: Array[Monitor.Value], monitorTypes: Array[MonitorType.Value], tabType: TableType.Value,
@@ -296,7 +271,9 @@ object Query extends Controller {
 
     val downloadFileName = {
       val startName = start.toString("YYMMdd")
-      val mtNames = monitorTypes.map { MonitorType.map(_).desp }
+      val mtNames = monitorTypes.map {
+        MonitorType.map(_).desp
+      }
       startName + mtNames.mkString
     }
 
@@ -326,7 +303,11 @@ object Query extends Controller {
         else
           Some(AxisLine("#FF0000", 2, mtCase.std_law.get, Some(AxisLineLabel("right", "法規值"))))
 
-      val lines = Seq(std_law_line, None).filter { _.isDefined }.map { _.get }
+      val lines = Seq(std_law_line, None).filter {
+        _.isDefined
+      }.map {
+        _.get
+      }
       if (lines.length > 0)
         Some(lines)
       else
@@ -370,6 +351,55 @@ object Query extends Controller {
     chart
   }
 
+  def getPeriodReportMap(monitor: Monitor.Value, mt: MonitorType.Value, tabType: TableType.Value, period: Period,
+                         statusFilter: MonitorStatusFilter.Value = MonitorStatusFilter.ValidData)(start: DateTime, end: DateTime) = {
+    val recordList = Record.getRecordMap(TableType.mapCollection(tabType))(List(mt), monitor, start, end)(mt)
+
+    def periodSlice(period_start: DateTime, period_end: DateTime) = {
+      recordList.dropWhile {
+        _.time < period_start
+      }.takeWhile {
+        _.time < period_end
+      }
+    }
+
+    val pairs =
+      if (period.getHours == 1) {
+        recordList.filter { r => MonitorStatusFilter.isMatched(statusFilter, r.status) }.map { r => r.time -> r.value }
+      } else {
+        for {
+          period_start <- getPeriods(start, end, period)
+          records = periodSlice(period_start, period_start + period) if records.length > 0
+        } yield {
+          val values = records.map { r => r.value }
+          period_start -> values.sum / values.length
+        }
+      }
+
+    Map(pairs: _*)
+  }
+
+  def historyTrendChart2(monitorStr: String, monitorTypeStr: String, startLong: Long, endLong: Long) = Security.Authenticated.async {
+    implicit request =>
+
+      val monitorStrArray = java.net.URLDecoder.decode(monitorStr, "UTF-8").split(',')
+      val monitors = monitorStrArray.map {
+        Monitor.withName
+      }
+
+      val monitorTypeStrArray = java.net.URLDecoder.decode(monitorTypeStr, "UTF-8").split(':')
+      val monitorTypes = monitorTypeStrArray.map {
+        MonitorType.withName
+      }
+      val statusFilter = MonitorStatusFilter.ValidData
+      val (tabType, start, end) = (TableType.min, new DateTime(startLong), new DateTime(endLong))
+      val chartFuture = trendHelper2(monitors, monitorTypes, tabType, start, end)(statusFilter)
+      chartFuture.onFailure(errorHandler)
+      for (chart <- chartFuture) yield {
+        Results.Ok(Json.toJson(chart))
+      }
+  }
+
   def trendHelper2(monitors: Array[Monitor.Value], monitorTypes: Array[MonitorType.Value], tabType: TableType.Value,
                    start: DateTime, end: DateTime)(statusFilter: MonitorStatusFilter.Value) = {
 
@@ -384,7 +414,11 @@ object Query extends Controller {
         else
           Some(AxisLine("#FF0000", 2, mtCase.std_law.get, Some(AxisLineLabel("right", "法規值"))))
 
-      val lines = Seq(std_law_line, None).filter { _.isDefined }.map { _.get }
+      val lines = Seq(std_law_line, None).filter {
+        _.isDefined
+      }.map {
+        _.get
+      }
       if (lines.length > 0)
         Some(lines)
       else
@@ -393,7 +427,9 @@ object Query extends Controller {
 
     val downloadFileName = {
       val startName = start.toString("YYMMdd")
-      val mtNames = monitorTypes.map { MonitorType.map(_).desp }
+      val mtNames = monitorTypes.map {
+        MonitorType.map(_).desp
+      }
       startName + mtNames.mkString
     }
 
@@ -460,6 +496,65 @@ object Query extends Controller {
     }
   }
 
+  def historyBoxPlot(monitorStr: String, monitorTypeStr: String, reportUnitStr: String,
+                     startLong: Long, endLong: Long, outputTypeStr: String) = Security.Authenticated {
+    implicit request =>
+
+      val monitorStrArray = java.net.URLDecoder.decode(monitorStr, "UTF-8").split(':')
+      val monitors = monitorStrArray.map {
+        Monitor.withName
+      }
+
+      val monitorTypeStrArray = monitorTypeStr.split(':')
+      val monitorTypes = monitorTypeStrArray.map {
+        MonitorType.withName
+      }
+      val reportUnit = ReportUnit.withName(reportUnitStr)
+      val statusFilter = MonitorStatusFilter.ValidData
+      val (tabType, start, end) =
+        if (reportUnit == ReportUnit.Hour || reportUnit == ReportUnit.Min || reportUnit == ReportUnit.TenMin) {
+          val tab = if (reportUnit == ReportUnit.Hour)
+            TableType.hour
+          else
+            TableType.min
+
+          (tab, new DateTime(startLong), new DateTime(endLong))
+        } else if (reportUnit == ReportUnit.Day) {
+          (TableType.hour, new DateTime(startLong), new DateTime(endLong))
+        } else {
+          (TableType.hour, new DateTime(startLong), new DateTime(endLong))
+        }
+
+      val outputType = OutputType.withName(outputTypeStr)
+
+      val chart = boxHelper(monitors, monitorTypes, tabType, reportUnit, start, end)(statusFilter)
+
+      if (outputType == OutputType.excel) {
+        import java.nio.file.Files
+        def allMoniotorTypes = {
+          val mts =
+            for (i <- 1 to monitors.length) yield monitorTypes
+
+          mts.flatMap { x => x }
+        }
+
+        val excelFile = ExcelUtility.exportChartData(chart, allMoniotorTypes.toArray)
+        val downloadFileName =
+          if (chart.downloadFileName.isDefined)
+            chart.downloadFileName.get
+          else
+            chart.title("text")
+
+        Ok.sendFile(excelFile, fileName = _ =>
+          play.utils.UriEncoding.encodePathSegment(downloadFileName + ".xlsx", "UTF-8"),
+          onClose = () => {
+            Files.deleteIfExists(excelFile.toPath())
+          })
+      } else {
+        Results.Ok(Json.toJson(chart))
+      }
+  }
+
   def boxHelper(monitors: Array[Monitor.Value], monitorTypes: Array[MonitorType.Value], tabType: TableType.Value,
                 reportUnit: ReportUnit.Value, start: DateTime, end: DateTime)(statusFilter: MonitorStatusFilter.Value) = {
 
@@ -510,7 +605,9 @@ object Query extends Controller {
 
     val downloadFileName = {
       val startName = start.toString("YYMMdd")
-      val mtNames = monitorTypes.map { MonitorType.map(_).desp }
+      val mtNames = monitorTypes.map {
+        MonitorType.map(_).desp
+      }
       startName + mtNames.mkString
     }
 
@@ -540,7 +637,11 @@ object Query extends Controller {
         else
           Some(AxisLine("#FF0000", 2, mtCase.std_law.get, Some(AxisLineLabel("right", "法規值"))))
 
-      val lines = Seq(std_law_line, None).filter { _.isDefined }.map { _.get }
+      val lines = Seq(std_law_line, None).filter {
+        _.isDefined
+      }.map {
+        _.get
+      }
       if (lines.length > 0)
         Some(lines)
       else
@@ -569,10 +670,9 @@ object Query extends Controller {
           series,
           Some(downloadFileName))
       } else {
-        val yAxis =
-          {
-            Seq(YAxis(None, AxisTitle(Some(None)), None))
-          }
+        val yAxis = {
+          Seq(YAxis(None, AxisTitle(Some(None)), None))
+        }
 
         HighchartData(
           Map("type" -> "line"),
@@ -586,138 +686,80 @@ object Query extends Controller {
     chart
   }
 
-  def historyTrendChart(monitorStr: String, monitorTypeStr: String, reportUnitStr: String,
-                        startLong: Long, endLong: Long, outputTypeStr: String) = Security.Authenticated {
-    implicit request =>
-      import scala.collection.JavaConverters._
-      val monitorStrArray = java.net.URLDecoder.decode(monitorStr, "UTF-8").split(':')
-      val monitors = monitorStrArray.map { Monitor.withName }
+  def getPeriods(start: DateTime, endTime: DateTime, d: Period): List[DateTime] = {
+    import scala.collection.mutable.ListBuffer
 
-      val monitorTypeStrArray = monitorTypeStr.split(':')
-      val monitorTypes = monitorTypeStrArray.map { MonitorType.withName }
-      val reportUnit = ReportUnit.withName(reportUnitStr)
-      val statusFilter = MonitorStatusFilter.ValidData
-      val (tabType, start, end) =
-        if (reportUnit == ReportUnit.Hour || reportUnit == ReportUnit.Min || reportUnit == ReportUnit.TenMin) {
-          val tab = if (reportUnit == ReportUnit.Hour)
-            TableType.hour
-          else
-            TableType.min
+    val buf = ListBuffer[DateTime]()
+    var current = start
+    while (current < endTime) {
+      buf.append(current)
+      current += d
+    }
 
-          (tab, new DateTime(startLong), new DateTime(endLong))
-        } else if (reportUnit == ReportUnit.Day) {
-          (TableType.hour, new DateTime(startLong), new DateTime(endLong))
-        } else {
-          (TableType.hour, new DateTime(startLong), new DateTime(endLong))
-        }
+    buf.toList
+  }
 
-      val outputType = OutputType.withName(outputTypeStr)
+  def getPeriodBoxReport(monitor: Monitor.Value, mt: MonitorType.Value, tabType: TableType.Value, period: Period,
+                         statusFilter: MonitorStatusFilter.Value = MonitorStatusFilter.ValidData)(start: DateTime, end: DateTime) = {
+    val recordList = Record.getRecordMap(TableType.mapCollection(tabType))(List(mt), monitor, start, end)(mt)
 
-      val chart = trendHelper(monitors, monitorTypes, tabType, reportUnit, start, end)(statusFilter)
+    def periodSlice(period_start: DateTime, period_end: DateTime) = {
+      recordList.dropWhile {
+        _.time < period_start
+      }.takeWhile {
+        _.time < period_end
+      }
+    }
 
-      if (outputType == OutputType.excel) {
-        import java.nio.file.Files
-        def allMoniotorTypes = {
-          val mts =
-            for (i <- 1 to monitors.length) yield monitorTypes
-
-          mts.flatMap { x => x }
-        }
-        val excelFile = ExcelUtility.exportChartData(chart, allMoniotorTypes.toArray)
-        val downloadFileName =
-          if (chart.downloadFileName.isDefined)
-            chart.downloadFileName.get
-          else
-            chart.title("text")
-
-        Ok.sendFile(excelFile, fileName = _ =>
-          play.utils.UriEncoding.encodePathSegment(downloadFileName + ".xlsx", "UTF-8"),
-          onClose = () => { Files.deleteIfExists(excelFile.toPath()) })
+    val data =
+      if (period.getHours == 1) {
+        recordList.filter { r => MonitorStatusFilter.isMatched(statusFilter, r.status) }.map { r => r.value }
       } else {
-        Results.Ok(Json.toJson(chart))
-      }
-  }
-
-  def historyTrendChart2(monitorStr: String, monitorTypeStr: String, startLong: Long, endLong: Long) = Security.Authenticated.async {
-    implicit request =>
-      import scala.collection.JavaConverters._
-      val monitorStrArray = java.net.URLDecoder.decode(monitorStr, "UTF-8").split(',')
-      val monitors = monitorStrArray.map { Monitor.withName }
-
-      val monitorTypeStrArray = java.net.URLDecoder.decode(monitorTypeStr, "UTF-8").split(':')
-      val monitorTypes = monitorTypeStrArray.map { MonitorType.withName }
-      val statusFilter = MonitorStatusFilter.ValidData
-      val (tabType, start, end) = (TableType.min, new DateTime(startLong), new DateTime(endLong))
-      val chartFuture = trendHelper2(monitors, monitorTypes, tabType, start, end)(statusFilter)
-      chartFuture.onFailure(errorHandler)
-      for (chart <- chartFuture) yield {
-        Results.Ok(Json.toJson(chart))
-      }
-  }
-
-  def historyBoxPlot(monitorStr: String, monitorTypeStr: String, reportUnitStr: String,
-                     startLong: Long, endLong: Long, outputTypeStr: String) = Security.Authenticated {
-    implicit request =>
-      import scala.collection.JavaConverters._
-      val monitorStrArray = java.net.URLDecoder.decode(monitorStr, "UTF-8").split(':')
-      val monitors = monitorStrArray.map { Monitor.withName }
-
-      val monitorTypeStrArray = monitorTypeStr.split(':')
-      val monitorTypes = monitorTypeStrArray.map { MonitorType.withName }
-      val reportUnit = ReportUnit.withName(reportUnitStr)
-      val statusFilter = MonitorStatusFilter.ValidData
-      val (tabType, start, end) =
-        if (reportUnit == ReportUnit.Hour || reportUnit == ReportUnit.Min || reportUnit == ReportUnit.TenMin) {
-          val tab = if (reportUnit == ReportUnit.Hour)
-            TableType.hour
-          else
-            TableType.min
-
-          (tab, new DateTime(startLong), new DateTime(endLong))
-        } else if (reportUnit == ReportUnit.Day) {
-          (TableType.hour, new DateTime(startLong), new DateTime(endLong))
-        } else {
-          (TableType.hour, new DateTime(startLong), new DateTime(endLong))
+        for {
+          period_start <- getPeriods(start, end, period)
+          records = periodSlice(period_start, period_start + period) if records.length > 0
+        } yield {
+          val values = records.map { r => r.value }
+          values.sum / values.length
         }
-
-      val outputType = OutputType.withName(outputTypeStr)
-
-      val chart = boxHelper(monitors, monitorTypes, tabType, reportUnit, start, end)(statusFilter)
-
-      if (outputType == OutputType.excel) {
-        import java.nio.file.Files
-        def allMoniotorTypes = {
-          val mts =
-            for (i <- 1 to monitors.length) yield monitorTypes
-
-          mts.flatMap { x => x }
-        }
-        val excelFile = ExcelUtility.exportChartData(chart, allMoniotorTypes.toArray)
-        val downloadFileName =
-          if (chart.downloadFileName.isDefined)
-            chart.downloadFileName.get
-          else
-            chart.title("text")
-
-        Ok.sendFile(excelFile, fileName = _ =>
-          play.utils.UriEncoding.encodePathSegment(downloadFileName + ".xlsx", "UTF-8"),
-          onClose = () => { Files.deleteIfExists(excelFile.toPath()) })
-      } else {
-        Results.Ok(Json.toJson(chart))
       }
+    val sorted = data.sorted
+    val min = if (sorted.length >= 1)
+      Some(sorted.head)
+    else
+      None
+    val max = if (sorted.length >= 1)
+      Some(sorted.last)
+    else
+      None
+    val med = if (sorted.length >= 3)
+      Some(sorted(sorted.length / 2))
+    else
+      None
+
+    val low_q = if (sorted.length >= 4)
+      Some(sorted(sorted.length / 4))
+    else
+      None
+
+    val high_q = if (sorted.length >= 4)
+      Some(sorted(sorted.length * 3 / 4))
+    else
+      None
+
+    Seq(min, low_q, med, high_q, max)
   }
 
-  import java.util.Date
   import org.mongodb.scala.bson._
-  case class CellData(v: String, cellClassName: String)
-  case class RowData(date: Long, cellData: Seq[CellData], pdfReport: ObjectId)
-  case class DataTab(columnNames: Seq[String], rows: Seq[RowData])
+
   def historyData(monitorStr: String, monitorTypeStr: String, startLong: Long, endLong: Long) = Security.Authenticated.async {
     implicit request =>
-      import scala.collection.JavaConverters._
+
 
       val monitorTypeStrArray = java.net.URLDecoder.decode(monitorTypeStr, "UTF-8").split(',')
-      val monitorTypes = monitorTypeStrArray.map { MonitorType.withName }
+      val monitorTypes = monitorTypeStrArray.map {
+        MonitorType.withName
+      }
       val (start, end) = (new DateTime(startLong), new DateTime(endLong))
 
       implicit val cdWrite = Json.writes[CellData]
@@ -750,7 +792,9 @@ object Query extends Controller {
             RowData(r.time, cellData, r.pdfReport)
         }
 
-        val mtColumnNames = monitorTypes.toSeq map { MonitorType.map(_).desp }
+        val mtColumnNames = monitorTypes.toSeq map {
+          MonitorType.map(_).desp
+        }
         val columnNames = mtColumnNames.+:("GC/選擇器")
         Ok(Json.toJson(DataTab(columnNames, rows)))
       }
@@ -758,10 +802,12 @@ object Query extends Controller {
 
   def historyDataExcel(monitorStr: String, monitorTypeStr: String, startLong: Long, endLong: Long) = Security.Authenticated.async {
     implicit request =>
-      import scala.collection.JavaConverters._
+
 
       val monitorTypeStrArray = java.net.URLDecoder.decode(monitorTypeStr, "UTF-8").split(',')
-      val monitorTypes = monitorTypeStrArray.map { MonitorType.withName }
+      val monitorTypes = monitorTypeStrArray.map {
+        MonitorType.withName
+      }
       val (start, end) = (new DateTime(startLong), new DateTime(endLong))
 
       implicit val cdWrite = Json.writes[CellData]
@@ -780,22 +826,28 @@ object Query extends Controller {
         val excelFile = ExcelUtility.createHistoryData(recordList, monitorTypes)
         Ok.sendFile(excelFile, fileName = _ =>
           play.utils.UriEncoding.encodePathSegment("歷史資料.xlsx", "UTF-8"),
-          onClose = () => { Files.deleteIfExists(excelFile.toPath()) })
+          onClose = () => {
+            Files.deleteIfExists(excelFile.toPath())
+          })
       }
   }
 
-  def last10Data() = Security.Authenticated.async {
+  def last10Data(gcFilter: String) = Security.Authenticated.async {
     implicit request =>
-      import scala.collection.JavaConverters._
-
       implicit val cdWrite = Json.writes[CellData]
       implicit val rdWrite = Json.writes[RowData]
       implicit val dtWrite = Json.writes[DataTab]
 
-      for (recordList <- Record.getLatestRecordListFuture(Record.MinCollection)(10)) yield {
+      val monitors = Monitor.getMonitorByGcFilter(gcFilter)
+
+      for (recordList <- Record.getLatestRecordListFuture(Record.MinCollection, monitors)(10)) yield {
+        import scala.collection.mutable.Set
+        val mtSet = Set.empty[String]
+        recordList.foreach(_.mtDataList.foreach(mtData=>mtSet.add(mtData.mtName)))
+        val mtList = mtSet.toList.sorted
         val rows = recordList map {
           r =>
-            val mtCellData = MonitorType.mtvList map { mt =>
+            val mtCellData = mtList map { mt =>
               val mtDataOpt = r.mtDataList.find(mtdt => mtdt.mtName == mt.toString)
               if (mtDataOpt.isDefined) {
                 val mtData: Record.MtRecord = mtDataOpt.get
@@ -809,7 +861,9 @@ object Query extends Controller {
             val cellData = mtCellData.+:(CellData(r.monitor, ""))
             RowData(r.time, cellData, r.pdfReport)
         }
-        val mtColumnNames = MonitorType.mtvList map { MonitorType.map(_).desp }
+        val mtColumnNames = mtList map {id=>
+          MonitorType.map(MonitorType.withName(id)).desp
+        }
         val columnNames = mtColumnNames.+:("GC/選擇器")
         Ok(Json.toJson(DataTab(columnNames, rows)))
       }
@@ -824,12 +878,6 @@ object Query extends Controller {
     val recordMap = Record.getRecordMap(Record.HourCollection)(List(monitorType), monitor, start, end)
     Ok(Json.toJson(recordMap(monitorType)))
   }
-
-  import java.nio.file.Files
-
-  import java.util.Date
-  import Record._
-  case class QueryParam(dataType: String, monitors: Seq[String], monitorTypes: Seq[String], start: Long, end: Long)
 
   def alarmData(start: Long, end: Long) = Security.Authenticated.async {
     implicit request =>
@@ -873,14 +921,26 @@ object Query extends Controller {
     }
   }
 
-  def excelForm(pdfId:String) = Security.Authenticated.async {
+  def excelForm(pdfId: String) = Security.Authenticated.async {
     val f = Record.getRecordWithPdfID(new ObjectId(pdfId))
-    for(map<-f) yield {
+    for (map <- f) yield {
       val excelFile = ExcelUtility.excelForm(map)
 
       Ok.sendFile(excelFile, fileName = _ =>
         play.utils.UriEncoding.encodePathSegment("報告.xlsx", "UTF-8"),
-        onClose = () => { Files.deleteIfExists(excelFile.toPath()) })
+        onClose = () => {
+          Files.deleteIfExists(excelFile.toPath())
+        })
     }
   }
+
+  import java.nio.file.Files
+
+  case class CellData(v: String, cellClassName: String)
+
+  case class RowData(date: Long, cellData: Seq[CellData], pdfReport: ObjectId)
+
+  case class DataTab(columnNames: Seq[String], rows: Seq[RowData])
+
+  case class QueryParam(dataType: String, monitors: Seq[String], monitorTypes: Seq[String], start: Long, end: Long)
 }
