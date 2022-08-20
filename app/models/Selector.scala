@@ -33,6 +33,11 @@ class Selector(gcName:String, config: Configuration) {
     case "MOXA" =>
       Logger.info("MOXA E1212 is selected")
       new MoxaSelector(gcName, config.getConfig("MOXA").get)
+
+    case "ADAM6250" =>
+      Logger.info("Adam 6250 is selected")
+      Adam6250Selector(gcName, config.getConfig("ADAM6250").get)
+
     case unknown =>
       Logger.error(s"Unknown model $unknown")
       ???
