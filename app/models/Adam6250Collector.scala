@@ -8,7 +8,7 @@ import play.api.{Configuration, Logger}
 
 case class Adam6250Selector(gcName:String, config:Configuration) extends SelectorModel {
   val host = config.getString("host").get
-  val max = 6
+  val max = 8
   for (id <- 1 to max) {
     Monitor.getMonitorValueByName(gcName, id)
   }
@@ -85,7 +85,7 @@ class Adam6250Collector(host: String, maxStreamNum: Int, selector: Adam6250Selec
 
               val rawResult = masterOpt.get.send(batch)
               val result =
-                for (idx <- 0 to maxStreamNum - 1) yield rawResult.getValue(idx).asInstanceOf[Boolean]
+                for (idx <- 0 to 7) yield rawResult.getValue(idx).asInstanceOf[Boolean]
 
               result match {
                 case  Seq(true, false, true, false, false, false, true, false) =>

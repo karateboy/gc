@@ -146,10 +146,11 @@ object Exporter {
         master.setValue(locator, value);
       }
 
+      val gcOffset = gcConfig.index * 52
       //Selector
-      writeShort(0, (gcConfig.selector.get.toShort).toShort)
+      writeShort(gcOffset, (gcConfig.selector.get.toShort).toShort)
       for ((mtData, idx) <- data.mtDataList.zipWithIndex) {
-        writeDouble(idx * 4 + 1, mtData.value)
+        writeDouble(gcOffset + idx * 4 + 1, mtData.value)
       }
 
     }
