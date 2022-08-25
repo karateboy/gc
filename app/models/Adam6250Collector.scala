@@ -37,6 +37,7 @@ class Adam6250Collector(host: String, maxStreamNum: Int, selector: Adam6250Selec
   def receive = handler(MonitorStatus.NormalStat, None)
 
   import context.dispatcher
+  var errorCount = 0
   def handler(collectorState: String, masterOpt: Option[ModbusMaster]): Receive = {
     case ConnectHost =>
       Logger.info(s"connect to Adama 6250")
@@ -89,25 +90,33 @@ class Adam6250Collector(host: String, maxStreamNum: Int, selector: Adam6250Selec
 
               result match {
                 case  Seq(true, false, true, false, false, false, true, false) =>
+                  errorCount = 0
                   selector.modifyStreamNum(1)
 
                 case Seq(false, true, true, false, false, false, true, false) =>
+                  errorCount = 0
                   selector.modifyStreamNum(2)
 
                 case Seq(_, _, false, true, false, false, true, false) =>
+                  errorCount = 0
                   selector.modifyStreamNum(3)
 
                 case Seq(_, _, false, false, true, false, true, false) =>
+                  errorCount = 0
                   selector.modifyStreamNum(4)
 
                 case Seq(_, _, false, false, false, true, true, false) =>
+                  errorCount = 0
                   selector.modifyStreamNum(5)
 
                 case Seq(_, _, false, false, false, false, false, true) =>
+                  errorCount = 0
                   selector.modifyStreamNum(6)
 
                 case _ =>
-                  Alarm.log(None, None, s"選樣錯誤! $result")
+                  errorCount += 1
+                  if(errorCount > 10)
+                    Alarm.log(None, None, s"選樣錯誤! $result")
               }
             }
 
