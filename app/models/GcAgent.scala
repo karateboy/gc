@@ -228,9 +228,8 @@ class GcAgent extends Actor {
 
     import com.github.nscala_time.time.Imports._
 
-    val monitor = Monitor.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
-
     def insertRecord() = {
+      Logger.info("insertRecord")
       val lines =
         Files.readAllLines(Paths.get(reportDir.getAbsolutePath + "/Report.txt"), StandardCharsets.UTF_16LE).asScala
 
@@ -238,6 +237,17 @@ class GcAgent extends Actor {
         val tokens = line.split(":")
         tokens(1).trim()
       })
+
+      lines.find(line=>line.contains("Location"))
+        .map(line=> {
+          val tokens = line.split(":")
+          assert(tokens.length == 3)
+          val locs = tokens(2).trim.split("\\s+").map(_.trim)
+          val pos = locs(0).toInt
+          gcConfig.selector.set(pos)
+        })
+
+      val monitor = Monitor.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
 
       val mDate = {
         val mDates =
