@@ -82,19 +82,20 @@
               <tbody>
                 <tr>
                   <td>
-                    <Button
-                      type="primary"
-                      size="large"
-                      @click="showPdfReport(index)"
+                    <Button type="primary" @click="showPdfReport(index)"
                       >PDF</Button
                     >
                   </td>
                   <td>
                     <Button
                       type="info"
-                      size="large"
-                      @click="downloadForm(index)"
-                      >報告</Button
+                      @click="downloadFormUrl(rows[index].excelArUrl)"
+                      >Ar報告</Button
+                    >
+                    <Button
+                      type="info"
+                      @click="downloadFormUrl(rows[index].excelN2Url)"
+                      >N2報告</Button
                     >
                   </td>
                 </tr>
@@ -273,6 +274,8 @@ export default {
                 rowData.pdfUrl = `pdfReport/${row.pdfReport}`;
                 rowData.excelUrl = `${baseUrl}excelForm/${row.pdfReport}`;
               }
+              rowData.excelArUrl = `${baseUrl}excelFormAr/${row.pdfReport}`;
+              rowData.excelN2Url = `${baseUrl}excelFormN2/${row.pdfReport}`;
             }
             this.rows.push(rowData);
           }
@@ -287,6 +290,9 @@ export default {
     },
     downloadForm(idx) {
       let url = this.rows[idx].excelUrl;
+      window.open(url);
+    },
+    downloadFormUrl(url) {
       window.open(url);
     },
     downloadExcel() {

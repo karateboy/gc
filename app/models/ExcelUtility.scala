@@ -435,4 +435,194 @@ object ExcelUtility {
     wb.setActiveSheet(0)
     finishExcel(reportFilePath, pkg, wb)
   }
+
+  def excelFormN2(map: Map[Monitor.Value, (DateTime, Option[String], Map[MonitorType.Value, Record])]) = {
+    implicit val (reportFilePath, pkg, wb) = prepareTemplate("formN2.xlsx")
+    for (entry <- map) {
+      val (dt, sampleNameOpt, mtMap) = entry._2
+      var sheet: XSSFSheet = wb.getSheetAt(0)
+
+      def fillMtContent(mtName: String, rowN: Int, cellN: Int, limitN: Int): Unit = {
+        val mt = MonitorType.getMonitorTypeValueByName(mtName)
+        var limitStr = ""
+        if (mtMap.contains(mt)) {
+          val limit = try {
+            limitStr = sheet.getRow(rowN).getCell(limitN).
+              getStringCellValue
+            limitStr.replaceAll("^\\d+", "").toDouble
+          } catch {
+            case _: Throwable =>
+              0d
+          }
+          if (mtMap(mt).value == 0 || mtMap(mt).value < limit)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
+          else
+            sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value)
+        }
+      }
+
+      def fillThcContent(rowN: Int, cellN: Int, limitN: Int): Unit = {
+        val ch4 = MonitorType.getMonitorTypeValueByName("CH4")
+        val c3h8 = MonitorType.getMonitorTypeValueByName("C3H8")
+        var limitStr = ""
+        if (mtMap.contains(ch4) && mtMap.contains(c3h8)) {
+          val limit = try {
+            limitStr = sheet.getRow(rowN).getCell(limitN).
+              getStringCellValue
+            limitStr.replaceAll("^\\d+", "").toDouble
+          } catch {
+            case _: Throwable =>
+              0d
+          }
+          val sum = mtMap(ch4).value + mtMap(c3h8).value
+          if (sum == 0 || sum < limit)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
+          else
+            sheet.getRow(rowN).getCell(cellN).setCellValue(sum)
+        }
+      }
+
+      def fillSheet0(sheetN: Int) = {
+        sheet = wb.getSheetAt(sheetN)
+        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        sheet.getRow(9).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        for (sampleName <- sampleNameOpt)
+          sheet.getRow(13).getCell(9).setCellValue(sampleName)
+
+        fillMtContent("O2", 17, 4, 9)
+        fillMtContent("H2O", 18, 4, 9)
+        fillMtContent("H2", 19, 4, 9)
+        fillMtContent("CO", 20, 4, 9)
+        fillMtContent("CO2", 21, 4, 9)
+        fillThcContent(22, 4, 9)
+        fillMtContent("Ar", 23, 4, 9)
+      }
+
+      def fillSheet1(sheetN: Int) = {
+        sheet = wb.getSheetAt(sheetN)
+        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        sheet.getRow(9).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        for (sampleName <- sampleNameOpt)
+          sheet.getRow(13).getCell(9).setCellValue(sampleName)
+
+        fillMtContent("O2", 17, 4, 9)
+        fillMtContent("H2O", 18, 4, 9)
+        fillMtContent("H2", 19, 4, 9)
+        fillMtContent("CO", 20, 4, 9)
+        fillMtContent("CO2", 21, 4, 9)
+        fillThcContent(22, 4, 9)
+      }
+
+      def fillSheetByMt(sheetN: Int, startRow:Int, mtSeq:Seq[String]) = {
+        sheet = wb.getSheetAt(sheetN)
+        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        sheet.getRow(9).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        for (sampleName <- sampleNameOpt)
+          sheet.getRow(13).getCell(9).setCellValue(sampleName)
+
+        for((mt, idx) <- mtSeq.zipWithIndex){
+          if(mt.toUpperCase != "THC")
+            fillMtContent(mt, startRow + idx, 4, 9)
+          else
+            fillThcContent(startRow + idx, 4, 9)
+        }
+      }
+
+      fillSheetByMt(0, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
+      fillSheetByMt(1, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
+      fillSheetByMt(2, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
+      fillSheetByMt(3, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
+      fillSheetByMt(4, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
+      fillSheetByMt(5, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
+      fillSheetByMt(6, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
+    }
+
+    wb.setActiveSheet(0)
+    finishExcel(reportFilePath, pkg, wb)
+  }
+
+  def excelFormAr(map: Map[Monitor.Value, (DateTime, Option[String], Map[MonitorType.Value, Record])]) = {
+    implicit val (reportFilePath, pkg, wb) = prepareTemplate("formAr.xlsx")
+    for (entry <- map) {
+      val (dt, sampleNameOpt, mtMap) = entry._2
+      var sheet: XSSFSheet = wb.getSheetAt(0)
+
+      def fillMtContent(mtName: String, rowN: Int, cellN: Int, limitN: Int): Unit = {
+        val mt = MonitorType.getMonitorTypeValueByName(mtName)
+        var limitStr = ""
+        if (mtMap.contains(mt)) {
+          val limit = try {
+            limitStr = sheet.getRow(rowN).getCell(limitN).
+              getStringCellValue
+            limitStr.replaceAll("^\\d+", "").toDouble
+          } catch {
+            case _: Throwable =>
+              0d
+          }
+          if (mtMap(mt).value == 0 || mtMap(mt).value < limit)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
+          else
+            sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value)
+        }
+      }
+
+      def fillThcContent(rowN: Int, cellN: Int, limitN: Int): Unit = {
+        val ch4 = MonitorType.getMonitorTypeValueByName("CH4")
+        val c3h8 = MonitorType.getMonitorTypeValueByName("C3H8")
+        var limitStr = ""
+        if (mtMap.contains(ch4) && mtMap.contains(c3h8)) {
+          val limit = try {
+            limitStr = sheet.getRow(rowN).getCell(limitN).
+              getStringCellValue
+            limitStr.replaceAll("^\\d+", "").toDouble
+          } catch {
+            case _: Throwable =>
+              0d
+          }
+          val sum = mtMap(ch4).value + mtMap(c3h8).value
+          if (sum == 0 || sum < limit)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
+          else
+            sheet.getRow(rowN).getCell(cellN).setCellValue(sum)
+        }
+      }
+
+      def fillSheetByMt(sheetN: Int, startRow: Int, mtSeq: Seq[String]) = {
+        sheet = wb.getSheetAt(sheetN)
+        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        sheet.getRow(9).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
+        for (sampleName <- sampleNameOpt)
+          sheet.getRow(13).getCell(9).setCellValue(sampleName)
+
+        for ((mt, idx) <- mtSeq.zipWithIndex) {
+          if (mt.toUpperCase != "THC")
+            fillMtContent(mt, startRow + idx, 4, 9)
+          else
+            fillThcContent(startRow + idx, 4, 9)
+        }
+      }
+
+      fillSheetByMt(0, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
+      fillSheetByMt(1, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC"))
+      fillSheetByMt(2, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
+      fillSheetByMt(3, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
+      fillSheetByMt(4, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
+      fillSheetByMt(5, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
+      fillSheetByMt(6, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
+      fillSheetByMt(7, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
+      fillSheetByMt(8, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
+      fillSheetByMt(9, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
+      fillSheetByMt(10, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
+      fillSheetByMt(11, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC"))
+      fillSheetByMt(12, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
+      fillSheetByMt(13, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
+    }
+
+    wb.setActiveSheet(0)
+    finishExcel(reportFilePath, pkg, wb)
+  }
 }

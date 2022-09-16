@@ -42,18 +42,23 @@
                 <td>
                   <Button
                     type="primary"
-                    size="large"
                     @click="showPdfReport(index)"
                     >PDF</Button
                   >
                 </td>
                 <td>
-                  <Button type="info" size="large" @click="downloadForm(index)"
-                    >報告</Button
+                  <Button
+                    type="info"
+                    @click="downloadFormUrl(rows[index].excelArUrl)"
+                    >Ar報告</Button
+                  >
+                  <Button
+                    type="info"
+                    @click="downloadFormUrl(rows[index].excelN2Url)"
+                    >N2報告</Button
                   >
                 </td>
               </tr>
-              <tr></tr>
             </tbody>
           </table>
         </template>
@@ -173,6 +178,9 @@ export default {
             rowData.excelUrl = `${baseUrl}excelForm/${row.pdfReport}`;
           }
 
+          rowData.excelArUrl = `${baseUrl}excelFormAr/${row.pdfReport}`;
+          rowData.excelN2Url = `${baseUrl}excelFormN2/${row.pdfReport}`;
+
           for (let c = 0; c < row.cellData.length; c++) {
             let key = `col${c}`;
             rowData[key] = row.cellData[c].v;
@@ -190,6 +198,9 @@ export default {
     },
     downloadForm(idx) {
       let url = this.rows[idx].excelUrl;
+      window.open(url);
+    },
+    downloadFormUrl(url) {
       window.open(url);
     },
   },
