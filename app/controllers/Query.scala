@@ -884,19 +884,6 @@ object Query extends Controller {
     }
   }
 
-  def excelFormN2(pdfId: String) = Security.Authenticated.async {
-    val f = Record.getRecordWithPdfID(new ObjectId(pdfId))
-    for (map <- f) yield {
-      val excelFile = ExcelUtility.excelFormN2(map)
-
-      Ok.sendFile(excelFile, fileName = _ =>
-        play.utils.UriEncoding.encodePathSegment("N2報告.xlsx", "UTF-8"),
-        onClose = () => {
-          Files.deleteIfExists(excelFile.toPath())
-        })
-    }
-  }
-
   def excelFormAr(pdfId: String) = Security.Authenticated.async {
     val f = Record.getRecordWithPdfID(new ObjectId(pdfId))
     for (map <- f) yield {
@@ -904,6 +891,19 @@ object Query extends Controller {
 
       Ok.sendFile(excelFile, fileName = _ =>
         play.utils.UriEncoding.encodePathSegment("Ar報告.xlsx", "UTF-8"),
+        onClose = () => {
+          Files.deleteIfExists(excelFile.toPath())
+        })
+    }
+  }
+
+  def excelFormN2(pdfId: String) = Security.Authenticated.async {
+    val f = Record.getRecordWithPdfID(new ObjectId(pdfId))
+    for (map <- f) yield {
+      val excelFile = ExcelUtility.excelFormN2(map)
+
+      Ok.sendFile(excelFile, fileName = _ =>
+        play.utils.UriEncoding.encodePathSegment("N2報告.xlsx", "UTF-8"),
         onClose = () => {
           Files.deleteIfExists(excelFile.toPath())
         })
