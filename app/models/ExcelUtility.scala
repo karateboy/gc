@@ -449,15 +449,15 @@ object ExcelUtility {
           val limit = try {
             limitStr = sheet.getRow(rowN).getCell(limitN).
               getStringCellValue
-            limitStr.replaceAll("^\\d+", "").toDouble
+            limitStr.replaceAll("\\p{Alpha}+", "").toInt
           } catch {
             case _: Throwable =>
-              0d
+              0
           }
-          if (mtMap(mt).value == 0 || mtMap(mt).value < limit)
-            sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
+          if (mtMap(mt).value == 0 || mtMap(mt).value * 1000 < limit)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(s"<$limit")
           else
-            sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value * 1000)
         }
       }
 
@@ -469,20 +469,20 @@ object ExcelUtility {
           val limit = try {
             limitStr = sheet.getRow(rowN).getCell(limitN).
               getStringCellValue
-            limitStr.replaceAll("^\\d+", "").toDouble
+            limitStr.replaceAll("\\p{Alpha}+", "").toInt
           } catch {
             case _: Throwable =>
-              0d
+              0
           }
           val sum = mtMap(ch4).value + mtMap(c3h8).value
-          if (sum == 0 || sum < limit)
-            sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
+          if (sum == 0 || sum * 1000 < limit)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(s"<$limit")
           else
-            sheet.getRow(rowN).getCell(cellN).setCellValue(sum)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(sum * 1000)
         }
       }
 
-      def fillSheet0(sheetN: Int) = {
+      def fillSheetByMt(sheetN: Int, startRow: Int, mtSeq: Seq[String]) = {
         sheet = wb.getSheetAt(sheetN)
         sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
         sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
@@ -490,41 +490,8 @@ object ExcelUtility {
         for (sampleName <- sampleNameOpt)
           sheet.getRow(13).getCell(9).setCellValue(sampleName)
 
-        fillMtContent("O2", 17, 4, 9)
-        fillMtContent("H2O", 18, 4, 9)
-        fillMtContent("H2", 19, 4, 9)
-        fillMtContent("CO", 20, 4, 9)
-        fillMtContent("CO2", 21, 4, 9)
-        fillThcContent(22, 4, 9)
-        fillMtContent("Ar", 23, 4, 9)
-      }
-
-      def fillSheet1(sheetN: Int) = {
-        sheet = wb.getSheetAt(sheetN)
-        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        sheet.getRow(9).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        for (sampleName <- sampleNameOpt)
-          sheet.getRow(13).getCell(9).setCellValue(sampleName)
-
-        fillMtContent("O2", 17, 4, 9)
-        fillMtContent("H2O", 18, 4, 9)
-        fillMtContent("H2", 19, 4, 9)
-        fillMtContent("CO", 20, 4, 9)
-        fillMtContent("CO2", 21, 4, 9)
-        fillThcContent(22, 4, 9)
-      }
-
-      def fillSheetByMt(sheetN: Int, startRow:Int, mtSeq:Seq[String]) = {
-        sheet = wb.getSheetAt(sheetN)
-        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        sheet.getRow(9).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        for (sampleName <- sampleNameOpt)
-          sheet.getRow(13).getCell(9).setCellValue(sampleName)
-
-        for((mt, idx) <- mtSeq.zipWithIndex){
-          if(mt.toUpperCase != "THC")
+        for ((mt, idx) <- mtSeq.zipWithIndex) {
+          if (mt.toUpperCase != "THC")
             fillMtContent(mt, startRow + idx, 4, 9)
           else
             fillThcContent(startRow + idx, 4, 9)
@@ -557,15 +524,15 @@ object ExcelUtility {
           val limit = try {
             limitStr = sheet.getRow(rowN).getCell(limitN).
               getStringCellValue
-            limitStr.replaceAll("^\\d+", "").toDouble
+            limitStr.replaceAll("\\p{Alpha}+", "").toInt
           } catch {
             case _: Throwable =>
-              0d
+              0
           }
-          if (mtMap(mt).value == 0 || mtMap(mt).value < limit)
-            sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
+          if (mtMap(mt).value == 0 || mtMap(mt).value * 1000 < limit)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(s"<$limit")
           else
-            sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value * 1000)
         }
       }
 
@@ -577,16 +544,16 @@ object ExcelUtility {
           val limit = try {
             limitStr = sheet.getRow(rowN).getCell(limitN).
               getStringCellValue
-            limitStr.replaceAll("^\\d+", "").toDouble
+            limitStr.replaceAll("\\p{Alpha}+", "").toInt
           } catch {
             case _: Throwable =>
-              0d
+              0
           }
           val sum = mtMap(ch4).value + mtMap(c3h8).value
-          if (sum == 0 || sum < limit)
-            sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
+          if (sum == 0 || sum * 1000 < limit)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(s"<$limit")
           else
-            sheet.getRow(rowN).getCell(cellN).setCellValue(sum)
+            sheet.getRow(rowN).getCell(cellN).setCellValue(sum * 1000)
         }
       }
 
