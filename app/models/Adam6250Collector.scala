@@ -6,7 +6,7 @@ import play.api.Play.current
 import play.api.libs.concurrent.Akka
 import play.api.{Configuration, Logger}
 
-case class Adam6250Selector(gcName:String, config:Configuration) extends SelectorModel {
+case class Adam6250Selector(gcName: String, config: Configuration) extends SelectorModel {
   val host = config.getString("host").get
   val max = 8
   for (id <- 1 to max) {
@@ -16,8 +16,11 @@ case class Adam6250Selector(gcName:String, config:Configuration) extends Selecto
   worker ! ConnectHost
 
   @volatile var streamNum = 1
+
   def getStreamNum(): Int = streamNum
+
   def setStreamNum(v: Int) {}
+
   val canSetStream = false
 
   def modifyStreamNum(v: Int) {
@@ -26,7 +29,7 @@ case class Adam6250Selector(gcName:String, config:Configuration) extends Selecto
 
 }
 
-class Adam6250Collector(host: String, maxStreamNum: Int, selector: Adam6250Selector) extends Actor with ActorLogging{
+class Adam6250Collector(host: String, maxStreamNum: Int, selector: Adam6250Selector) extends Actor with ActorLogging {
   var cancelable: Cancellable = _
 
   import com.serotonin.modbus4j._
@@ -37,7 +40,9 @@ class Adam6250Collector(host: String, maxStreamNum: Int, selector: Adam6250Selec
   def receive = handler(MonitorStatus.NormalStat, None)
 
   import context.dispatcher
+
   var errorCount = 0
+
   def handler(collectorState: String, masterOpt: Option[ModbusMaster]): Receive = {
     case ConnectHost =>
       Logger.info(s"connect to Adama 6250")
@@ -89,33 +94,33 @@ class Adam6250Collector(host: String, maxStreamNum: Int, selector: Adam6250Selec
                 for (idx <- 0 to 7) yield rawResult.getValue(idx).asInstanceOf[Boolean]
 
               result match {
-                case  Seq(true, false, true, false, false, false, true, false) =>
+                case Seq(_, _, _, _, _, _, false, true) =>
                   errorCount = 0
                   selector.modifyStreamNum(1)
 
-                case Seq(false, true, true, false, false, false, true, false) =>
+                case Seq(true, false, true, false, false, false, true, false) =>
                   errorCount = 0
                   selector.modifyStreamNum(2)
 
-                case Seq(_, _, false, true, false, false, true, false) =>
+                case Seq(false, true, true, false, false, false, true, false) =>
                   errorCount = 0
                   selector.modifyStreamNum(3)
 
-                case Seq(_, _, false, false, true, false, true, false) =>
+                case Seq(_, _, false, true, false, false, true, false) =>
                   errorCount = 0
                   selector.modifyStreamNum(4)
 
-                case Seq(_, _, false, false, false, true, true, false) =>
+                case Seq(_, _, false, false, true, false, true, false) =>
                   errorCount = 0
                   selector.modifyStreamNum(5)
 
-                case Seq(_, _, false, false, false, false, false, true) =>
+                case Seq(_, _, false, false, false, true, true, false) =>
                   errorCount = 0
                   selector.modifyStreamNum(6)
 
                 case _ =>
                   errorCount += 1
-                  if(errorCount > 10)
+                  if (errorCount > 10)
                     Alarm.log(None, None, s"選樣錯誤! $result")
               }
             }

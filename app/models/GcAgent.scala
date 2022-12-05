@@ -29,14 +29,14 @@ case class GcConfig(index: Int, inputDir: String, selector: Selector,
                     aoConfigList: Option[Seq[AoConfig]],
                     haloKaConfig : Option[HaloKaConfig],
                     computedMtList: Option[Seq[ComputedMeasureType]], var latestDataTime: com.github.nscala_time.time.Imports.DateTime) {
-  val gcName = GcAgent.getGcName(index)
+  val gcName: String = GcAgent.getGcName(index)
 }
 case class HaloKaConfig(com:Int, speed:Int, MonitorType:String)
 import scala.collection.JavaConverters._
 
 object GcAgent {
-  val gcAgent_check_period = Play.current.configuration.getInt("gcAgent_check_period").getOrElse(60)
-  val export_period = Play.current.configuration.getInt("export_period").getOrElse(60)
+  val gcAgent_check_period: Int = Play.current.configuration.getInt("gcAgent_check_period").getOrElse(60)
+  val export_period: Int = Play.current.configuration.getInt("export_period").getOrElse(60)
 
   val gcConfigList: mutable.Seq[GcConfig] = {
     val configList = Play.current.configuration.getConfigList("gcConfigList").get.asScala
@@ -130,7 +130,7 @@ object GcAgent {
 
   def getGcName(idx: Int) = s"gc${idx + 1}"
 
-  def startup() = {
+  def startup(): Unit = {
     // Init export local mode to PLC
     for (mode <- SysConfig.getOperationMode()) {
       for (gcConfig <- gcConfigList)
@@ -167,7 +167,7 @@ class GcAgent extends Actor {
 
   var counter = 0
 
-  def receive = {
+  def receive: Receive = {
     case ParseReport =>
       try {
         for (gcConfig <- gcConfigList) {
@@ -230,7 +230,7 @@ class GcAgent extends Actor {
 
     val monitor = Monitor.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
 
-    def insertRecord() = {
+    def insertRecord(): Unit = {
       val lines =
         Files.readAllLines(Paths.get(reportDir.getAbsolutePath + "/Report.txt"), StandardCharsets.UTF_16LE).asScala
 
@@ -276,8 +276,8 @@ class GcAgent extends Actor {
       }
 
       import scala.collection.mutable.Map
-      val recordMap = Map.empty[Monitor.Value, Map[DateTime, Map[MonitorType.Value, (Double, String)]]]
-      val timeMap = recordMap.getOrElseUpdate(monitor, Map.empty[DateTime, Map[MonitorType.Value, (Double, String)]])
+      val recordMap = mutable.Map.empty[Monitor.Value, mutable.Map[DateTime, mutable.Map[MonitorType.Value, (Double, String)]]]
+      val timeMap = recordMap.getOrElseUpdate(monitor, mutable.Map.empty[DateTime, mutable.Map[MonitorType.Value, (Double, String)]])
 
       val rLines = getRecordLines(lines)
       for (rec <- rLines) {
@@ -297,11 +297,11 @@ class GcAgent extends Actor {
           assert(!name.contains("|"))
           assert(!name.contains("="))
           assert(!name.contains("-"))
-          assert(!name.isEmpty())
+          assert(name.nonEmpty)
           assert(name.charAt(0).isLetter)
 
           val monitorType = MonitorType.getMonitorTypeValueByName(name, "")
-          val mtMap = timeMap.getOrElseUpdate(mDate, Map.empty[MonitorType.Value, (Double, String)])
+          val mtMap = timeMap.getOrElseUpdate(mDate, mutable.Map.empty[MonitorType.Value, (Double, String)])
 
           val mtValue = try {
             ppm.toDouble
@@ -317,7 +317,7 @@ class GcAgent extends Actor {
         }
       } //End of process report.txt
 
-      def insertComputedTypes = {
+      def insertComputedTypes(): Unit = {
         if (gcConfig.computedMtList.isDefined) {
           for (mtMap <- timeMap.values) {
             for (computedType <- gcConfig.computedMtList.get) {
@@ -335,7 +335,7 @@ class GcAgent extends Actor {
         }
       }
 
-      insertComputedTypes
+      insertComputedTypes()
 
       val updateModels =
         for {
@@ -363,20 +363,20 @@ class GcAgent extends Actor {
       }
     } //End of process report.txt
 
-    insertRecord
+    insertRecord()
     true
   }
 
   def listDirs(files_path: String): List[File] = {
     //import java.io.FileFilter
     val path = new java.io.File(files_path)
-    if (path.exists() && path.isDirectory()) {
+    if (path.exists() && path.isDirectory) {
       def isArchive(f: File) = {
         import java.nio.file._
         import java.nio.file.attribute.DosFileAttributes
 
         val dfa = Files.readAttributes(Paths.get(f.getAbsolutePath), classOf[DosFileAttributes])
-        dfa.isArchive()
+        dfa.isArchive
       }
 
       val allFileAndDirs = new java.io.File(files_path).listFiles().toList
@@ -395,10 +395,10 @@ class GcAgent extends Actor {
     }
   }
 
-  def processInputPath(gcConfig: GcConfig, parser: (GcConfig, File) => Boolean) = {
+  def processInputPath(gcConfig: GcConfig, parser: (GcConfig, File) => Boolean): List[Unit] = {
     import java.io.File
 
-    def setArchive(f: File) {
+    def setArchive(f: File): Unit = {
       import java.nio.file._
       import java.nio.file.attribute.DosFileAttributeView
 
@@ -432,7 +432,7 @@ class GcAgent extends Actor {
     }
   }
 
-  def checkNoDataPeriod(gcConfig: GcConfig) = {
+  def checkNoDataPeriod(gcConfig: GcConfig): Future[Unit] = {
     import com.github.nscala_time.time.Imports._
 
     for {dataPeriod <- SysConfig.getDataPeriod()
@@ -449,7 +449,7 @@ class GcAgent extends Actor {
   }
 
   def readPlcStatus(gcConfig: GcConfig): Unit = {
-    gcConfig.plcConfig map {
+    gcConfig.plcConfig foreach {
       plcConfig =>
         var connectorOpt: Option[S7Connector] = None
         try {
@@ -503,7 +503,7 @@ class GcAgent extends Actor {
     }
   }
 
-  override def postStop = {
+  override def postStop: Unit = {
 
   }
 }
