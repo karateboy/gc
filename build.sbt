@@ -4,13 +4,12 @@ version := "1.3.7"
 
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
-scalaVersion := "2.11.12"
+scalaVersion := "2.11.11"
 
 libraryDependencies ++= Seq(
   cache,
   ws,
   filters,
-  specs2 % Test,
    "commons-io" % "commons-io" % "2.6"
 )
 
@@ -34,8 +33,6 @@ mappings in Universal ++=
 mappings in Universal ++=
 (baseDirectory.value / "export/" * "*" get) map
     (x => x -> ("export/" + x.getName))
-
-resolvers += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
 
 // Play provides two styles of routers, one expects its actions to be injected, the
 // other, legacy style, accesses its actions statically.
