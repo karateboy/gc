@@ -496,7 +496,7 @@ object ExcelUtility {
         }
       }
 
-      fillSheetByMt(0, 10, Seq("H2", "N2", "CO", "CO2", "CH4", "THC"))
+      fillSheetByMt(0, 10, Seq("Ar", "H2", "CO", "CH4", "CO2", "THC"))
     }
 
     wb.setActiveSheet(0)
@@ -563,7 +563,7 @@ object ExcelUtility {
         }
       }
 
-      fillSheetByMt(0, 10, Seq("Ar", "H2", "CO", "CH4", "CO2", "THC"))
+      fillSheetByMt(0, 10, Seq("H2", "N2", "CO", "CO2", "CH4", "THC"))
     }
 
     wb.setActiveSheet(0)
