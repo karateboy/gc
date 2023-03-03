@@ -449,7 +449,7 @@ object ExcelUtility {
           val limit = try {
             limitStr = sheet.getRow(rowN).getCell(limitN).
               getStringCellValue
-            limitStr.replaceAll("\\p{Alpha}+", "").toInt
+            limitStr.reverse.drop(3).reverse.toInt
           } catch {
             case _: Throwable =>
               0
@@ -516,7 +516,7 @@ object ExcelUtility {
           val limit = try {
             limitStr = sheet.getRow(rowN).getCell(limitN).
               getStringCellValue
-            limitStr.replaceAll("\\p{Alpha}+", "").toInt
+            limitStr.reverse.drop(3).reverse.toInt
           } catch {
             case _: Throwable =>
               0
