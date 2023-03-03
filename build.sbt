@@ -15,10 +15,8 @@ libraryDependencies ++= Seq(
 
 libraryDependencies += "com.github.tototoshi" %% "scala-csv" % "1.3.6"
 
-libraryDependencies += "org.apache.poi" % "poi" % "4.1.0"
-libraryDependencies += "org.apache.poi" % "poi-ooxml" % "4.1.0"
-libraryDependencies += "org.apache.poi" % "poi-ooxml-schemas" % "4.1.0"
-libraryDependencies += "org.apache.poi" % "poi-scratchpad" % "4.1.0"
+// https://mvnrepository.com/artifact/org.apache.poi/poi-ooxml
+libraryDependencies += "org.apache.poi" % "poi-ooxml" % "5.0.0"
 
 libraryDependencies += "org.scream3r" % "jssc" % "2.8.0"
 libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "2.22.0"
@@ -34,10 +32,10 @@ mappings in Universal ++=
 (baseDirectory.value / "export/" * "*" get) map
     (x => x -> ("export/" + x.getName))
 
-// Play provides two styles of routers, one expects its actions to be injected, the
-// other, legacy style, accesses its actions statically.
-//routesGenerator := InjectedRoutesGenerator
 
-scalacOptions ++= Seq("-feature")
+PlayKeys.fileWatchService := play.runsupport.FileWatchService.sbt(2000)
 
-fork in run := false
+scalacOptions ++= Seq(
+  "-feature",
+  "-deprecation"
+)
