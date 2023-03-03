@@ -484,27 +484,19 @@ object ExcelUtility {
 
       def fillSheetByMt(sheetN: Int, startRow: Int, mtSeq: Seq[String]) = {
         sheet = wb.getSheetAt(sheetN)
-        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        sheet.getRow(9).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        for (sampleName <- sampleNameOpt)
-          sheet.getRow(13).getCell(9).setCellValue(sampleName)
+        sheet.getRow(6).getCell(4).setCellValue(dt.toString("YYYY/MM/dd"))
+        //for (sampleName <- sampleNameOpt)
+        //  sheet.getRow(13).getCell(9).setCellValue(sampleName)
 
         for ((mt, idx) <- mtSeq.zipWithIndex) {
           if (mt.toUpperCase != "THC")
-            fillMtContent(mt, startRow + idx, 4, 9)
+            fillMtContent(mt, startRow + idx, 4, 8)
           else
-            fillThcContent(startRow + idx, 4, 9)
+            fillThcContent(startRow + idx, 4, 8)
         }
       }
 
-      fillSheetByMt(0, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
-      fillSheetByMt(1, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
-      fillSheetByMt(2, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
-      fillSheetByMt(3, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
-      fillSheetByMt(4, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
-      fillSheetByMt(5, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
-      fillSheetByMt(6, 18, Seq("O2", "H2O", "H2", "N2", "CO", "CO2", "THC"))
+      fillSheetByMt(0, 10, Seq("H2", "N2", "CO", "CO2", "CH4", "THC"))
     }
 
     wb.setActiveSheet(0)
@@ -559,34 +551,19 @@ object ExcelUtility {
 
       def fillSheetByMt(sheetN: Int, startRow: Int, mtSeq: Seq[String]) = {
         sheet = wb.getSheetAt(sheetN)
-        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        sheet.getRow(9).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        for (sampleName <- sampleNameOpt)
-          sheet.getRow(13).getCell(9).setCellValue(sampleName)
+        sheet.getRow(6).getCell(4).setCellValue(dt.toString("YYYY/MM/dd"))
+        //for (sampleName <- sampleNameOpt)
+        //  sheet.getRow(13).getCell(9).setCellValue(sampleName)
 
         for ((mt, idx) <- mtSeq.zipWithIndex) {
           if (mt.toUpperCase != "THC")
-            fillMtContent(mt, startRow + idx, 4, 9)
+            fillMtContent(mt, startRow + idx, 4, 8)
           else
-            fillThcContent(startRow + idx, 4, 9)
+            fillThcContent(startRow + idx, 4, 8)
         }
       }
 
-      fillSheetByMt(0, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
-      fillSheetByMt(1, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC"))
-      fillSheetByMt(2, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
-      fillSheetByMt(3, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
-      fillSheetByMt(4, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
-      fillSheetByMt(5, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
-      fillSheetByMt(6, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
-      fillSheetByMt(7, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
-      fillSheetByMt(8, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
-      fillSheetByMt(9, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
-      fillSheetByMt(10, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
-      fillSheetByMt(11, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC"))
-      fillSheetByMt(12, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
-      fillSheetByMt(13, 17, Seq("O2", "H2O", "H2", "CO", "CO2", "THC", "Ar"))
+      fillSheetByMt(0, 10, Seq("Ar", "H2", "CO", "CH4", "CO2", "THC"))
     }
 
     wb.setActiveSheet(0)
