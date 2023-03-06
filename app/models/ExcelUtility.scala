@@ -436,7 +436,7 @@ object ExcelUtility {
     finishExcel(reportFilePath, pkg, wb)
   }
 
-  def excelFormAr(map: Map[Monitor.Value, (DateTime, Option[String], Map[MonitorType.Value, Record])]) = {
+  def excelFormN2(map: Map[Monitor.Value, (DateTime, Option[String], Map[MonitorType.Value, Record])]) = {
     implicit val (reportFilePath, pkg, wb) = prepareTemplate("formN2.xlsx")
     for (entry <- map) {
       val (dt, sampleNameOpt, mtMap) = entry._2
@@ -503,7 +503,7 @@ object ExcelUtility {
     finishExcel(reportFilePath, pkg, wb)
   }
 
-  def excelFormN2(map: Map[Monitor.Value, (DateTime, Option[String], Map[MonitorType.Value, Record])]) = {
+  def excelFormAr(map: Map[Monitor.Value, (DateTime, Option[String], Map[MonitorType.Value, Record])]) = {
     implicit val (reportFilePath, pkg, wb) = prepareTemplate("formAr.xlsx")
     for (entry <- map) {
       val (dt, sampleNameOpt, mtMap) = entry._2
