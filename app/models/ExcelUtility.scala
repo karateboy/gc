@@ -344,15 +344,15 @@ object ExcelUtility {
           val limit = try {
             limitStr = sheet.getRow(rowN).getCell(limitN).
               getStringCellValue
-            limitStr.replaceAll("^\\d+", "").toDouble
+            limitStr.reverse.drop(4).reverse.toDouble
           } catch {
             case _: Throwable =>
               0d
           }
           val sum = mtMap(ch4).value + mtMap(c3h8).value
-          if (sum == 0 || sum < limit)
-            sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
-          else
+          if (sum == 0 || sum < limit) {
+            //sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
+          } else
             sheet.getRow(rowN).getCell(cellN).setCellValue(sum)
         }
       }
@@ -370,7 +370,7 @@ object ExcelUtility {
         fillMtContent("Ar", 13, 4, 8)
         fillMtContent("CH4", 14, 4, 8)
         fillMtContent("N2", 15, 4, 8)
-        fillThcContent(22, 16, 9)
+        fillThcContent(16, 4, 8)
       }
 
       fillSheetUPO()
