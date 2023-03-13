@@ -324,14 +324,14 @@ object ExcelUtility {
           val limit = try {
             limitStr = sheet.getRow(rowN).getCell(limitN).
               getStringCellValue
-            limitStr.replaceAll("^\\d+", "").toDouble
+            limitStr.reverse.drop(4).reverse.toDouble
           } catch {
             case _: Throwable =>
               0d
           }
-          if (mtMap(mt).value == 0 || mtMap(mt).value < limit)
-            sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
-          else
+          if (mtMap(mt).value == 0 || mtMap(mt).value*1000 < limit) {
+            //sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
+          } else
             sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value)
         }
       }
@@ -359,77 +359,21 @@ object ExcelUtility {
 
       def fillSheetUPO(): Unit = {
         val sheet = wb.getSheetAt(0)
-        sheet.getRow(10).getCell(4).setCellValue(dt.toString("YYYY/MM/dd"))
-        sheet.getRow(11).getCell(4).setCellValue(dt.toString("YYYY/MM/dd"))
-        for (sampleName <- sampleNameOpt)
-          sheet.getRow(12).getCell(5).setCellValue(sampleName)
+        sheet.getRow(6).getCell(4).setCellValue(dt.toString("YYYY/MM/dd"))
+        //for (sampleName <- sampleNameOpt)
+        //  sheet.getRow(12).getCell(5).setCellValue(sampleName)
 
-        fillMtContent("H2O", 16, 4, 9)
-        fillMtContent("CO", 17, 4, 9)
-        fillMtContent("CO2", 18, 4, 9)
-        fillMtContent("H2", 19, 4, 9)
-        fillMtContent("N2", 20, 4, 9)
-        fillMtContent("Ar", 21, 4, 9)
-        fillThcContent(22, 4, 9)
-      }
-
-      def fillSheetWithAr(sheetN: Int) = {
-        sheet = wb.getSheetAt(sheetN)
-        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        for (sampleName <- sampleNameOpt)
-          sheet.getRow(13).getCell(9).setCellValue(sampleName)
-
-        fillMtContent("H2O", 18, 4, 9)
-        fillMtContent("CO", 19, 4, 9)
-        fillMtContent("CO2", 20, 4, 9)
-        fillMtContent("H2", 21, 4, 9)
-        fillMtContent("N2", 22, 4, 9)
-        fillMtContent("Ar", 23, 4, 9)
-        fillThcContent(24, 4, 9)
-      }
-
-      def fillSheetWithoutAr(sheetN: Int) = {
-        sheet = wb.getSheetAt(sheetN)
-        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        for (sampleName <- sampleNameOpt)
-          sheet.getRow(13).getCell(9).setCellValue(sampleName)
-
-        fillMtContent("H2O", 18, 4, 9)
-        fillMtContent("CO", 19, 4, 9)
-        fillMtContent("CO2", 20, 4, 9)
-        fillMtContent("H2", 21, 4, 9)
-        fillMtContent("N2", 22, 4, 9)
-        fillThcContent(23, 4, 9)
-      }
-
-      def fillSheetWithCh4(sheetN: Int) = {
-        sheet = wb.getSheetAt(sheetN)
-        sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
-        for (sampleName <- sampleNameOpt)
-          sheet.getRow(13).getCell(9).setCellValue(sampleName)
-
-        fillMtContent("H2O", 18, 4, 9)
-        fillMtContent("CO", 19, 4, 9)
-        fillMtContent("CO2", 20, 4, 9)
-        fillMtContent("H2", 21, 4, 9)
-        fillMtContent("N2", 22, 4, 9)
-        fillThcContent(23, 4, 9)
-        fillMtContent("CH4", 24, 4, 9)
+        fillMtContent("H2O", 9, 4, 8)
+        fillMtContent("CO", 10, 4, 8)
+        fillMtContent("CO2", 11, 4, 8)
+        fillMtContent("H2", 12, 4, 8)
+        fillMtContent("Ar", 13, 4, 8)
+        fillMtContent("CH4", 14, 4, 8)
+        fillMtContent("N2", 15, 4, 8)
+        fillThcContent(22, 16, 9)
       }
 
       fillSheetUPO()
-      fillSheetWithAr(1)
-      fillSheetWithoutAr(2)
-      fillSheetWithAr(3)
-      fillSheetWithAr(4)
-      fillSheetWithAr(5)
-      fillSheetWithAr(6)
-      fillSheetWithAr(7)
-      fillSheetWithCh4(8)
-      fillSheetWithoutAr(9)
     }
 
     wb.setActiveSheet(0)
