@@ -96,27 +96,27 @@ class Adam6250Collector(host: String, maxStreamNum: Int, selector: Adam6250Selec
               result match {
                 case Seq(_, _, _, _, _, _, false, true) =>
                   errorCount = 0
-                  selector.modifyStreamNum(1)
+                  selector.modifyStreamNum(6)
 
                 case Seq(true, false, true, false, false, false, true, false) =>
                   errorCount = 0
-                  selector.modifyStreamNum(2)
+                  selector.modifyStreamNum(1)
 
                 case Seq(false, true, true, false, false, false, true, false) =>
                   errorCount = 0
-                  selector.modifyStreamNum(3)
+                  selector.modifyStreamNum(2)
 
                 case Seq(_, _, false, true, false, false, true, false) =>
                   errorCount = 0
-                  selector.modifyStreamNum(4)
+                  selector.modifyStreamNum(3)
 
                 case Seq(_, _, false, false, true, false, true, false) =>
                   errorCount = 0
-                  selector.modifyStreamNum(5)
+                  selector.modifyStreamNum(4)
 
                 case Seq(_, _, false, false, false, true, true, false) =>
                   errorCount = 0
-                  selector.modifyStreamNum(6)
+                  selector.modifyStreamNum(5)
 
                 case _ =>
                   errorCount += 1
