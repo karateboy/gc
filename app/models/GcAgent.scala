@@ -28,6 +28,7 @@ case class GcConfig(index: Int, inputDir: String, selector: Selector,
                     plcConfig: Option[SiemensPlcConfig],
                     aoConfigList: Option[Seq[AoConfig]],
                     haloKaConfig : Option[HaloKaConfig],
+                    adam6017Config: Option[Adam6017Config],
                     computedMtList: Option[Seq[ComputedMeasureType]], var latestDataTime: com.github.nscala_time.time.Imports.DateTime) {
   val gcName: String = GcAgent.getGcName(index)
 }
@@ -120,9 +121,25 @@ object GcAgent {
           HaloKaConfig(com, speed, monitorType)
         }
 
+      val adam6017ConfigOpt: Option[Adam6017Config] =
+        for(config <- config.getConfig("adam6017Config")) yield {
+          val host = config.getString("host").get
+          val aiConfigs =
+            for(aiConfig <- config.getConfigList("aiConfigs").get.asScala) yield {
+              val seq = aiConfig.getInt("seq").get
+              val mt = aiConfig.getString("mt").get
+              val max = aiConfig.getDouble("max").get
+              val mtMax = aiConfig.getDouble("mtMax").get
+              val min = aiConfig.getDouble("min").get
+              val mtMin = aiConfig.getDouble("mtMin").get
+              AiChannelCfg(seq, mt, max, mtMax, min, mtMin)
+            }
+          Adam6017Config(host, aiConfigs)
+        }
+
       Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
       Logger.info(s"${plcConfig.toString}")
-      GcConfig(idx, inputDir, selector, plcConfig, aoConfigs, haloKaConfig, computedTypes,
+      GcConfig(idx, inputDir, selector, plcConfig, aoConfigs, haloKaConfig, adam6017ConfigOpt, computedTypes,
         com.github.nscala_time.time.Imports.DateTime.now())
     }
   }
@@ -142,6 +159,9 @@ object GcAgent {
     for (gcConfig <- gcConfigList){
       for(haloKaConfig<- gcConfig.haloKaConfig){
         Akka.system.actorOf(HaloKaAgent.prof(haloKaConfig, gcConfig), name = s"haloKaAgent${gcConfig.index}")
+      }
+      for(adam6017Config <- gcConfig.adam6017Config){
+        Akka.system.actorOf(Adam6017Agent.prof(adam6017Config, gcConfig), name = s"adam6017Agent${gcConfig.index}")
       }
     }
   }
