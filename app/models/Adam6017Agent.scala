@@ -22,9 +22,10 @@ object Adam6017Agent {
 }
 
 private class Adam6017Agent(config: Adam6017Config, gcConfig: GcConfig) extends Actor {
-  Logger.info(s"Adam6017Agent ")
+  Logger.info(s"Adam6017Agent start for ${config.host}")
   import Adam6017Agent._
 
+  self ! ConnectHost
   def decodeAi(values: Seq[Double]) = {
     val dataPairList =
       for {

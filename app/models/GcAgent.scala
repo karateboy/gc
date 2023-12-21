@@ -122,7 +122,7 @@ object GcAgent {
         }
 
       val adam6017ConfigOpt: Option[Adam6017Config] =
-        for(config <- config.getConfig("adam6017Config")) yield {
+        for(config <- config.getConfig("Adam6017Config")) yield {
           val host = config.getString("host").get
           val aiConfigs =
             for(aiConfig <- config.getConfigList("aiConfigs").get.asScala) yield {
