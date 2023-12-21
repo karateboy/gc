@@ -38,7 +38,7 @@ private class Adam6017Agent(config: Adam6017Config, gcConfig: GcConfig) extends 
         min = channelCfg.min
       } yield {
         val v = mtMin + (mtMax - mtMin) / (max - min) * (rawValue - min)
-        val mt = MonitorType.getMonitorTypeValueByName(mtName, "ppb")
+        val mt = MonitorType.getMonitorTypeValueByName(mtName, "ppb", 2000)
         (mt, (v, MonitorStatus.NormalStat))
       }
 

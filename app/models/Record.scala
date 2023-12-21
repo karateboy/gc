@@ -341,8 +341,8 @@ object Record {
           } yield {
             MtRecord(mt.toString, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
           }
-        val pdfReport = doc.get("pdfReport").get.asObjectId().getValue
-        RecordList(Monitor.map(monitor).dp_no, time.getMillis, mtDataList, pdfReport)
+        val pdfReportOpt = doc.get("pdfReport").map{_.asObjectId().getValue}
+        RecordList(Monitor.map(monitor).dp_no, time.getMillis, mtDataList, pdfReportOpt.getOrElse(new ObjectId()))
       }
     }
   }
@@ -493,10 +493,10 @@ object Record {
               MtRecord(mt.toString, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
           }
         val pdfReport = if (doc.get("pdfReport").isEmpty)
-          new ObjectId()
+          None
         else
-          doc.get("pdfReport").get.asObjectId().getValue
-        RecordList(Monitor.map(monitor).dp_no, time.getMillis, mtDataList, pdfReport)
+          doc.get("pdfReport").map{ _.asObjectId().getValue }
+        RecordList(Monitor.map(monitor).dp_no, time.getMillis, mtDataList, pdfReport.getOrElse(new ObjectId()))
       }
     }
   }
@@ -538,10 +538,10 @@ object Record {
             }
           }
         val pdfReport = if (doc.get("pdfReport").isEmpty)
-          new ObjectId()
+          None
         else
-          doc.get("pdfReport").get.asObjectId().getValue
-        RecordList(monitor, time.getMillis, mtDataList, pdfReport)
+          doc.get("pdfReport").map{_.asObjectId().getValue}
+        RecordList(monitor, time.getMillis, mtDataList, pdfReport.getOrElse(new ObjectId()))
       }
     }
   }
