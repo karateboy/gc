@@ -477,6 +477,8 @@ class GcAgent extends Actor {
             Some(S7ConnectorFactory
               .buildTCPConnector()
               .withHost(plcConfig.host)
+              .withRack(0)
+              .withSlot(1)
               .build())
 
           for (connector <- connectorOpt) {

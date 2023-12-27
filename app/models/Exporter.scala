@@ -186,6 +186,8 @@ object Exporter {
           Some(S7ConnectorFactory
             .buildTCPConnector()
             .withHost(plcConfig.host)
+            .withRack(0)
+            .withSlot(1)
             .build())
         for (connector <- connectorOpt) {
           val serializer: S7Serializer = S7SerializerFactory.buildSerializer(connector)
