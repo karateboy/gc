@@ -509,10 +509,10 @@ object Record {
     val mtList = MonitorType.activeMtvList
     val col = MongoDB.database.getCollection(colName)
     val projFields = "monitor" :: "time" :: "pdfReport" :: MonitorType.mtvList.map {
-      MonitorType.BFName(_)
+      MonitorType.BFName
     }
     val proj = Projections.include(projFields: _*)
-    val f = col.find(Filters.in("monitor", monitors:_*)).projection(proj).sort(descending("time")).limit(limit).toFuture()
+    val f = col.find(Filters.and(Filters.in("monitor", monitors:_*), Filters.exists("pdfReport")) ).projection(proj).sort(descending("time")).limit(limit).toFuture()
     for {
       docs <- f
     } yield {
