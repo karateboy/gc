@@ -392,8 +392,8 @@ class GcAgent extends Actor {
           case _ =>
             gcConfig.executeCount += 1
             for (cleanCount <- SysConfig.getCleanCount()) {
-              if (cleanCount != 0 && gcConfig.executeCount % cleanCount == 0) {
-                gcConfig.executeCount = 0
+              if (cleanCount != 0 && gcConfig.executeCount >= cleanCount) {
+                gcConfig.executeCount = gcConfig.executeCount % cleanCount
                 for(cleanNotify <- gcConfig.cleanNotifyConfig)
                   CleanNotify.notify(cleanNotify)
               }
