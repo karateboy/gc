@@ -24,15 +24,22 @@ case class AoConfig(host: String, exportMap: Map[String, AoEntry])
 
 case class ComputedMeasureType(_id: String, sum: Seq[String])
 
+case class CleanNotifyConfig(host: String, slaveId:Option[Int], address: Int)
+
 case class GcConfig(index: Int, inputDir: String, selector: Selector,
                     plcConfig: Option[SiemensPlcConfig],
                     aoConfigList: Option[Seq[AoConfig]],
-                    haloKaConfig : Option[HaloKaConfig],
+                    haloKaConfig: Option[HaloKaConfig],
                     adam6017Config: Option[Adam6017Config],
-                    computedMtList: Option[Seq[ComputedMeasureType]], var latestDataTime: com.github.nscala_time.time.Imports.DateTime) {
+                    computedMtList: Option[Seq[ComputedMeasureType]],
+                    cleanNotifyConfig: Option[CleanNotifyConfig],
+                    var latestDataTime: com.github.nscala_time.time.Imports.DateTime,
+                    var executeCount: Int) {
   val gcName: String = GcAgent.getGcName(index)
 }
-case class HaloKaConfig(com:Int, speed:Int, MonitorType:String)
+
+case class HaloKaConfig(com: Int, speed: Int, MonitorType: String)
+
 import scala.collection.JavaConverters._
 
 object GcAgent {
@@ -113,7 +120,7 @@ object GcAgent {
           }
         }
 
-      val haloKaConfig : Option[HaloKaConfig] =
+      val haloKaConfig: Option[HaloKaConfig] =
         for (config <- config.getConfig("haloKaConfig")) yield {
           val com = config.getInt("com").get
           val speed = config.getInt("speed").get
@@ -122,10 +129,10 @@ object GcAgent {
         }
 
       val adam6017ConfigOpt: Option[Adam6017Config] =
-        for(config <- config.getConfig("Adam6017Config")) yield {
+        for (config <- config.getConfig("Adam6017Config")) yield {
           val host = config.getString("host").get
           val aiConfigs =
-            for(aiConfig <- config.getConfigList("aiConfigs").get.asScala) yield {
+            for (aiConfig <- config.getConfigList("aiConfigs").get.asScala) yield {
               val seq = aiConfig.getInt("seq").get
               val mt = aiConfig.getString("mt").get
               val max = aiConfig.getDouble("max").get
@@ -137,13 +144,17 @@ object GcAgent {
           Adam6017Config(host, aiConfigs)
         }
 
+      val cleanNotify: Option[CleanNotifyConfig] = CleanNotify.getConfig(config)
+
+      Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
       Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
       Logger.info(s"${plcConfig.toString}")
       GcConfig(idx, inputDir, selector, plcConfig, aoConfigs, haloKaConfig, adam6017ConfigOpt, computedTypes,
-        com.github.nscala_time.time.Imports.DateTime.now())
+        cleanNotify,
+        com.github.nscala_time.time.Imports.DateTime.now(), 0)
     }
   }
-  var receiver: ActorRef = _
+  private var receiver: ActorRef = _
 
   def getGcName(idx: Int) = s"gc${idx + 1}"
 
@@ -156,11 +167,11 @@ object GcAgent {
 
     receiver = Akka.system.actorOf(Props(classOf[GcAgent]), name = "gcAgent")
     receiver ! ParseReport
-    for (gcConfig <- gcConfigList){
-      for(haloKaConfig<- gcConfig.haloKaConfig){
+    for (gcConfig <- gcConfigList) {
+      for (haloKaConfig <- gcConfig.haloKaConfig) {
         Akka.system.actorOf(HaloKaAgent.prof(haloKaConfig, gcConfig), name = s"haloKaAgent${gcConfig.index}")
       }
-      for(adam6017Config <- gcConfig.adam6017Config){
+      for (adam6017Config <- gcConfig.adam6017Config) {
         Akka.system.actorOf(Adam6017Agent.prof(adam6017Config, gcConfig), name = s"adam6017Agent${gcConfig.index}")
       }
     }
@@ -191,14 +202,14 @@ class GcAgent extends Actor {
     case ParseReport =>
       try {
         for (gcConfig <- gcConfigList) {
-          Future{
-            blocking{
+          Future {
+            blocking {
               processInputPath(gcConfig, parser)
             }
           }
 
-          Future{
-            blocking{
+          Future {
+            blocking {
               checkNoDataPeriod(gcConfig)
               for (operationMode <- SysConfig.getOperationMode()) {
                 if (operationMode == 1 && gcConfig.plcConfig.nonEmpty) //remote mode
@@ -254,7 +265,7 @@ class GcAgent extends Actor {
       val lines =
         Files.readAllLines(Paths.get(reportDir.getAbsolutePath + "/Report.txt"), StandardCharsets.UTF_16LE).asScala
 
-      val sampleName = lines.find(line=>line.startsWith("Sample Name:")).map(line=>{
+      val sampleName = lines.find(line => line.startsWith("Sample Name:")).map(line => {
         val tokens = line.split(":")
         tokens(1).trim()
       })
@@ -283,19 +294,20 @@ class GcAgent extends Actor {
         else
           ret ++ getRecordLines(remain)
       }
+
       def getPosHint(inputLines: Seq[String]): List[Int] = {
         val head = inputLines.dropWhile(!_.startsWith("-------")).take(1)
-        def getPos(from:Int): List[Int]= {
+
+        def getPos(from: Int): List[Int] = {
           val pos = head.indexOf('|', from)
-          if(pos == -1)
+          if (pos == -1)
             Nil
           else
-            pos :: getPos(pos +1)
+            pos :: getPos(pos + 1)
         }
+
         getPos(0)
       }
-
-      import scala.collection.mutable.Map
       val recordMap = mutable.Map.empty[Monitor.Value, mutable.Map[DateTime, mutable.Map[MonitorType.Value, (Double, String)]]]
       val timeMap = recordMap.getOrElseUpdate(monitor, mutable.Map.empty[DateTime, mutable.Map[MonitorType.Value, (Double, String)]])
 
@@ -303,10 +315,10 @@ class GcAgent extends Actor {
       for (rec <- rLines) {
         try {
           val tokens = rec.split("\\s+")
-          val ppm = try{
+          val ppm = try {
             tokens.reverse(1).toInt
             tokens.reverse(2)
-          }catch{
+          } catch {
             case _: NumberFormatException =>
               tokens.reverse(1)
           }
@@ -378,6 +390,14 @@ class GcAgent extends Actor {
         f2.onFailure(errorHandler)
         f2 onSuccess {
           case _ =>
+            gcConfig.executeCount += 1
+            for (cleanCount <- SysConfig.getCleanCount()) {
+              if (cleanCount != 0 && gcConfig.executeCount % cleanCount == 0) {
+                gcConfig.executeCount = 0
+                for(cleanNotify <- gcConfig.cleanNotifyConfig)
+                  CleanNotify.notify(cleanNotify)
+              }
+            }
             Exporter.exportRealtimeData(gcConfig)
         }
       }
@@ -415,7 +435,7 @@ class GcAgent extends Actor {
     }
   }
 
-  def processInputPath(gcConfig: GcConfig, parser: (GcConfig, File) => Boolean): List[Unit] = {
+  private def processInputPath(gcConfig: GcConfig, parser: (GcConfig, File) => Boolean): List[Unit] = {
     import java.io.File
 
     def setArchive(f: File): Unit = {
@@ -456,7 +476,7 @@ class GcAgent extends Actor {
     import com.github.nscala_time.time.Imports._
 
     for {dataPeriod <- SysConfig.getDataPeriod()
-         stopWarn <- SysConfig.getStopWarn()
+         stopWarn <- SysConfig.getStopWarn
          } yield {
 
       if (!stopWarn && (gcConfig.latestDataTime + dataPeriod.minutes) < DateTime.now) {

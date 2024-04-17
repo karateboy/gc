@@ -43,6 +43,9 @@ PUT      /operationMode                                                        c
 POST     /gc                                                                   controllers.Application.setGcName
 GET      /stopWarn                                                             controllers.Application.getStopWarn
 POST     /stopWarn                                                             controllers.Application.setStopWarn
+GET      /cleanCount                                                           controllers.Application.getCleanCount
+POST     /cleanCount                                                           controllers.Application.setCleanCount
+
 # old api
 POST     /User                                                                 controllers.Application.newUser
 GET      /User                                                                 controllers.Application.getAllUsers

@@ -58,6 +58,21 @@
         <Checkbox v-model="stopWarn" @on-change="onStopWarn">暫停警報</Checkbox>
       </Card>
     </Row>
+    <Row class="margin-top-10">
+      <Card>
+        <p slot="title">
+          <Icon type="ios-keypad"></Icon>GC觸發清洗 (0表示不觸發)
+        </p>
+        <Form :model="formItem" :label-width="80">
+          <FormItem label="分析次數:">
+            <Slider v-model="formItem.cleanCount" show-input></Slider>
+          </FormItem>
+          <FormItem>
+            <Button type="primary" @click.prevent="setCleanCount">更新</Button>
+          </FormItem>
+        </Form>
+      </Card>
+    </Row>
   </div>
 </template>
 
@@ -140,7 +155,8 @@ export default {
         }
       ],
       formItem: {
-        dataPeriod: 30
+        dataPeriod: 30,
+        cleanCount: 0
       },
       stopWarn: false
     };
@@ -209,6 +225,24 @@ export default {
           alert(err);
         });
     },
+    getCleanCount() {
+      axios.get("/cleanCount").then(res => {
+        const ret = res.data;
+        this.formItem.cleanCount = ret;
+      });
+    },
+    setCleanCount() {
+      axios
+        .post("/cleanCount", { value: this.formItem.cleanCount })
+        .then(res => {
+          const ret = res.data;
+          if (ret.ok) this.$Message.success("成功");
+          else this.$Message.success("失敗");
+        })
+        .catch(err => {
+          alert(err);
+        });
+    },
     getGcList() {
       axios.get("/gc").then(res => {
         const ret = res.data;
@@ -248,6 +282,7 @@ export default {
     this.getDataPeriod();
     this.getGcList();
     this.getStopWarn();
+    this.getCleanCount();
   }
 };
 </script>

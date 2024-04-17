@@ -1,32 +1,25 @@
 package controllers
 
+import com.github.nscala_time.time.Imports._
+import models.Record.MtRecord
+import models._
+import org.mongodb.scala.bson.ObjectId
 import play.api._
-import play.api.mvc._
-import play.api.libs.json._
-import play.api.libs.functional.syntax._
-import play.api.Play.current
-import play.api.data._
-import play.api.data.Forms._
-import play.api.libs.ws._
-import play.api.libs.ws.ning.NingAsyncHttpClientConfigBuilder
-
-import scala.concurrent._
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json._
-import com.github.nscala_time.time.Imports._
-import Highchart._
-import models._
+import play.api.mvc._
 
 import scala.collection.mutable
+import scala.concurrent._
 
 object Realtime extends Controller {
   val overTimeLimit = 6
 
   case class MonitorTypeStatus(desp: String, value: String, unit: String, instrument: String, status: String, classStr: String, order: Int)
 
-  def MonitorTypeStatusList() = Security.Authenticated.async {
+  def MonitorTypeStatusList(): Action[AnyContent] = Security.Authenticated.async {
     implicit request =>
-      import MonitorType._
+
 
       implicit val mtsWrite = Json.writes[MonitorTypeStatus]
 
@@ -35,20 +28,24 @@ object Realtime extends Controller {
       }
   }
 
-  def latestValues(gcFilter:String) = Security.Authenticated.async {
+  case class GcLatestStatus(monitor: String, time: Long, mtDataList: Seq[MtRecord], pdfReport: ObjectId, executeCount: Int)
+  import models.ObjectIdUtil._
+  def latestValues(gcFilter: String): Action[AnyContent] = Security.Authenticated.async {
     implicit request =>
+      val gcConfig = GcAgent.gcConfigList.find(_.gcName == gcFilter).get
       val monitors = Monitor.getMonitorByGcFilter(gcFilter)
       val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection, monitors, true)(1)
+      implicit val gcLatestStatusWrite = Json.writes[GcLatestStatus]
 
       for (records <- latestRecord) yield {
-        if (records.isEmpty) {
-          import org.mongodb.scala.bson._
-          val emptyRecordList = Record.RecordList("-", DateTime.now().getMillis, Seq.empty[Record.MtRecord], new ObjectId())
-          Ok(Json.toJson(emptyRecordList))
-        } else {
-          val recordList = records.head
-          Ok(Json.toJson(recordList))
-        }
+        val gcLatestStatus =
+          if (records.isEmpty) {
+            GcLatestStatus("-", DateTime.now().getMillis, Seq.empty[Record.MtRecord], new ObjectId(), gcConfig.executeCount)
+          } else {
+            val recordList = records.head
+            GcLatestStatus(recordList.monitor, recordList.time, recordList.mtDataList, recordList.pdfReport, gcConfig.executeCount)
+          }
+        Ok(Json.toJson(gcLatestStatus))
       }
   }
 
@@ -62,9 +59,9 @@ object Realtime extends Controller {
   implicit val rowWrite = Json.writes[RowData]
   implicit val dtWrite = Json.writes[DataTab]
 
-  def realtimeData() = Security.Authenticated.async {
+  def realtimeData(): Action[AnyContent] = Security.Authenticated.async {
     implicit request =>
-      import MonitorType._
+
       val user = request.user
       val latestRecordMapF = Record.getLatestRecordMap2Future(Record.HourCollection)
       val targetTime = (DateTime.now() - 2.hour).withMinuteOfHour(0).withSecond(0).withMillisOfSecond(0)
@@ -144,8 +141,6 @@ object Realtime extends Controller {
         config.selector.set(selector)
         Exporter.notifySelectorChange(config, selector)
       }
-
-      import java.util.Timer
 
       Future {
         blocking {

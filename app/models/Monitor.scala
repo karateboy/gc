@@ -190,9 +190,9 @@ object Monitor extends Enumeration {
     f
   }
 
-  def getGcNameMap() = {
+  def getGcNameMap(): Future[Map[String, String]] = {
     val gcIdList = Monitor.indParkList
-    for (gcNameList: Seq[String] <- SysConfig.getGcNameList()) yield {
+    for (gcNameList: Seq[String] <- SysConfig.getGcNameList) yield {
       val pairs = gcIdList.zip(gcNameList)
       pairs.toMap
     }

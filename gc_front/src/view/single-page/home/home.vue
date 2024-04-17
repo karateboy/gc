@@ -172,6 +172,14 @@ export default {
           color: '#ff9900',
         };
         this.inforCardData.push(card);
+        let executeCountCard = {
+          title: '執行次數',
+          icon: 'ios-stats',
+          text: ret.executeCount,
+          color: '#ff9900',
+        };
+        this.inforCardData.push(executeCountCard);
+
         for (let mtData of ret.mtDataList) {
           let card = {
             title: mtData.mtName,
