@@ -36,7 +36,8 @@ object CleanNotify {
           master.init();
 
           val locator = BaseLocator.coilStatus(config.slaveId.getOrElse(1), config.address)
-          master.setValue(locator, 1)
+          master.setValue(locator, true)
+          logger.info(s"clean notify success..$config")
         } catch {
           case ex: Exception =>
             logger.error(ex.getMessage, ex)
