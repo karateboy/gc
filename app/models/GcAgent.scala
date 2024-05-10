@@ -328,7 +328,6 @@ class GcAgent extends Actor {
           assert(!name.contains(" "))
           assert(!name.contains("|"))
           assert(!name.contains("="))
-          assert(!name.contains("-"))
           assert(name.nonEmpty)
           assert(name.charAt(0).isLetter)
 
@@ -451,18 +450,20 @@ class GcAgent extends Actor {
     for (dir <- dirs) yield {
       val absPath = dir.getAbsolutePath
       if (!retryMap.contains(absPath))
-        Logger.info(s"Processing ${absPath}")
+        Logger.info(s"Processing $absPath")
 
       try {
-        if (parser(gcConfig, dir))
+        if (parser(gcConfig, dir)) {
           setArchive(dir)
+          Logger.info(s"Successfully processed: $absPath")
+        }
       } catch {
         case ex: Throwable =>
           if (retryMap.contains(absPath)) {
             if (retryMap(absPath) + 1 <= MAX_RETRY_COUNT) {
               retryMap += (absPath -> (retryMap(absPath) + 1))
             } else {
-              Logger.info(s"$absPath reach max retries. Give up!")
+              Logger.error(s"$absPath reach max retries. Give up!", ex)
               retryMap -= absPath
               setArchive(dir)
             }
