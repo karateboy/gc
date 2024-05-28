@@ -48,6 +48,8 @@ object Exporter {
           Some(S7ConnectorFactory
             .buildTCPConnector()
             .withHost(plcConfig.host)
+            .withRack(plcConfig.rack.getOrElse(0))
+            .withSlot(plcConfig.slot.getOrElse(1))
             .build())
         for (connector <- connectorOpt) {
           val serializer = S7SerializerFactory.buildSerializer(connector)
@@ -186,8 +188,8 @@ object Exporter {
           Some(S7ConnectorFactory
             .buildTCPConnector()
             .withHost(plcConfig.host)
-            .withRack(0)
-            .withSlot(1)
+            .withRack(plcConfig.rack.getOrElse(0))
+            .withSlot(plcConfig.slot.getOrElse(1))
             .build())
         for (connector <- connectorOpt) {
           val serializer: S7Serializer = S7SerializerFactory.buildSerializer(connector)
