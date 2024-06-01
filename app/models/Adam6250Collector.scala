@@ -1,35 +1,36 @@
 package models
 
-import akka.actor.{Actor, ActorLogging, Cancellable, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Cancellable, Props}
 import models.ModelHelper._
-import play.api.Play.current
-import play.api.libs.concurrent.Akka
 import play.api.{Configuration, Logger}
 
-case class Adam6250Selector(gcName: String, config: Configuration) extends SelectorModel {
-  val host = config.getString("host").get
+import javax.inject.Inject
+
+case class Adam6250Selector(monitorOp: MonitorOp, alarmOp: AlarmOp, actorSystem: ActorSystem)
+                           (gcName: String, config: Configuration) extends SelectorModel {
+  val host: String = config.getString("host").get
   val max = 8
   for (id <- 1 to max) {
-    Monitor.getMonitorValueByName(gcName, id)
+    monitorOp.getMonitorValueByName(gcName, id)
   }
-  val worker = Akka.system.actorOf(Props(new Adam6250Collector(host, max, this)), name = s"moxaAgent_${gcName}")
+  val worker: ActorRef = actorSystem.actorOf(Props(new Adam6250Collector(alarmOp)(host, max, this)), name = s"moxaAgent_${gcName}")
   worker ! ConnectHost
 
   @volatile var streamNum = 1
 
   def getStreamNum(): Int = streamNum
 
-  def setStreamNum(v: Int) {}
+  def setStreamNum(v: Int): Unit = {}
 
   val canSetStream = false
 
-  def modifyStreamNum(v: Int) {
+  def modifyStreamNum(v: Int): Unit = {
     streamNum = v
   }
 
 }
 
-class Adam6250Collector(host: String, maxStreamNum: Int, selector: Adam6250Selector) extends Actor with ActorLogging {
+class Adam6250Collector @Inject()(alarmOp: AlarmOp)(host: String, maxStreamNum: Int, selector: Adam6250Selector) extends Actor with ActorLogging {
   var cancelable: Cancellable = _
 
   import com.serotonin.modbus4j._
@@ -37,7 +38,7 @@ class Adam6250Collector(host: String, maxStreamNum: Int, selector: Adam6250Selec
 
   import scala.concurrent._
 
-  def receive = handler(MonitorStatus.NormalStat, None)
+  def receive: Receive = handler(MonitorStatus.NormalStat, None)
 
   import context.dispatcher
 
@@ -61,14 +62,14 @@ class Adam6250Collector(host: String, maxStreamNum: Int, selector: Adam6250Selec
             master.init();
             context become handler(collectorState, Some(master))
             import scala.concurrent.duration._
-            cancelable = Akka.system.scheduler.scheduleOnce(Duration(3, SECONDS), self, Collect)
+            cancelable = context.system.scheduler.scheduleOnce(Duration(3, SECONDS), self, Collect)
           } catch {
             case ex: Exception =>
               Logger.error(ex.getMessage, ex)
               Logger.info("Try again 1 min later...")
               //Try again
               import scala.concurrent.duration._
-              cancelable = Akka.system.scheduler.scheduleOnce(Duration(1, MINUTES), self, ConnectHost)
+              cancelable = context.system.scheduler.scheduleOnce(Duration(1, MINUTES), self, ConnectHost)
           }
 
         }
@@ -121,12 +122,12 @@ class Adam6250Collector(host: String, maxStreamNum: Int, selector: Adam6250Selec
                 case _ =>
                   errorCount += 1
                   if (errorCount > 10)
-                    Alarm.log(None, None, s"選樣錯誤! $result")
+                    alarmOp.log(None, None, s"選樣錯誤! $result")
               }
             }
 
             import scala.concurrent.duration._
-            cancelable = Akka.system.scheduler.scheduleOnce(scala.concurrent.duration.Duration(3, SECONDS), self, Collect)
+            cancelable = context.system.scheduler.scheduleOnce(scala.concurrent.duration.Duration(3, SECONDS), self, Collect)
           } catch {
             case ex: Throwable =>
               Logger.error("Read reg failed", ex)

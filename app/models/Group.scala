@@ -1,17 +1,16 @@
 package models
 
-case class GroupInfo(id: String, name: String, privilege: Privilege)
+case class GroupInfo(id: String, name: String, privilege: String)
 object Group extends Enumeration {
 
-  def mapEntry(_id: String, name: String, privilege: Privilege) =
+  def mapEntry(_id: String, name: String, privilege: String) =
     _id -> GroupInfo(_id.toString, name, privilege)
 
   val adminID = "admin"
-  val adminGroup = mapEntry(adminID, "系統管理員", Privilege.defaultPrivilege)
+  val adminGroup = mapEntry(adminID, "系統管理員", "")
   
   val map = Map(
-    adminGroup,
-    mapEntry("雲林環保局", "雲林環保局", Privilege.defaultPrivilege))
+    adminGroup)
 
   val getInfoList = map.values.toList
 

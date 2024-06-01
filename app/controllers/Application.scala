@@ -1,26 +1,26 @@
 package controllers
 
-import play.api._
-import play.api.mvc._
-import play.api.mvc.WebSocket
-import play.api.libs.json._
-import play.api.libs.functional.syntax._
-import scala.concurrent.ExecutionContext.Implicits.global
-import play.api.Play.current
-import play.api.data._
-import play.api.data.Forms._
-import play.api.libs.ws._
-import play.api.libs.ws.ning.NingAsyncHttpClientConfigBuilder
-import scala.concurrent.Future
-import play.api.libs.json._
-import com.github.nscala_time.time.Imports._
-import Highchart._
+import models.ModelHelper._
 import models._
-import ModelHelper._
+import play.api._
+import play.api.data.Forms._
+import play.api.data._
+import play.api.libs.json._
+import play.api.mvc._
 
-object Application extends Controller {
+import javax.inject._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
-  val title = "特殊性工業區監測系統"
+class Application @Inject()(userOp: UserOp,
+                            monitorTypeOp: MonitorTypeOp,
+                            monitorOp: MonitorOp,
+                            exporter: Exporter,
+                            alarmOp: AlarmOp,
+                            lineNotify: LineNotify,
+                            sysConfig: SysConfig) extends Controller {
+
+  import userOp._
 
   def newUser: Action[JsValue] = Security.Authenticated.async(BodyParsers.parse.json) {
     implicit request =>
@@ -28,14 +28,9 @@ object Application extends Controller {
         val newUserParam = request.body.validate[User]
 
         newUserParam.fold(
-          error => {
-            Logger.error(JsError.toJson(error).toString())
-            Future {
-              BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
-            }
-          },
+          error => handleJsonValidateErrorFuture(error),
           param => {
-            val f = User.newUser(param)
+            val f = userOp.newUser(param)
             val requestF =
               for (result <- f) yield {
                 Ok(Json.obj("ok" -> true))
@@ -53,7 +48,7 @@ object Application extends Controller {
   def deleteUser(email: String): Action[AnyContent] = Security.Authenticated.async {
     implicit request =>
       adminOnly({
-        val f = User.deleteUser(email)
+        val f = userOp.deleteUser(email)
         val requestF =
           for (result <- f) yield {
             Ok(Json.obj("ok" -> (result.getDeletedCount == 1)))
@@ -72,14 +67,9 @@ object Application extends Controller {
       val userParam = request.body.validate[User]
 
       userParam.fold(
-        error => {
-          Future {
-            Logger.error(JsError.toJson(error).toString())
-            BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
-          }
-        },
+        error => handleJsonValidateErrorFuture(error),
         param => {
-          val f = User.updateUser(param)
+          val f = userOp.updateUser(param)
           for (ret <- f) yield {
             Ok(Json.obj("ok" -> (ret.getMatchedCount == 1)))
           }
@@ -87,7 +77,7 @@ object Application extends Controller {
   }
 
   def getAllUsers: Action[AnyContent] = Security.Authenticated.async {
-    val userF = User.getAllUsersFuture()
+    val userF = userOp.getAllUsersFuture()
     for (users <- userF) yield Ok(Json.toJson(users))
   }
 
@@ -99,7 +89,7 @@ object Application extends Controller {
       }
     else {
       val userInfo = userInfoOpt.get
-      val userF = User.getUserByIdFuture(userInfo.id)
+      val userF = userOp.getUserByIdFuture(userInfo.id)
       val userOpt = waitReadyResult(userF)
       if (userOpt.isEmpty || userOpt.get.groupId != Group.adminID)
         Future {
@@ -115,15 +105,8 @@ object Application extends Controller {
 
   def getGroupInfoList: Action[AnyContent] = Action {
     val infoList = Group.getInfoList
-    implicit val write = Json.writes[GroupInfo]
+    implicit val write: OWrites[GroupInfo] = Json.writes[GroupInfo]
     Ok(Json.toJson(infoList))
-  }
-
-  val path = current.path.getAbsolutePath + "/importEPA/"
-
-  def importEpa103: Action[AnyContent] = Action {
-    Epa103Importer.importData(path)
-    Ok(s"匯入 $path")
   }
 
   private case class EditData(id: String, data: String)
@@ -138,9 +121,9 @@ object Application extends Controller {
 
         val mtData = mtForm.bindFromRequest.get
         val mtInfo = mtData.id.split(":")
-        val mt = MonitorType.withName(mtInfo(0))
+        val mt = monitorTypeOp.withName(mtInfo(0))
 
-        MonitorType.updateMonitorType(mt, mtInfo(1), mtData.data)
+        monitorTypeOp.updateMonitorType(mt, mtInfo(1), mtData.data)
 
         Ok(mtData.data)
       } catch {
@@ -160,9 +143,9 @@ object Application extends Controller {
 
         val mtData = mtForm.bindFromRequest.get
         val mtInfo = mtData.id.split(":")
-        val m = Monitor.withName(mtInfo(0))
+        val m = monitorOp.withName(mtInfo(0))
 
-        Monitor.updateMonitor(m, mtInfo(1), mtData.data)
+        monitorOp.updateMonitor(m, mtInfo(1), mtData.data)
 
         Ok(mtData.data)
       } catch {
@@ -172,70 +155,51 @@ object Application extends Controller {
       }
   }
 
+  import monitorOp._
+  import monitorTypeOp._
+
   def monitorTypeList: Action[AnyContent] = Security.Authenticated {
     implicit request =>
-      val monitorTypes = MonitorType.mtvList map {
-        MonitorType.map
+      val monitorTypes = monitorTypeOp.mtvList map {
+        monitorTypeOp.map
       }
       Ok(Json.toJson(monitorTypes))
   }
 
   def monitorList: Action[AnyContent] = Security.Authenticated {
     implicit request =>
-      val monitors = Monitor.mvList map {
-        Monitor.map
-      }
-      // val actualMonitors = monitors.filter(m => m._id.toInt <= Selector.model.max)
-      Ok(Json.toJson(monitors))
+      Ok(Json.toJson(monitorOp.getMonitorList))
   }
 
-  case class GcName(key: String, name: String)
+  private case class GcName(key: String, name: String)
 
   def gcList: Action[AnyContent] = Security.Authenticated.async {
     implicit request =>
-      implicit val writes = Json.writes[GcName]
+      implicit val writes: OWrites[GcName] = Json.writes[GcName]
 
-      for (gcNameList <- SysConfig.getGcNameList) yield {
-        val gcList = Monitor.indParkList
+      for (gcNameList <- sysConfig.getGcNameList) yield {
+        val gcList = monitorOp.indParkList
         val keyName: Seq[GcName] = gcList.zip(gcNameList).map { entry => GcName(entry._1, entry._2) }
         Ok(Json.toJson(keyName))
       }
   }
 
-  def indParkList: Action[AnyContent] = Security.Authenticated.async {
-    implicit request =>
-      val userOptF = User.getUserByIdFuture(request.user.id)
-      for {
-        userOpt <- userOptF if userOpt.isDefined
-        groupInfo = Group.getGroupInfo(userOpt.get.groupId)
-      } yield {
-
-        val indParks =
-          groupInfo.privilege.allowedIndParks
-
-        Ok(Json.toJson(indParks))
-      }
-  }
-
   def reportUnitList: Action[AnyContent] = Security.Authenticated {
-    implicit val ruWrite = Json.writes[ReportUnit]
+    implicit val ruWrite: OWrites[ReportUnit] = Json.writes[ReportUnit]
     Ok(Json.toJson(ReportUnit.values.toList.sorted.map {
       ReportUnit.map
     }))
   }
 
-  def updateMonitorType = Security.Authenticated(BodyParsers.parse.json) {
+  def updateMonitorType(): Action[JsValue] = Security.Authenticated(BodyParsers.parse.json) {
     implicit request =>
       val mtResult = request.body.validate[MonitorType]
 
       mtResult.fold(
-        error => {
-          Logger.error(JsError.toJson(error).toString())
-          BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
-        },
+        error => handleJsonValidateError(error),
         mt => {
-          MonitorType.upsertMonitorType(mt)
-          MonitorType.refreshMtv
+          monitorTypeOp.upsertMonitorType(mt)
+          monitorTypeOp.refreshMtv()
           Ok(Json.obj("ok" -> true))
         })
   }
@@ -245,31 +209,23 @@ object Application extends Controller {
       val mtResult = request.body.validate[MonitorType]
 
       mtResult.fold(
-        error => {
-          Logger.error(JsError.toJson(error).toString())
-          BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
-        },
+        error => handleJsonValidateError(error),
         mt => {
-          MonitorType.upsertMonitorType(mt)
-          MonitorType.refreshMtv
+          monitorTypeOp.upsertMonitorType(mt)
+          monitorTypeOp.refreshMtv()
           Ok(Json.obj("ok" -> true))
         })
   }
 
-  def updateMonitor: Action[JsValue] = Security.Authenticated.async(BodyParsers.parse.json) {
+  def updateMonitor(): Action[JsValue] = Security.Authenticated.async(BodyParsers.parse.json) {
     implicit request =>
       val mtResult = request.body.validate[Monitor]
 
       mtResult.fold(
-        error => {
-          Future {
-            Logger.error(JsError.toJson(error).toString())
-            BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
-          }
-        },
+        error => handleJsonValidateErrorFuture(error),
         monitor => {
-          for (ret <- Monitor.upsert(monitor)) yield {
-            Monitor.refresh
+          for (ret <- monitorOp.upsert(monitor)) yield {
+            monitorOp.refresh()
             Ok(Json.obj("ok" -> true))
           }
         })
@@ -280,38 +236,19 @@ object Application extends Controller {
       val mtResult = request.body.validate[Monitor]
 
       mtResult.fold(
-        error => {
-          Future {
-            Logger.error(JsError.toJson(error).toString())
-            BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
-          }
-        },
+        error => handleJsonValidateErrorFuture(error),
         monitor => {
-          for (ret <- Monitor.upsert(monitor)) yield {
-            Monitor.refresh
+          for (ret <- monitorOp.upsert(monitor)) yield {
+            monitorOp.refresh()
             Ok(Json.obj("ok" -> true))
           }
         })
   }
 
-  def menuRightList: Action[AnyContent] = Security.Authenticated.async {
-    implicit request =>
-      val userOptF = User.getUserByIdFuture(request.user.id)
-      for {
-        userOpt <- userOptF if userOpt.isDefined
-        groupInfo = Group.getGroupInfo(userOpt.get.groupId)
-      } yield {
-        val menuRightList =
-          groupInfo.privilege.allowedMenuRights.map { v => MenuRight(v, MenuRight.map(v)) }
-
-        Ok(Json.toJson(menuRightList))
-      }
-  }
-
   def testAlarm: Action[AnyContent] = Security.Authenticated.async {
     implicit request =>
       for {
-        ret <- Alarm.log(None, None, "Test alarm")
+        _ <- alarmOp.log(None, None, "Test alarm")
       } yield {
         Ok("Test alarm!")
       }
@@ -319,62 +256,53 @@ object Application extends Controller {
 
   //Websocket
 
-  import GcWebSocketActor._
-
-  def gcWebSocket: WebSocket[InEvent, OutEvent] = WebSocket.acceptWithActor[InEvent, OutEvent] { request =>
-    out =>
-      GcWebSocketActor.props(out)
-  }
+  //  def gcWebSocket: WebSocket[InEvent, OutEvent] = WebSocket.acceptWithActor[InEvent, OutEvent] { request =>
+  //    out =>
+  //      GcWebSocketActor.props(out)
+  //  }
 
   def getDataPeriod: Action[AnyContent] = Security.Authenticated.async {
-    for (ret <- SysConfig.getDataPeriod()) yield Ok(Json.toJson(ret))
+    for (ret <- sysConfig.getDataPeriod) yield Ok(Json.toJson(ret))
   }
 
   private case class ParamInt(value: Int)
 
-  def setDataPeriod: Action[JsValue] = Security.Authenticated.async(BodyParsers.parse.json) {
+  private case class ParamStr(value: String, test: Option[Boolean])
+
+  def setDataPeriod(): Action[JsValue] = Security.Authenticated.async(BodyParsers.parse.json) {
     implicit request =>
       implicit val reads: Reads[ParamInt] = Json.reads[ParamInt]
       val ret = request.body.validate[ParamInt]
       ret.fold(
-        error => {
-          Future {
-            Logger.error(JsError.toJson(error).toString())
-            BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
-          }
-        },
+        error => handleJsonValidateErrorFuture(error),
         param => {
-          for (ret <- SysConfig.setDataPeriod(param.value)) yield {
+          for (_ <- sysConfig.setDataPeriod(param.value)) yield {
             Ok(Json.obj("ok" -> true))
           }
         })
   }
 
-  def getOperationMode(): Action[AnyContent] = Security.Authenticated.async {
-    for (ret <- SysConfig.getOperationMode()) yield {
+  def getOperationMode: Action[AnyContent] = Security.Authenticated.async {
+    for (ret <- sysConfig.getOperationMode) yield {
       Ok(Json.obj("mode" -> ret))
     }
   }
 
-  private case class OpMode(mode:Int)
+  private case class OpMode(mode: Int)
+
   def putOperationMode: Action[JsValue] = Security.Authenticated.async(BodyParsers.parse.json) {
     implicit request =>
-      implicit val reads = Json.reads[OpMode]
+      implicit val reads: Reads[OpMode] = Json.reads[OpMode]
       val modeParam = request.body.validate[OpMode]
 
       modeParam.fold(
-        error => {
-          Future {
-            Logger.error(JsError.toJson(error).toString())
-            BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
-          }
-        },
+        error => handleJsonValidateErrorFuture(error),
         param => {
           Logger.info(s"set operation mode = ${param.mode}")
-          for(gcConfig <- GcAgent.gcConfigList)
-            Exporter.exportLocalModeToPLC(gcConfig, param.mode)
+          for (gcConfig <- GcAgent.gcConfigList)
+            exporter.exportLocalModeToPLC(gcConfig, param.mode)
 
-          for (ret <- SysConfig.setOperationMode(param.mode)) yield {
+          for (ret <- sysConfig.setOperationMode(param.mode)) yield {
             Ok(Json.obj("mode" -> param.mode))
           }
         })
@@ -383,81 +311,97 @@ object Application extends Controller {
 
   def setGcName(): Action[JsValue] = Security.Authenticated.async(BodyParsers.parse.json) {
     implicit request =>
-      implicit val reads = Json.reads[GcName]
+      implicit val reads: Reads[GcName] = Json.reads[GcName]
       val gcParam = request.body.validate[GcName]
 
       gcParam.fold(
-        error => {
-          Future {
-            Logger.error(JsError.toJson(error).toString())
-            BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
-          }
-        },
+        error => handleJsonValidateErrorFuture(error),
         param => {
-          for (gcList: Seq[String] <- SysConfig.getGcNameList) yield {
-            val idx = Monitor.indParkList.indexOf(param.key)
+          for (gcList: Seq[String] <- sysConfig.getGcNameList) yield {
+            val idx = monitorOp.indParkList.indexOf(param.key)
             val newGcList: Seq[String] = gcList.patch(idx, Seq(param.name), 1)
-            SysConfig.setGcNameList(newGcList)
+            sysConfig.setGcNameList(newGcList)
             Ok(Json.obj("ok" -> true))
           }
         })
   }
 
-  case class StopWarn(stopWarn: Boolean)
+  private case class StopWarn(stopWarn: Boolean)
 
-  def getStopWarn(): Action[AnyContent] = Security.Authenticated.async {
+  def getStopWarn: Action[AnyContent] = Security.Authenticated.async {
     implicit request =>
-      implicit val writes = Json.writes[StopWarn]
-      for (stopWarn <- SysConfig.getStopWarn) yield {
+      implicit val writes: OWrites[StopWarn] = Json.writes[StopWarn]
+      for (stopWarn <- sysConfig.getStopWarn) yield {
         Ok(Json.toJson(StopWarn(stopWarn)))
       }
   }
 
   def setStopWarn(): Action[JsValue] = Security.Authenticated.async(BodyParsers.parse.json) {
     implicit request =>
-      implicit val reads = Json.reads[StopWarn]
+      implicit val reads: Reads[StopWarn] = Json.reads[StopWarn]
       val ret = request.body.validate[StopWarn]
 
       ret.fold(
-        error => {
-          Future {
-            Logger.error(JsError.toJson(error).toString())
-            BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
-          }
-        },
+        error => handleJsonValidateErrorFuture(error),
         param => {
-          for (ret <- SysConfig.setStopWarn(param.stopWarn)) yield
+          for (_ <- sysConfig.setStopWarn(param.stopWarn)) yield
             Ok(Json.obj("ok" -> true))
         }
       )
   }
 
   def getCleanCount: Action[AnyContent] = Security.Authenticated.async {
-    for (ret <- SysConfig.getCleanCount()) yield {
+    for (ret <- sysConfig.getCleanCount) yield {
       Ok(Json.toJson(ret))
     }
   }
 
-  def setCleanCount: Action[JsValue] = Security.Authenticated.async(BodyParsers.parse.json) {
+  def setCleanCount(): Action[JsValue] = Security.Authenticated.async(BodyParsers.parse.json) {
     implicit request =>
       implicit val reads: Reads[ParamInt] = Json.reads[ParamInt]
       val ret = request.body.validate[ParamInt]
 
       ret.fold(
-        error => {
-          Future {
-            Logger.error(JsError.toJson(error).toString())
-            BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
-          }
-        },
+        error => handleJsonValidateErrorFuture(error),
         param => {
-          for (ret <- SysConfig.setCleanCount(param.value)) yield
+          for (_ <- sysConfig.setCleanCount(param.value)) yield
             Ok(Json.obj("ok" -> true))
         }
       )
   }
 
-  def redirectRoot(ignore:String): Action[AnyContent] = Action {
+  def getLineToken: Action[AnyContent] = Security.Authenticated.async {
+    for (ret <- sysConfig.getLineToken) yield {
+      Ok(Json.toJson(ret))
+    }
+  }
+
+  def setLineToken(): Action[JsValue] = Security.Authenticated.async(BodyParsers.parse.json) {
+    implicit request =>
+      implicit val reads: Reads[ParamStr] = Json.reads[ParamStr]
+      val ret = request.body.validate[ParamStr]
+
+      ret.fold(
+        error => handleJsonValidateErrorFuture(error),
+        param => {
+          if (param.test.getOrElse(false)) {
+            Logger.info(s"test line token = ${param.value}")
+            for {
+              ret <- lineNotify.notify(param.value, "LINE Notify 測試訊息")
+            } yield
+              if (ret)
+                Ok(Json.obj("ok" -> true))
+              else
+                Ok(Json.obj("ok" -> false))
+          } else {
+            for (_ <- sysConfig.setLineToken(param.value)) yield
+              Ok(Json.obj("ok" -> true))
+          }
+        }
+      )
+  }
+
+  def redirectRoot(ignore: String): Action[AnyContent] = Action {
     Redirect("/")
   }
 }

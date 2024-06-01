@@ -6,39 +6,43 @@ import org.apache.poi.openxml4j.opc.OPCPackage
 import org.apache.poi.ss.usermodel.Row.MissingCellPolicy
 import org.apache.poi.ss.usermodel.{BorderStyle, FillPatternType, IndexedColors}
 import org.apache.poi.xssf.usermodel.{XSSFCellStyle, XSSFColor, XSSFSheet, XSSFWorkbook}
-import play.api.Logger
+import play.api.{Configuration, Environment, Logger}
 import play.api.Play.current
 
 import java.io.{File, FileInputStream, FileOutputStream}
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
+import javax.inject.Inject
 
-object ExcelUtility {
+@javax.inject.Singleton
+class ExcelUtility @Inject()(environment: Environment,
+                             monitorTypeOp: MonitorTypeOp,
+                             recordOp: RecordOp) {
   val docRoot = "/report_template/"
 
   private def prepareTemplate(templateFile: String) = {
-    val templatePath = Paths.get(current.path.getAbsolutePath + docRoot + templateFile)
+    val templatePath = Paths.get(environment.rootPath.getAbsolutePath + docRoot + templateFile)
     val reportFilePath = Files.createTempFile("temp", ".xlsx");
 
     Files.copy(templatePath, reportFilePath, StandardCopyOption.REPLACE_EXISTING)
 
     //Open Excel
-    val pkg = OPCPackage.open(new FileInputStream(reportFilePath.toAbsolutePath().toString()))
+    val pkg = OPCPackage.open(new FileInputStream(reportFilePath.toAbsolutePath.toString))
     val wb = new XSSFWorkbook(pkg);
 
     (reportFilePath, pkg, wb)
   }
 
-  def finishExcel(reportFilePath: Path, pkg: OPCPackage, wb: XSSFWorkbook) = {
-    val out = new FileOutputStream(reportFilePath.toAbsolutePath().toString());
+  private def finishExcel(reportFilePath: Path, pkg: OPCPackage, wb: XSSFWorkbook) = {
+    val out = new FileOutputStream(reportFilePath.toAbsolutePath.toString);
     wb.write(out);
     out.close();
     pkg.close();
 
-    new File(reportFilePath.toAbsolutePath().toString())
+    new File(reportFilePath.toAbsolutePath.toString)
   }
 
-  def createStyle(mt: MonitorType.Value)(implicit wb: XSSFWorkbook) = {
-    val prec = MonitorType.map(mt).prec
+  private def createStyle(mt: monitorTypeOp.Value)(implicit wb: XSSFWorkbook) = {
+    val prec = monitorTypeOp.map(mt).prec
     val format_str = "0." + "0" * prec
     val style = wb.createCellStyle();
     val format = wb.createDataFormat();
@@ -60,7 +64,7 @@ object ExcelUtility {
     style
   }
 
-  def createColorStyle(fgColors: Array[XSSFColor], mt: MonitorType.Value)(implicit wb: XSSFWorkbook) = {
+  private def createColorStyle(fgColors: Array[XSSFColor], mt: monitorTypeOp.Value)(implicit wb: XSSFWorkbook): Array[XSSFCellStyle] = {
     fgColors.map {
       color =>
         val style = createStyle(mt)
@@ -93,12 +97,12 @@ object ExcelUtility {
 
   import controllers.Highchart._
 
-  def exportChartData(chart: HighchartData, monitorTypes: Array[MonitorType.Value]): File = {
-    val precArray = monitorTypes.map { mt => MonitorType.map(mt).prec }
+  def exportChartData(chart: HighchartData, monitorTypes: Array[MonitorTypeOp#Value]): File = {
+    val precArray = monitorTypes.map { mt => monitorTypeOp.map(mt).prec }
     exportChartData(chart, precArray)
   }
 
-  def exportChartData(chart: HighchartData, precArray: Array[Int]) = {
+  def exportChartData(chart: HighchartData, precArray: Array[Int]): File = {
     val (reportFilePath, pkg, wb) = prepareTemplate("chart_export.xlsx")
     val evaluator = wb.getCreationHelper().createFormulaEvaluator()
     val format = wb.createDataFormat();
@@ -178,104 +182,8 @@ object ExcelUtility {
     finishExcel(reportFilePath, pkg, wb)
   }
 
-  def createDailyReport(monitor: Monitor.Value, reportDate: DateTime) = {
-    implicit val (reportFilePath, pkg, wb) = prepareTemplate("dailyReport.xlsx")
-    val format = wb.createDataFormat();
-    val sheet = wb.getSheetAt(0)
-    val titleRow = sheet.createRow(0)
-    val dateRow = sheet.createRow(1)
-    val legendRow = sheet.getRow(2)
-
-    val fgColors = {
-      val seqColors =
-        for (col <- 3 to 7)
-          yield legendRow.getCell(col).getCellStyle.getFillForegroundXSSFColor
-      seqColors.toArray
-    }
-
-    val periodMap = Record.getRecordMap(Record.HourCollection)(MonitorType.mtvList, monitor, reportDate, reportDate + 1.day)
-    val mtTimeMap = periodMap.map { pair =>
-      val k = pair._1
-      val v = pair._2
-      k -> Map(v.map { r => r.time -> r }: _*)
-    }
-    val statMap = Query.getPeriodStatReportMap(periodMap, 1.day)(reportDate, reportDate + 1.day)
-
-    def fillMonitorDailyReport(monitor: Monitor.Value) = {
-      titleRow.createCell(0).setCellValue((Monitor.map(monitor).gcName + Monitor.map(monitor).selector) + "監測日報表")
-      dateRow.createCell(0).setCellValue(s"日期:${reportDate.toString("yyyy年MM月dd日")}")
-
-      for {
-        mt_idx <- MonitorType.activeMtvList.zipWithIndex
-        mt = mt_idx._1
-        idx = mt_idx._2
-        col = idx + 1
-      } {
-        sheet.getRow(3).createCell(col).setCellValue(MonitorType.map(mt).desp)
-      }
-      val normalStyleList = MonitorType.activeMtvList map createStyle
-      val abnormalStyleList = MonitorType.activeMtvList map {
-        createColorStyle(fgColors, _)
-      }
-
-      for {
-        hour <- 0 to 23
-        rowN = hour + 4
-        row = sheet.createRow(rowN)
-        timeLabel = row.createCell(0).setCellValue(s"$hour:00")
-
-        mt_idx <- MonitorType.activeMtvList.zipWithIndex
-        mt = mt_idx._1
-        idx = mt_idx._2
-        colN = idx + 1
-        normalStyle = normalStyleList(idx)
-        abnormalStyles = abnormalStyleList(idx)
-        cell = row.createCell(colN)
-        recordOpt = mtTimeMap(mt).get(reportDate + hour.hour)
-      } {
-        if (recordOpt.isEmpty) {
-          cell.setCellValue("-")
-        } else {
-          val record = recordOpt.get
-          val value = record.value
-          val status = record.status
-          cell.setCellValue(value)
-
-          val cellStyle = getStyle(status, normalStyle, abnormalStyles)
-          cell.setCellStyle(cellStyle)
-        }
-      }
-
-      val avgRow = sheet.createRow(28)
-      avgRow.createCell(0).setCellValue("平均")
-      val maxRow = sheet.createRow(29)
-      maxRow.createCell(0).setCellValue("最大")
-      val minRow = sheet.createRow(30)
-      minRow.createCell(0).setCellValue("最小")
-      val effectRow = sheet.createRow(31)
-      effectRow.createCell(0).setCellValue("有效率")
-
-      for {
-        mt_idx <- MonitorType.activeMtvList.zipWithIndex
-        mt = mt_idx._1
-        idx = mt_idx._2
-        colN = idx + 1
-      } {
-        avgRow.createCell(colN).setCellValue(MonitorType.format(mt, statMap(mt)(reportDate).avg))
-        maxRow.createCell(colN).setCellValue(MonitorType.format(mt, statMap(mt)(reportDate).max))
-        minRow.createCell(colN).setCellValue(MonitorType.format(mt, statMap(mt)(reportDate).min))
-        effectRow.createCell(colN).setCellValue(MonitorType.format(mt, statMap(mt)(reportDate).effectPercent))
-      }
-
-    }
-
-    fillMonitorDailyReport(monitor)
-
-    wb.setActiveSheet(0)
-    finishExcel(reportFilePath, pkg, wb)
-  }
-
-  def createHistoryData(recordList: Seq[Record.RecordList], monitorTypes: Seq[MonitorType.Value]) = {
+  import recordOp._
+  def createHistoryData(recordList: Seq[RecordList], monitorTypes: Seq[MonitorTypeOp#Value]): File = {
     implicit val (reportFilePath, pkg, wb) = prepareTemplate("historyData.xlsx")
     val format = wb.createDataFormat();
     val sheet = wb.getSheetAt(0)
@@ -287,7 +195,7 @@ object ExcelUtility {
     header.createCell(0).setCellValue("日期")
     header.createCell(1).setCellValue("選擇器")
     for ((mt, col) <- monitorTypes.zip(2 to 1 + monitorTypes.length)) {
-      header.createCell(col).setCellValue(MonitorType.map(mt).desp)
+      header.createCell(col).setCellValue(monitorTypeOp.map(mt).desp)
     }
     val dateStyle = wb.createCellStyle()
     dateStyle.setDataFormat(format.getFormat("yyyy-mm-dd hh:mm"))
@@ -313,13 +221,13 @@ object ExcelUtility {
     finishExcel(reportFilePath, pkg, wb)
   }
 
-  def excelForm(map: Map[Monitor.Value, (DateTime, Option[String], Map[MonitorType.Value, Record])]) = {
+  def excelForm(map: Map[MonitorOp#Value, (DateTime, Option[String], Map[MonitorTypeOp#Value, Record])]): File = {
     implicit val (reportFilePath, pkg, wb) = prepareTemplate("form.xlsx")
     for (entry <- map) {
       val (dt, sampleNameOpt, mtMap) = entry._2
       var sheet: XSSFSheet = wb.getSheetAt(0)
       def fillMtContent(mtName:String, rowN:Int, cellN:Int, limitN:Int): Unit ={
-        val mt = MonitorType.getMonitorTypeValueByName(mtName)
+        val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt)) {
           val limit = try {
             sheet.getRow(rowN).getCell(limitN).
@@ -349,7 +257,7 @@ object ExcelUtility {
         fillMtContent("Ar", 21, 4, 9)
       }
 
-      def fillSheetWithAr(sheetN:Int) = {
+      def fillSheetWithAr(sheetN:Int): Unit = {
         sheet = wb.getSheetAt(sheetN)
         sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
         sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
@@ -364,7 +272,7 @@ object ExcelUtility {
         fillMtContent("Ar", 23, 4, 9)
       }
 
-      def fillSheetWithoutAr(sheetN:Int) = {
+      def fillSheetWithoutAr(sheetN:Int): Unit = {
         sheet = wb.getSheetAt(sheetN)
         sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
         sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
@@ -377,7 +285,7 @@ object ExcelUtility {
         fillMtContent("H2", 21, 4, 9)
         fillMtContent("N2", 22, 4, 9)
       }
-      def fillSheetWithCh4(sheetN:Int) = {
+      def fillSheetWithCh4(sheetN:Int): Unit = {
         sheet = wb.getSheetAt(sheetN)
         sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
         sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))

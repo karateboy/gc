@@ -3,84 +3,83 @@
 # ~~~~
 
 # Home page
-GET      /                                                                     controllers.Assets.at(path="/public/dist", file="index.html")
+GET           /                                                                          controllers.Assets.at(path="/public/dist", file="index.html")
 
 # Map static resources from the /public folder to the /assets URL path
-GET      /static/*file                                                         controllers.Assets.versioned(path="/public/static", file: Asset)
-GET      /html/*file                                                           controllers.Assets.at(path="/public/html", file)
-GET      /dist/*file                                                           controllers.Assets.at(path="/public/dist", file)
+GET           /static/*file                                                              controllers.Assets.versioned(path="/public/static", file: Asset)
+GET           /html/*file                                                                controllers.Assets.at(path="/public/html", file)
+GET           /dist/*file                                                                controllers.Assets.at(path="/public/dist", file)
 
-POST     /logout                                                               controllers.Login.logout
-POST     /login                                                                controllers.Login.authenticate
-GET      /getUserInfo                                                          controllers.Login.getUserInfo
+POST          /logout                                                                    controllers.Login.logout
+POST          /login                                                                     controllers.Login.authenticate
+GET           /getUserInfo                                                               controllers.Login.getUserInfo
 
-GET      /logout                                                               controllers.Login.logout
-POST     /authenticate                                                         controllers.Login.authenticate
+GET           /logout                                                                    controllers.Login.logout
+POST          /authenticate                                                              controllers.Login.authenticate
 
-GET      /gc                                                                   controllers.Application.gcList
-GET      /monitor                                                              controllers.Application.monitorList
-POST     /monitor                                                              controllers.Application.updateMonitor
-GET      /monitor_type                                                         controllers.Application.monitorTypeList
-POST     /monitor_type                                                         controllers.Application.updateMonitorType
+GET           /gc                                                                        controllers.Application.gcList
+GET           /monitor                                                                   controllers.Application.monitorList
+POST          /monitor                                                                   controllers.Application.updateMonitor
+GET           /monitor_type                                                              controllers.Application.monitorTypeList
+POST          /monitor_type                                                              controllers.Application.updateMonitorType
 
-GET      /history_data                                                         controllers.Query.historyData(monitor:String, monitorTypes: String, start: Long, end: Long)
-GET      /history_data/excel                                                   controllers.Query.historyDataExcel(monitor:String, monitorTypes: String, start: Long, end: Long)
-GET      /pdfReport/:id                                                        controllers.Query.pdfReport(id:String)
-GET      /excelForm/:pdfId                                                     controllers.Query.excelForm(pdfId)
-GET      /history_trend                                                        controllers.Query.historyTrendChart2(monitors: String, monitorTypes: String, start: Long, end: Long)
-GET      /realtime_data                                                        controllers.Realtime.latestValues(gcFilter)
-GET      /current_monitor                                                      controllers.Realtime.getCurrentMonitor
-POST     /current_monitor                                                      controllers.Realtime.setCurrentMonitor(monitorId:String)
-GET      /gc_monitor                                                           controllers.Realtime.getGcMonitors
-GET      /last10_data                                                          controllers.Query.last10Data(gcFilter)
-GET      /alarm                                                                controllers.Query.alarmData(start: Long, end: Long)
-GET      /testAlarm                                                            controllers.Application.testAlarm	
-GET      /GcWebSocket                                                          controllers.Application.gcWebSocket
-GET      /dataPeriod                                                           controllers.Application.getDataPeriod
-POST     /dataPeriod                                                           controllers.Application.setDataPeriod
-GET      /operationMode                                                        controllers.Application.getOperationMode
-PUT      /operationMode                                                        controllers.Application.putOperationMode
-POST     /gc                                                                   controllers.Application.setGcName
-GET      /stopWarn                                                             controllers.Application.getStopWarn
-POST     /stopWarn                                                             controllers.Application.setStopWarn
-GET      /cleanCount                                                           controllers.Application.getCleanCount
-POST     /cleanCount                                                           controllers.Application.setCleanCount
+GET           /history_data                                                              controllers.Query.historyData(monitor:String, monitorTypes: String, start: Long, end: Long)
+GET           /history_data/excel                                                        controllers.Query.historyDataExcel(monitor:String, monitorTypes: String, start: Long, end: Long)
+GET           /pdfReport/:id                                                             controllers.Query.pdfReport(id:String)
+GET           /excelForm/:pdfId                                                          controllers.Query.excelForm(pdfId)
+GET           /history_trend                                                             controllers.Query.historyTrendChart2(monitors: String, monitorTypes: String, start: Long, end: Long)
+GET           /realtime_data                                                             controllers.Realtime.latestValues(gcFilter)
+GET           /current_monitor                                                           controllers.Realtime.getCurrentMonitor
+POST          /current_monitor                                                           controllers.Realtime.setCurrentMonitor(monitorId:String)
+GET           /gc_monitor                                                                controllers.Realtime.getGcMonitors
+GET           /last10_data                                                               controllers.Query.last10Data(gcFilter)
+GET           /alarm                                                                     controllers.Query.alarmData(start: Long, end: Long)
+GET           /testAlarm                                                                 controllers.Application.testAlarm
+#GET      /GcWebSocket                                                          controllers.Application.gcWebSocket
+GET           /dataPeriod                                                                controllers.Application.getDataPeriod
+POST          /dataPeriod                                                                controllers.Application.setDataPeriod
+GET           /operationMode                                                             controllers.Application.getOperationMode
+PUT           /operationMode                                                             controllers.Application.putOperationMode
+POST          /gc                                                                        controllers.Application.setGcName
+GET           /stopWarn                                                                  controllers.Application.getStopWarn
+POST          /stopWarn                                                                  controllers.Application.setStopWarn
+GET           /cleanCount                                                                controllers.Application.getCleanCount
+POST          /cleanCount                                                                controllers.Application.setCleanCount
+GET           /lineToken                                                                 controllers.Application.getLineToken
+POST          /lineToken                                                                 controllers.Application.setLineToken
 
 # old api
-POST     /User                                                                 controllers.Application.newUser
-GET      /User                                                                 controllers.Application.getAllUsers
-PUT      /User/:id                                                             controllers.Application.updateUser(id)
-DELETE   /User/:id                                                             controllers.Application.deleteUser(id)
+POST          /User                                                                      controllers.Application.newUser
+GET           /User                                                                      controllers.Application.getAllUsers
+PUT           /User/:id                                                                  controllers.Application.updateUser(id)
+DELETE        /User/:id                                                                  controllers.Application.deleteUser(id)
 
-GET      /Group                                                                controllers.Application.getGroupInfoList
+GET           /Group                                                                     controllers.Application.getGroupInfoList
 
-GET      /JSON/HistoryTrend/:monitors/:monitorType/:reportUnit/:start/:end     controllers.Query.historyTrendChart(monitors, monitorType, reportUnit, start:Long, end:Long, outputTypeStr="html")
-GET      /Excel/HistoryTrend/:monitors/:monitorType/:reportUnit/:start/:end    controllers.Query.historyTrendChart(monitors,monitorType, reportUnit, start:Long, end:Long, outputTypeStr="excel")
+GET           /JSON/HistoryTrend/:monitors/:monitorType/:reportUnit/:start/:end          controllers.Query.historyTrendChart(monitors, monitorType, reportUnit, start:Long, end:Long, outputTypeStr="html")
+GET           /Excel/HistoryTrend/:monitors/:monitorType/:reportUnit/:start/:end         controllers.Query.historyTrendChart(monitors,monitorType, reportUnit, start:Long, end:Long, outputTypeStr="excel")
 
-GET      /JSON/HistoryBoxplot/:monitors/:monitorType/:reportUnit/:start/:end   controllers.Query.historyBoxPlot(monitors, monitorType, reportUnit, start:Long, end:Long, outputTypeStr="html")
-GET      /Excel/HistorBoxplot/:monitors/:monitorType/:reportUnit/:start/:end   controllers.Query.historyBoxPlot(monitors,monitorType, reportUnit, start:Long, end:Long, outputTypeStr="excel")
+GET           /JSON/HistoryBoxplot/:monitors/:monitorType/:reportUnit/:start/:end        controllers.Query.historyBoxPlot(monitors, monitorType, reportUnit, start:Long, end:Long, outputTypeStr="html")
+GET           /Excel/HistorBoxplot/:monitors/:monitorType/:reportUnit/:start/:end        controllers.Query.historyBoxPlot(monitors,monitorType, reportUnit, start:Long, end:Long, outputTypeStr="excel")
 
 
-POST     /SaveMonitorTypeConfig                                                controllers.Application.saveMonitorTypeConfig
-POST     /SaveMonitorConfig                                                    controllers.Application.saveMonitorConfig
+POST          /SaveMonitorTypeConfig                                                     controllers.Application.saveMonitorTypeConfig
+POST          /SaveMonitorConfig                                                         controllers.Application.saveMonitorConfig
 
 #Realtime
-GET      /MonitorTypeStatusList                                                controllers.Realtime.MonitorTypeStatusList()
-GET      /RealtimeData                                                         controllers.Realtime.realtimeData()
+GET           /MonitorTypeStatusList                                                     controllers.Realtime.MonitorTypeStatusList()
 
 #JSON
-GET      /MonitorType                                                          controllers.Application.monitorTypeList
-POST     /MonitorType/:id                                                      controllers.Application.upsertMonitorType(id)
+GET           /MonitorType                                                               controllers.Application.monitorTypeList
+POST          /MonitorType/:id                                                           controllers.Application.upsertMonitorType(id)
 
-GET      /Monitor                                                              controllers.Application.monitorList
-POST     /Monitor/:id                                                          controllers.Application.upsertMonitor(id)
-GET      /IndPark                                                              controllers.Application.indParkList
-GET      /ReportUnit                                                           controllers.Application.reportUnitList
-GET      /MenuRight                                                            controllers.Application.menuRightList
+GET           /Monitor                                                                   controllers.Application.monitorList
+POST          /Monitor/:id                                                               controllers.Application.upsertMonitor(id)
+GET           /ReportUnit                                                                controllers.Application.reportUnitList
 
-GET      /Record/:monitor/:monitorType/:start/:end                             controllers.Query.recordList(monitor, monitorType, start:Long, end:Long)
+
+GET           /Record/:monitor/:monitorType/:start/:end                                  controllers.Query.recordList(monitor, monitorType, start:Long, end:Long)
 #PUT      /Record/:monitor/:monitorType                                         controllers.Query.updateRecord(monitor, monitorType)
 
 #import Data
-GET      /importEpaXLS                                                         controllers.Application.importEpa103
-GET      /*arg                                                                 controllers.Application.redirectRoot(arg)
+GET           /*arg                                                                      controllers.Application.redirectRoot(arg)

@@ -1,32 +1,42 @@
 package models
 
-import akka.actor.{Actor, Cancellable, Props}
+import akka.actor.{Actor, Cancellable}
+import com.google.inject.assistedinject.Assisted
 import com.serotonin.modbus4j.ip.IpParameters
 import com.serotonin.modbus4j.{ModbusFactory, ModbusMaster}
 import models.ModelHelper.errorHandler
 import org.joda.time.DateTime
 import play.api.Logger
 
+import javax.inject.Inject
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, blocking}
 
-case class AiChannelCfg(seq:Int, mt: String, max: Double, mtMax: Double, min: Double, mtMin: Double)
+case class AiChannelCfg(seq: Int, mt: String, max: Double, mtMax: Double, min: Double, mtMin: Double)
 
-case class Adam6017Config(host: String, aiConfigs:Seq[AiChannelCfg])
+case class Adam6017Config(host: String, aiConfigs: Seq[AiChannelCfg])
+
 object Adam6017Agent {
-  def prof(config: Adam6017Config, gcConfig: GcConfig): Props = Props(classOf[Adam6017Agent], config, gcConfig)
+  //def prof(config: Adam6017Config, gcConfig: GcConfig): Props = Props(classOf[Adam6017Agent], config, gcConfig)
+
+  trait Factory {
+    def apply(@Assisted("config") config: Adam6017Config, @Assisted("gcConfig") gcConfig: GcConfig): Actor
+  }
 
   case object ConnectHost
 
   private case object CollectData
 }
 
-private class Adam6017Agent(config: Adam6017Config, gcConfig: GcConfig) extends Actor {
+class Adam6017Agent @Inject()(monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp, recordOp: RecordOp)
+                             (@Assisted("config") config: Adam6017Config, @Assisted("gcConfig") gcConfig: GcConfig) extends Actor {
   Logger.info(s"Adam6017Agent start for ${config.host}")
+
   import Adam6017Agent._
 
   self ! ConnectHost
-  def decodeAi(values: Seq[Double]) = {
+
+  private def decodeAi(values: Seq[Double]) = {
     val dataPairList =
       for {
         channelCfg <- config.aiConfigs
@@ -38,19 +48,21 @@ private class Adam6017Agent(config: Adam6017Config, gcConfig: GcConfig) extends 
         min = channelCfg.min
       } yield {
         val v = mtMin + (mtMax - mtMin) / (max - min) * (rawValue - min)
-        val mt = MonitorType.getMonitorTypeValueByName(mtName, "ppb", 2000)
+        val mt = monitorTypeOp.getMonitorTypeValueByName(mtName, "ppb", 2000)
         (mt, (v, MonitorStatus.NormalStat))
       }
 
 
     val dt = DateTime.now.withSecondOfMinute(0).withMillisOfSecond(0)
-    val monitor = Monitor.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
-    val doc = Record.toDocument(monitor, dt, dataPairList.toList)
-    Record.upsertRecord(doc)(Record.MinCollection)
+    val monitor = monitorOp.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
+    val doc = recordOp.toDocument(monitor, dt, dataPairList.toList)
+    recordOp.upsertRecord(doc)(RecordOp.MinCollection)
   }
-  def receive = handler(None)
+
+  def receive: Receive = handler(None)
 
   @volatile var cancelable: Cancellable = _
+
   def handler(masterOpt: Option[ModbusMaster]): Receive = {
     case ConnectHost =>
       Future {

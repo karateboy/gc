@@ -1,67 +1,62 @@
 package models
-import play.api._
-import play.api.libs._
 import akka.actor._
+import play.api._
 import play.api.libs.json._
+import play.api.mvc.WebSocket
+
+import javax.inject.Inject
 import scala.concurrent.ExecutionContext.Implicits.global
 
 case class InEvent(msgType: String)
 case class OutEvent(mutation: Option[String], alarms: Seq[Alarm])
 object GcWebSocketActor {
-  var actorList = List.empty[ActorRef]
+  private var actorList = List.empty[ActorRef]
   import play.api.mvc.WebSocket.FrameFormatter
 
-  implicit val alarmFmt = Json.format[Alarm]
-  implicit val inEventFmt = Json.format[InEvent]
-  implicit val outEventFmt = Json.format[OutEvent]
-  implicit val inEventFrameFormatter = FrameFormatter.jsonFrame[InEvent]
-  implicit val outEventFrameFormatter = FrameFormatter.jsonFrame[OutEvent]
+  implicit val alarmFmt: OFormat[Alarm] = Json.format[Alarm]
+  implicit val inEventFmt: OFormat[InEvent] = Json.format[InEvent]
+  implicit val outEventFmt: OFormat[OutEvent] = Json.format[OutEvent]
+  //implicit val inEventFrameFormatter: WebSocket.MessageFlowTransformer[InEvent, InEvent] = FrameFormatter.jsonFrame[InEvent]
+  //implicit val outEventFrameFormatter: WebSocket.MessageFlowTransformer[OutEvent, OutEvent] = FrameFormatter.jsonFrame[OutEvent]
 
-  val MUTATION_REPORT_ALARM = Some("ReportAlarm")
+  private val MUTATION_REPORT_ALARM = Some("ReportAlarm")
 
-  def props(out: ActorRef) = {
-    val ref = Props(new GcWebSocketActor(out))
-    ref
-  }
-
-  case object ReportAlarm
+  private case object ReportAlarm
   
-  def notifyAllActors = {
+  def notifyAllActors(): Unit = {
     actorList.foreach(_!ReportAlarm)
   }
 }
 
-class GcWebSocketActor(out: ActorRef) extends Actor {
+class GcWebSocketActor @Inject()(sysConfig: SysConfig, alarmOp: AlarmOp, exporter: Exporter)(out: ActorRef)  extends Actor {
   import GcWebSocketActor._
   Logger.info("Websocket actor start!")
   actorList = actorList :+ self
   self ! ReportAlarm
 
-  def receive = {
+  def receive: Receive = {
     case ReportAlarm =>
       import java.time.Instant
       for {
-        lastReadDate <- SysConfig.getAlarmLastRead()
-        alarms <- Alarm.getList(lastReadDate.getTime, Instant.now().toEpochMilli())
+        lastReadDate <- sysConfig.getAlarmLastRead
+        alarms <- alarmOp.getList(lastReadDate.getTime, Instant.now().toEpochMilli)
       } {
         val evt = OutEvent(MUTATION_REPORT_ALARM, alarms)
         out ! evt
       }
 
     case evt: InEvent =>
-      {
-         evt.msgType match{
-           case "alarmRead" =>
-             Logger.info(s"alarm read!")
-             SysConfig.setAlarmLastRead()
-             Exporter.notifyAlarm(false)
-         }
+      evt.msgType match{
+        case "alarmRead" =>
+          Logger.info(s"alarm read!")
+          sysConfig.setAlarmLastRead()
+          exporter.notifyAlarm(false)
       }
     case msg: String =>
-      Logger.info(s"recv ${msg}")
+      Logger.info(s"recv $msg")
   }
 
-  override def postStop() {
+  override def postStop(): Unit = {
     actorList = actorList.filter(ref => ref != self)
   }
 }

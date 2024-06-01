@@ -10,35 +10,38 @@ import org.mongodb.scala.bson._
 import org.mongodb.scala.result.UpdateResult
 
 import java.util.Date
+import javax.inject.Inject
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 
-object SysConfig extends Enumeration {
+@javax.inject.Singleton
+class SysConfig @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp) extends Enumeration {
   val ColName = "sysConfig"
-  val collection = MongoDB.database.getCollection(ColName)
+  val collection = mongoDB.database.getCollection(ColName)
 
   val valueKey = "value"
-  val ALARM_LAST_READ = Value
-  val DATA_PERIOD = Value
-  val OPERATION_MODE = Value
-  val GCNAME_LIST = Value
-  val STOP_WARN = Value
-  val CLEAN_COUNT = Value
+  private val ALARM_LAST_READ = Value
+  private val DATA_PERIOD = Value
+  private val OPERATION_MODE = Value
+  private val GCNAME_LIST = Value
+  private val STOP_WARN = Value
+  private val CLEAN_COUNT = Value
+  private val LINE_TOKEN = Value
 
   val LocalMode = 0
   val RemoteMode = 1
 
-  lazy val defaultConfig = Map(
-    ALARM_LAST_READ -> Document(valueKey -> DateTime.parse("2019-10-1").toDate()),
+  private lazy val defaultConfig = Map(
+    ALARM_LAST_READ -> Document(valueKey -> DateTime.parse("2019-10-1").toDate),
     DATA_PERIOD -> Document(valueKey -> 30),
     OPERATION_MODE -> Document(valueKey -> 0),
     STOP_WARN -> Document(valueKey -> false),
     CLEAN_COUNT -> Document(valueKey -> 0)
   )
 
-  def init(colNames: Seq[String]): Unit = {
-    if (!colNames.contains(ColName)) {
-      val f = MongoDB.database.createCollection(ColName).toFuture()
+  def init(): Unit = {
+    if (!mongoDB.colNames.contains(ColName)) {
+      val f = mongoDB.database.createCollection(ColName).toFuture()
       f.onFailure(errorHandler)
     }
 
@@ -51,7 +54,7 @@ object SysConfig extends Enumeration {
     val updateModels =
       for ((k, defaultDoc) <- defaultConfig) yield {
         UpdateOneModel(
-          Filters.eq("_id", k.toString()),
+          Filters.eq("_id", k.toString),
           Updates.setOnInsert(valueKey, defaultDoc(valueKey)), UpdateOptions().upsert(true))
       }
 
@@ -62,14 +65,17 @@ object SysConfig extends Enumeration {
     waitReadyResult(f)
   }
 
-  def upsert(_id: SysConfig.Value, doc: Document): Future[UpdateResult] = {
-    val f = collection.replaceOne(Filters.equal("_id", _id.toString()), doc, ReplaceOptions().upsert(true)).toFuture()
+  init()
+
+
+  def upsert(_id: Value, doc: Document): Future[UpdateResult] = {
+    val f = collection.replaceOne(Filters.equal("_id", _id.toString), doc, ReplaceOptions().upsert(true)).toFuture()
     f.onFailure(errorHandler)
     f
   }
 
-  def get(_id: SysConfig.Value): Future[BsonValue] = {
-    val f = collection.find(Filters.eq("_id", _id.toString())).first().toFuture()
+  def get(_id: Value): Future[BsonValue] = {
+    val f = collection.find(Filters.eq("_id", _id.toString)).first().toFuture()
     f.onFailure(errorHandler)
     for (ret <- f) yield {
       val doc =
@@ -81,8 +87,8 @@ object SysConfig extends Enumeration {
     }
   }
 
-  def get(_id: SysConfig.Value, defaultDoc:Document): Future[BsonValue] = {
-    val f = collection.find(Filters.eq("_id", _id.toString())).first().toFuture()
+  def get(_id: Value, defaultDoc:Document): Future[BsonValue] = {
+    val f = collection.find(Filters.eq("_id", _id.toString)).first().toFuture()
     f.onFailure(errorHandler)
     for (ret <- f) yield {
       val doc =
@@ -94,9 +100,9 @@ object SysConfig extends Enumeration {
     }
   }
 
-  def set(_id: SysConfig.Value, v: BsonValue): Future[UpdateResult] = upsert(_id, Document(valueKey -> v))
+  def set(_id: Value, v: BsonValue): Future[UpdateResult] = upsert(_id, Document(valueKey -> v))
 
-  def getAlarmLastRead(): Future[Date] = {
+  def getAlarmLastRead: Future[Date] = {
     import java.util.Date
     import java.time.Instant
     val f = get(ALARM_LAST_READ)
@@ -112,7 +118,7 @@ object SysConfig extends Enumeration {
     f
   }
 
-  def getDataPeriod(): Future[Int] = {
+  def getDataPeriod: Future[Int] = {
     val f = get(DATA_PERIOD)
     f.failed.foreach(errorHandler)
     for (ret <- f)
@@ -126,7 +132,7 @@ object SysConfig extends Enumeration {
   }
 
 
-  def getOperationMode(): Future[Int] = {
+  def getOperationMode: Future[Int] = {
     val f = get(OPERATION_MODE)
     f.failed.foreach(errorHandler)
     for (ret <- f)
@@ -140,8 +146,7 @@ object SysConfig extends Enumeration {
   }
 
   def getGcNameList: Future[Seq[String]] = {
-    val gcList = Monitor.indParkList
-    val defaultGcNameList = gcList.map(_.toString)
+    val defaultGcNameList = monitorOp.indParkList
     val f = get(GCNAME_LIST, Document(valueKey -> defaultGcNameList))
     f.failed.foreach(errorHandler)
     for (ret <- f)
@@ -152,6 +157,14 @@ object SysConfig extends Enumeration {
     val f = upsert(GCNAME_LIST, Document(valueKey -> nameList))
     f.failed.foreach(errorHandler)
     f
+  }
+
+  def getGcNameMap: Future[Map[String, String]] = {
+    val gcIdList = monitorOp.indParkList
+    for (gcNameList: Seq[String] <- getGcNameList) yield {
+      val pairs = gcIdList.zip(gcNameList)
+      pairs.toMap
+    }
   }
 
   def getStopWarn: Future[Boolean] = {
@@ -167,7 +180,7 @@ object SysConfig extends Enumeration {
     f
   }
 
-  def getCleanCount(): Future[Int] = {
+  def getCleanCount: Future[Int] = {
     val f = get(CLEAN_COUNT)
     f.failed.foreach(errorHandler)
     for (ret <- f)
@@ -178,5 +191,18 @@ object SysConfig extends Enumeration {
     val f = upsert(CLEAN_COUNT, Document(valueKey -> count))
     f.failed.foreach(errorHandler)
     f
+  }
+
+  def setLineToken(token: String): Future[UpdateResult] = {
+    val f = upsert(LINE_TOKEN, Document(valueKey -> token))
+    f.failed.foreach(errorHandler)
+    f
+  }
+
+  def getLineToken: Future[String] = {
+    val f = get(LINE_TOKEN, Document(valueKey -> ""))
+    f.failed.foreach(errorHandler)
+    for (ret <- f)
+      yield ret.asString().getValue
   }
 }

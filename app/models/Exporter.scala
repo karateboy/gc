@@ -7,18 +7,22 @@ import com.serotonin.modbus4j.code.DataType
 import com.serotonin.modbus4j.ip.IpParameters
 import com.serotonin.modbus4j.locator.BaseLocator
 import models.ModelHelper._
-import models.Record.MtRecord
-import play.api.Play.current
 import play.api._
 
-import java.nio.file.{Files, Paths, StandardOpenOption}
+import java.nio.file.{Files, Path, Paths, StandardOpenOption}
+import javax.inject.Inject
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 
-object Exporter {
-  val activeMonitorType = List(MonitorType.mtvList: _*)
-  val exportLocalModbus = Play.current.configuration.getBoolean("exportLocalModbus").getOrElse(false)
-  val modbusPort = Play.current.configuration.getInt("modbus_port").getOrElse(503)
+@javax.inject.Singleton
+class Exporter @Inject()(monitorOp: MonitorOp,
+                         monitorTypeOp: MonitorTypeOp,
+                         recordOp: RecordOp,
+                         configuration: Configuration,
+                         environment: Environment) {
+  private val activeMonitorType = monitorTypeOp.mtvList
+  private val exportLocalModbus = configuration.getBoolean("exportLocalModbus").getOrElse(false)
+  private val modbusPort = configuration.getInt("modbus_port").getOrElse(503)
 
   import com.serotonin.modbus4j._
 
@@ -26,12 +30,12 @@ object Exporter {
   var masterOpt: Option[ModbusMaster] = None
 
   def exportActiveMonitorType = {
-    val path = Paths.get(current.path.getAbsolutePath + "/export/activeMonitor.txt")
+    val path = Paths.get(environment.rootPath.getAbsolutePath + "/export/activeMonitor.txt")
     val monitorTypeStrList = activeMonitorType map {
-      MonitorType.map(_)._id
+      monitorTypeOp.map(_)._id
     }
     val ret = monitorTypeStrList.fold("")((a, b) => {
-      if (a.isEmpty())
+      if (a.isEmpty)
         b
       else
         a + "\r" + b
@@ -40,7 +44,7 @@ object Exporter {
   }
 
   // 0 is local
-  def exportLocalModeToPLC(gcConfig: GcConfig, mode: Int) = {
+  def exportLocalModeToPLC(gcConfig: GcConfig, mode: Int): Unit = {
     for (plcConfig <- gcConfig.plcConfig) {
       var connectorOpt: Option[S7Connector] = None
       try {
@@ -68,14 +72,14 @@ object Exporter {
     }
   }
 
-  def exportRealtimeData(gcConfig: GcConfig) = {
-    val path = Paths.get(current.path.getAbsolutePath + "/export/realtime.txt")
+  def exportRealtimeData(gcConfig: GcConfig): Future[Path] = {
+    val path = Paths.get(environment.rootPath.getAbsolutePath + "/export/realtime.txt")
     var buffer = ""
     buffer += s"Selector,${gcConfig.selector.get}\n"
-    val monitors = Monitor.getMonitorsByGcName(gcConfig.gcName) map {
+    val monitors = monitorOp.getMonitorsByGcName(gcConfig.gcName) map {
       _._id
     }
-    val latestRecord = Record.getLatestFixedRecordListFuture(Record.MinCollection, monitors)(1)
+    val latestRecord = recordOp.getLatestFixedRecordListFuture(RecordOp.MinCollection, monitors)(1)
 
     for (records <- latestRecord if records.nonEmpty) yield {
       val data = records.head
@@ -108,7 +112,7 @@ object Exporter {
     }
   }
 
-  def writeModbusSlave(gcConfig: GcConfig, data: Record.RecordList) = {
+  def writeModbusSlave(gcConfig: GcConfig, data: RecordList) = {
     import com.serotonin.modbus4j.ip.IpParameters
 
     def connectHost() {
@@ -172,8 +176,8 @@ object Exporter {
     } onFailure errorHandler
   }
 
-  def exportDataToPLC(data: Record.RecordList) = {
-    val selector: Monitor = Monitor.map(Monitor.withName(data.monitor))
+  def exportDataToPLC(data: RecordList) = {
+    val selector: Monitor = monitorOp.map(monitorOp.withName(data.monitor))
     val gcName = selector.gcName
 
     for {gcConfig <- GcAgent.gcConfigList.find(gcConfig => gcConfig.gcName == gcName)
@@ -222,8 +226,8 @@ object Exporter {
     }
   }
 
-  def exportDataToAO(data: Record.RecordList) = {
-    val selector: Monitor = Monitor.map(Monitor.withName(data.monitor))
+  def exportDataToAO(data: RecordList) = {
+    val selector: Monitor = monitorOp.map(monitorOp.withName(data.monitor))
     val gcName = selector.gcName
 
     for {gcConfig <- GcAgent.gcConfigList.find(gcConfig => gcConfig.gcName == gcName)

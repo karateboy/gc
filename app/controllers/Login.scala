@@ -1,11 +1,10 @@
 package controllers
 
-import play.api._
 import play.api.mvc._
 import play.api.libs.json._
-import play.api.libs.functional.syntax._
-import play.api.Logger
-import models.User
+import models.UserOp
+
+import javax.inject.Inject
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 case class Credential(userName: String, password: String)
@@ -13,13 +12,13 @@ case class Credential(userName: String, password: String)
 /**
  * @author user
  */
-object Login extends Controller {
-  implicit val credentialReads = Json.reads[Credential]
+class Login @Inject()(userOp: UserOp) extends Controller {
+  implicit val credentialReads: Reads[Credential] = Json.reads[Credential]
   
-  def authenticate = Action.async(BodyParsers.parse.json) {
+  def authenticate: Action[JsValue] = Action.async(BodyParsers.parse.json) {
     implicit request =>
-      val credentail = request.body.validate[Credential]
-      credentail.fold(
+      val credential = request.body.validate[Credential]
+      credential.fold(
         {
           error =>
             Future {
@@ -27,12 +26,12 @@ object Login extends Controller {
             }
         },
         crd => {
-          for (optUser <- User.getUserByIdFuture(crd.userName)) yield {
+          for (optUser <- userOp.getUserByIdFuture(crd.userName)) yield {
             if (optUser.isEmpty || optUser.get.password != crd.password)
               Ok(Json.obj("ok" -> false, "msg" -> "密碼或帳戶錯誤"))
             else {
               val user = optUser.get
-              implicit val userInfoWrite = Json.writes[UserInfo]
+              implicit val userInfoWrite: OWrites[UserInfo] = Json.writes[UserInfo]
               val userInfo = UserInfo(user._id, user.name, "Admin")
               Ok(Json.obj("ok" -> true, "user" -> userInfo)).withSession(Security.setUserinfo(request, userInfo))
             }
@@ -40,14 +39,14 @@ object Login extends Controller {
         })
   }
 
-  def getUserInfo = Security.Authenticated {
+  def getUserInfo: Action[AnyContent] = Security.Authenticated {
     implicit request =>
       val user = request.user
-      implicit val writes = Json.writes[UserInfo]
+      implicit val writes: OWrites[UserInfo] = Json.writes[UserInfo]
       Ok(Json.toJson(user))
   }
   
-  def logout = Action {
-    Ok(Json.obj(("ok" -> true))).withNewSession
+  def logout: Action[AnyContent] = Action {
+    Ok(Json.obj("ok" -> true)).withNewSession
   }
 }

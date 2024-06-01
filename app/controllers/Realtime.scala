@@ -1,7 +1,6 @@
 package controllers
 
 import com.github.nscala_time.time.Imports._
-import models.Record.MtRecord
 import models._
 import org.mongodb.scala.bson.ObjectId
 import play.api._
@@ -9,23 +8,12 @@ import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json._
 import play.api.mvc._
 
-import scala.collection.mutable
+import javax.inject.Inject
 import scala.concurrent._
 
-object Realtime extends Controller {
-  val overTimeLimit = 6
-
-  case class MonitorTypeStatus(desp: String, value: String, unit: String, instrument: String, status: String, classStr: String, order: Int)
-
+class Realtime @Inject()(monitorOp: MonitorOp, recordOp: RecordOp, exporter: Exporter, sysConfig: SysConfig) extends Controller {
   def MonitorTypeStatusList(): Action[AnyContent] = Security.Authenticated.async {
-    implicit request =>
-
-
-      implicit val mtsWrite = Json.writes[MonitorTypeStatus]
-
-      Future {
-        Ok("")
-      }
+      Future.successful(Ok(""))
   }
 
   case class GcLatestStatus(monitor: String, time: Long, mtDataList: Seq[MtRecord], pdfReport: ObjectId, executeCount: Int)
@@ -33,14 +21,15 @@ object Realtime extends Controller {
   def latestValues(gcFilter: String): Action[AnyContent] = Security.Authenticated.async {
     implicit request =>
       val gcConfig = GcAgent.gcConfigList.find(_.gcName == gcFilter).get
-      val monitors = Monitor.getMonitorByGcFilter(gcFilter)
-      val latestRecord = Record.getLatestRecordListFuture(Record.MinCollection, monitors, true)(1)
-      implicit val gcLatestStatusWrite = Json.writes[GcLatestStatus]
+      val monitors = monitorOp.getMonitorByGcFilter(gcFilter)
+      val latestRecord = recordOp.getLatestRecordListFuture(RecordOp.MinCollection, monitors, rename = true)(1)
+      implicit val mtRecordWrite = Json.writes[MtRecord]
+      implicit val gcLatestStatusWrite: OWrites[GcLatestStatus] = Json.writes[GcLatestStatus]
 
       for (records <- latestRecord) yield {
         val gcLatestStatus =
           if (records.isEmpty) {
-            GcLatestStatus("-", DateTime.now().getMillis, Seq.empty[Record.MtRecord], new ObjectId(), gcConfig.executeCount)
+            GcLatestStatus("-", DateTime.now().getMillis, Seq.empty[MtRecord], new ObjectId(), gcConfig.executeCount)
           } else {
             val recordList = records.head
             GcLatestStatus(recordList.monitor, recordList.time, recordList.mtDataList, recordList.pdfReport, gcConfig.executeCount)
@@ -55,62 +44,16 @@ object Realtime extends Controller {
 
   case class DataTab(columnNames: Seq[String], rows: Seq[RowData])
 
-  implicit val cellWrite = Json.writes[CellData]
-  implicit val rowWrite = Json.writes[RowData]
-  implicit val dtWrite = Json.writes[DataTab]
+  implicit val cellWrite: OWrites[CellData] = Json.writes[CellData]
+  implicit val rowWrite: OWrites[RowData] = Json.writes[RowData]
+  implicit val dtWrite: OWrites[DataTab] = Json.writes[DataTab]
 
-  def realtimeData(): Action[AnyContent] = Security.Authenticated.async {
-    implicit request =>
-
-      val user = request.user
-      val latestRecordMapF = Record.getLatestRecordMap2Future(Record.HourCollection)
-      val targetTime = (DateTime.now() - 2.hour).withMinuteOfHour(0).withSecond(0).withMillisOfSecond(0)
-      val ylMonitors = Monitor.mvList filter {
-        Monitor.map(_).gcName == "台塑六輕工業園區"
-      }
-      for {
-        map <- latestRecordMapF
-        yulinMap = map.filter { kv =>
-          Monitor.map(kv._1).gcName == "台塑六輕工業園區"
-        }
-      } yield {
-        var yulinFullMap = yulinMap
-        for (m <- ylMonitors) {
-          if (!yulinFullMap.contains(m))
-            yulinFullMap += (m -> (targetTime, Map.empty[MonitorType.Value, Record]))
-        }
-
-        val mtColumns =
-          for (mt <- MonitorType.activeMtvList) yield s"${MonitorType.map(mt).desp}"
-
-        val columns = "測站" +: "資料時間" +: mtColumns
-        val rows = for {
-          (monitor, recordPair) <- yulinFullMap
-          (time, recordMap) = recordPair
-        } yield {
-          val monitorCell = CellData(s"${Monitor.map(monitor).selector}", "")
-          val timeCell = CellData(s"${time.toLocalTime().toString("HH:mm")}", "")
-          val valueCells =
-            for {
-              mt <- MonitorType.activeMtvList
-              v = MonitorType.formatRecord(mt, recordMap.get(mt))
-              styleStr = MonitorType.getCssClassStr(mt, recordMap.get(mt))
-            } yield CellData(v, styleStr)
-          RowData(monitorCell +: timeCell +: valueCells)
-        }
-
-        Ok(Json.toJson(DataTab(columns, rows.toSeq)))
-      }
-  }
-
-  def getGcMonitors() = Security.Authenticated.async {
-    implicit request =>
+  import monitorOp._
+  def getGcMonitors: Action[AnyContent] = Security.Authenticated.async {
       var gcNameMonitorMap = Map.empty[String, Seq[Monitor]]
 
-      for (gcNameMap <- Monitor.getGcNameMap()) yield {
-        for (monitor <- Monitor.mvList map {
-          Monitor.map
-        }) {
+      for (gcNameMap <- sysConfig.getGcNameMap) yield {
+        for (monitor <- monitorOp.map.values.toList.sortBy(_.gcName)) {
           val gcMonitorList = gcNameMonitorMap.getOrElse(gcNameMap(monitor.gcName), Seq.empty[Monitor])
           gcNameMonitorMap = gcNameMonitorMap + (gcNameMap(monitor.gcName) -> gcMonitorList.:+(monitor))
         }
@@ -119,19 +62,19 @@ object Realtime extends Controller {
 
   }
 
-  def getCurrentMonitor() = Security.Authenticated {
+  def getCurrentMonitor(): Action[AnyContent] = Security.Authenticated {
     implicit request =>
-      val monitors: mutable.Seq[_root_.models.Monitor.Value] =
+      val monitors =
         for (gcConfig <- GcAgent.gcConfigList) yield {
-          Monitor.withName(Monitor.monitorId(gcConfig.gcName, gcConfig.selector.get))
+          monitorOp.withName(monitorOp.monitorId(gcConfig.gcName, gcConfig.selector.get))
         }
-      val monitorCase: mutable.Seq[Monitor] = monitors map {
-        Monitor.map
+      val monitorCase =monitors map {
+        monitorOp.map
       }
       Ok(Json.toJson(monitorCase))
   }
 
-  def setCurrentMonitor(monitorId: String) = Security.Authenticated.async {
+  def setCurrentMonitor(monitorId: String): Action[AnyContent] = Security.Authenticated.async {
     implicit request =>
       val tokens = monitorId.split(":")
       val gcName = tokens(0)
@@ -139,7 +82,7 @@ object Realtime extends Controller {
       Logger.info(s"$gcName Selector set to ${selector}")
       for (config <- GcAgent.gcConfigList.find(config => config.gcName == gcName)) {
         config.selector.set(selector)
-        Exporter.notifySelectorChange(config, selector)
+        exporter.notifySelectorChange(config, selector)
       }
 
       Future {

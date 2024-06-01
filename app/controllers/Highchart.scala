@@ -28,11 +28,11 @@ object Highchart {
                            downloadFileName: Option[String]=None)
   case class FrequencyTab(header:Seq[String], body:Seq[Seq[String]], footer:Seq[String])                         
   case class WindRoseReport(chart:HighchartData, table:FrequencyTab)
-  implicit val xaWrite = Json.writes[XAxis]
-  implicit val axisLineLabelWrite = Json.writes[AxisLineLabel]
-  implicit val axisLineWrite = Json.writes[AxisLine]
-  implicit val axisTitleWrite = Json.writes[AxisTitle]
-  implicit val yaWrite = Json.writes[YAxis]
+  implicit val xaWrite: OWrites[XAxis] = Json.writes[XAxis]
+  implicit val axisLineLabelWrite: OWrites[AxisLineLabel] = Json.writes[AxisLineLabel]
+  implicit val axisLineWrite: OWrites[AxisLine] = Json.writes[AxisLine]
+  implicit val axisTitleWrite: OWrites[AxisTitle] = Json.writes[AxisTitle]
+  implicit val yaWrite: OWrites[YAxis] = Json.writes[YAxis]
   type lof = (Long, Option[Float])
           
   implicit val seqDataWrite:Writes[seqData] = (
@@ -41,9 +41,9 @@ object Highchart {
     (__ \ "yAxis").write[Int] and
     (__ \ "type").write[Option[String]]
   )(unlift(seqData.unapply))
-  implicit val hcWrite = Json.writes[HighchartData]
-  implicit val feqWrite = Json.writes[FrequencyTab]
-  implicit val wrWrite = Json.writes[WindRoseReport]
+  implicit val hcWrite: OWrites[HighchartData] = Json.writes[HighchartData]
+  implicit val feqWrite: OWrites[FrequencyTab] = Json.writes[FrequencyTab]
+  implicit val wrWrite: OWrites[WindRoseReport] = Json.writes[WindRoseReport]
 
 
 }

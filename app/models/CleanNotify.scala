@@ -17,7 +17,8 @@ object CleanNotify {
            slaveId = config.getInt("slaveId")
            address <- config.getInt("address")
            } yield {
-        CleanNotifyConfig(host, slaveId, address)
+        val delay = config.getInt("delay").getOrElse(0)
+        CleanNotifyConfig(host, slaveId, address, delay)
       }
   }
   def notify(config:CleanNotifyConfig): Unit = {

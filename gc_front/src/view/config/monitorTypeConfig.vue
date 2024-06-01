@@ -64,11 +64,28 @@
           <Icon type="ios-keypad"></Icon>GC觸發清洗 (0表示不觸發)
         </p>
         <Form :model="formItem" :label-width="80">
-          <FormItem label="分析次數:">
-            <Slider v-model="formItem.cleanCount" show-input></Slider>
+          <FormItem label="分析次數:" :label-width="150">
+            <Slider v-model="formItem.cleanCount" show-input max="1000"></Slider>
           </FormItem>
           <FormItem>
             <Button type="primary" @click.prevent="setCleanCount">更新</Button>
+          </FormItem>
+        </Form>
+      </Card>
+    </Row>
+    <Row class="margin-top-10">
+      <Card>
+        <p slot="title">
+          <Icon type="ios-keypad"></Icon>LINE 通知
+        </p>
+        <Form :model="formItem" :label-width="80">
+          <FormItem label="LINE Token:" :label-width="200">
+            <Input v-model="formItem.lineToken" placeholder="请输入LINE notify token..." width="300"></Input>
+          </FormItem>
+          <FormItem>
+            <Button type="primary" @click.prevent="setLineToken">更新</Button>
+            &nbsp;
+            <Button type="info" @click.prevent="testLineToken">測試</Button>
           </FormItem>
         </Form>
       </Card>
@@ -156,7 +173,8 @@ export default {
       ],
       formItem: {
         dataPeriod: 30,
-        cleanCount: 0
+        cleanCount: 0,
+        lineToken: ""
       },
       stopWarn: false
     };
@@ -243,6 +261,36 @@ export default {
           alert(err);
         });
     },
+    testLineToken() {
+      axios
+        .post("/lineToken", { value: this.formItem.lineToken, test: true})
+        .then(res => {
+          const ret = res.data;
+          if (ret.ok) this.$Message.success("成功");
+          else this.$Message.success("失敗");
+        })
+        .catch(err => {
+          alert(err);
+        });
+    },
+    setLineToken() {
+      axios
+        .post("/lineToken", { value: this.formItem.lineToken })
+        .then(res => {
+          const ret = res.data;
+          if (ret.ok) this.$Message.success("成功");
+          else this.$Message.success("失敗");
+        })
+        .catch(err => {
+          alert(err);
+        });
+    },
+    getLineTokens() {
+      axios.get("/lineToken").then(res => {
+        const ret = res.data;
+        this.formItem.lineToken = ret;
+      });
+    },
     getGcList() {
       axios.get("/gc").then(res => {
         const ret = res.data;
@@ -283,6 +331,7 @@ export default {
     this.getGcList();
     this.getStopWarn();
     this.getCleanCount();
+    this.getLineTokens();
   }
 };
 </script>

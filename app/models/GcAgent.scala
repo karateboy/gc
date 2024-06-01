@@ -5,10 +5,10 @@ import com.github.s7connector.api.S7Connector
 import com.github.s7connector.api.factory.{S7ConnectorFactory, S7SerializerFactory}
 import models.ModelHelper._
 import org.mongodb.scala.model._
-import play.api.Play.current
 import play.api._
-import play.api.libs.concurrent.Akka
+import play.api.libs.concurrent.InjectedActorSupport
 
+import javax.inject.Inject
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration
@@ -24,7 +24,7 @@ case class AoConfig(host: String, exportMap: Map[String, AoEntry])
 
 case class ComputedMeasureType(_id: String, sum: Seq[String])
 
-case class CleanNotifyConfig(host: String, slaveId:Option[Int], address: Int)
+case class CleanNotifyConfig(host: String, slaveId: Option[Int], address: Int, delay:Int = 7)
 
 case class GcConfig(index: Int, inputDir: String, selector: Selector,
                     plcConfig: Option[SiemensPlcConfig],
@@ -43,15 +43,16 @@ case class HaloKaConfig(com: Int, speed: Int, MonitorType: String)
 import scala.collection.JavaConverters._
 
 object GcAgent {
-  val gcAgent_check_period: Int = Play.current.configuration.getInt("gcAgent_check_period").getOrElse(60)
-  val export_period: Int = Play.current.configuration.getInt("export_period").getOrElse(60)
+  def getGcName(idx: Int) = s"gc${idx + 1}"
 
-  val gcConfigList: mutable.Seq[GcConfig] = {
-    val configList = Play.current.configuration.getConfigList("gcConfigList").get.asScala
+  var gcConfigList: Seq[GcConfig] = Seq.empty[GcConfig]
+
+  private def initGcConfigList(configuration: Configuration, monitorOp: MonitorOp, alarmOp: AlarmOp, actorSystem: ActorSystem): Unit = {
+    val configList = configuration.getConfigList("gcConfigList").get.asScala
     for ((config, idx) <- configList.zipWithIndex) yield {
       val inputDir = config.getString("inputDir", None).get
       Logger.info(config.toString)
-      val selector = new Selector(getGcName(idx), config.getConfig("selector").get)
+      val selector = new Selector(monitorOp, alarmOp, actorSystem)(getGcName(idx), config.getConfig("selector").get)
 
       val plcConfig: Option[SiemensPlcConfig] =
         for (config <- config.getConfig("plcConfig")) yield {
@@ -147,46 +148,58 @@ object GcAgent {
       val cleanNotify: Option[CleanNotifyConfig] = CleanNotify.getConfig(config)
 
       Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
-      Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
-      Logger.info(s"${plcConfig.toString}")
-      GcConfig(idx, inputDir, selector, plcConfig, aoConfigs, haloKaConfig, adam6017ConfigOpt, computedTypes,
-        cleanNotify,
-        com.github.nscala_time.time.Imports.DateTime.now(), 0)
-    }
-  }
-  private var receiver: ActorRef = _
-
-  def getGcName(idx: Int) = s"gc${idx + 1}"
-
-  def startup(): Unit = {
-    // Init export local mode to PLC
-    for (mode <- SysConfig.getOperationMode()) {
-      for (gcConfig <- gcConfigList)
-        Exporter.exportLocalModeToPLC(gcConfig, mode)
-    }
-
-    receiver = Akka.system.actorOf(Props(classOf[GcAgent]), name = "gcAgent")
-    receiver ! ParseReport
-    for (gcConfig <- gcConfigList) {
-      for (haloKaConfig <- gcConfig.haloKaConfig) {
-        Akka.system.actorOf(HaloKaAgent.prof(haloKaConfig, gcConfig), name = s"haloKaAgent${gcConfig.index}")
-      }
-      for (adam6017Config <- gcConfig.adam6017Config) {
-        Akka.system.actorOf(Adam6017Agent.prof(adam6017Config, gcConfig), name = s"adam6017Agent${gcConfig.index}")
-      }
+      gcConfigList = gcConfigList :+
+        GcConfig(idx, inputDir, selector, plcConfig, aoConfigs, haloKaConfig, adam6017ConfigOpt, computedTypes,
+          cleanNotify,
+          com.github.nscala_time.time.Imports.DateTime.now(), 0)
     }
   }
 
-  case object ParseReport
+  private case object ParseReport
 
-  case object ExportData
+  private case object ExportData
+
+  private case class NotifyClean(config: CleanNotifyConfig)
+
 }
 
-class GcAgent extends Actor {
+@javax.inject.Singleton
+class GcAgent @Inject()(configuration: Configuration,
+                        mongoDB: MongoDB,
+                        sysConfig: SysConfig,
+                        monitorOp: MonitorOp,
+                        monitorTypeOp: MonitorTypeOp,
+                        recordOp: RecordOp,
+                        alarmOp: AlarmOp,
+                        pdfReportOp: PdfReportOp,
+                        exporter: Exporter,
+                        haloKaAgentFactory: HaloKaAgent.Factory,
+                        adam6017AgentFactory: Adam6017Agent.Factory) extends Actor with InjectedActorSupport {
 
   import GcAgent._
 
   Logger.info("GcAgent started.")
+  val gcAgent_check_period: Int = configuration.getInt("gcAgent_check_period").getOrElse(60)
+  val export_period: Int = configuration.getInt("export_period").getOrElse(60)
+
+  initGcConfigList(configuration, monitorOp, alarmOp, context.system)
+
+  for (mode <- sysConfig.getOperationMode) {
+    for (gcConfig <- gcConfigList)
+      exporter.exportLocalModeToPLC(gcConfig, mode)
+  }
+
+  self ! ParseReport
+
+  for (gcConfig <- gcConfigList) {
+    for (haloKaConfig <- gcConfig.haloKaConfig) {
+      injectedChild(haloKaAgentFactory(haloKaConfig, gcConfig), name = s"haloKaAgent${gcConfig.index}")
+    }
+
+    for (adam6017Config <- gcConfig.adam6017Config) {
+      injectedChild(adam6017AgentFactory(adam6017Config, gcConfig), name = s"adam6017Agent${gcConfig.index}")
+    }
+  }
 
   val MAX_RETRY_COUNT = 30
 
@@ -211,7 +224,7 @@ class GcAgent extends Actor {
           Future {
             blocking {
               checkNoDataPeriod(gcConfig)
-              for (operationMode <- SysConfig.getOperationMode()) {
+              for (operationMode <- sysConfig.getOperationMode) {
                 if (operationMode == 1 && gcConfig.plcConfig.nonEmpty) //remote mode
                   readPlcStatus(gcConfig)
               }
@@ -231,13 +244,16 @@ class GcAgent extends Actor {
         for (gcConfig <- gcConfigList) {
           pos += 1
           if (pos == counter % gcConfigList.size)
-            Exporter.exportRealtimeData(gcConfig)
+            exporter.exportRealtimeData(gcConfig)
         }
       } catch {
         case ex: Throwable =>
           Logger.error("export data failed", ex)
       }
       context.system.scheduler.scheduleOnce(scala.concurrent.duration.Duration(export_period, scala.concurrent.duration.SECONDS), self, ExportData)
+
+    case NotifyClean(cleanNotifyConfig) =>
+      CleanNotify.notify(cleanNotifyConfig)
   }
 
   def parser(gcConfig: GcConfig, reportDir: File): Boolean = {
@@ -253,13 +269,13 @@ class GcAgent extends Actor {
     val pdfReport = PdfReport(pdfReportId, pdfReportFile.getName,
       Files.readAllBytes(Paths.get(pdfReportFile.getAbsolutePath)))
 
-    val f1 = PdfReport.collection.insertOne(pdfReport).toFuture()
+    val f1 = pdfReportOp.collection.insertOne(pdfReport).toFuture()
     f1.onFailure(errorHandler)
     waitReadyResult(f1)
 
     import com.github.nscala_time.time.Imports._
 
-    val monitor = Monitor.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
+    val monitor = monitorOp.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
 
     def insertRecord(): Unit = {
       val lines =
@@ -308,8 +324,9 @@ class GcAgent extends Actor {
 
         getPos(0)
       }
-      val recordMap = mutable.Map.empty[Monitor.Value, mutable.Map[DateTime, mutable.Map[MonitorType.Value, (Double, String)]]]
-      val timeMap = recordMap.getOrElseUpdate(monitor, mutable.Map.empty[DateTime, mutable.Map[MonitorType.Value, (Double, String)]])
+
+      val recordMap = mutable.Map.empty[MonitorOp#Value, mutable.Map[DateTime, mutable.Map[MonitorTypeOp#Value, (Double, String)]]]
+      val timeMap = recordMap.getOrElseUpdate(monitor, mutable.Map.empty[DateTime, mutable.Map[MonitorTypeOp#Value, (Double, String)]])
 
       val rLines = getRecordLines(lines)
       for (rec <- rLines) {
@@ -331,8 +348,8 @@ class GcAgent extends Actor {
           assert(name.nonEmpty)
           assert(name.charAt(0).isLetter)
 
-          val monitorType = MonitorType.getMonitorTypeValueByName(name, "")
-          val mtMap = timeMap.getOrElseUpdate(mDate, mutable.Map.empty[MonitorType.Value, (Double, String)])
+          val monitorType = monitorTypeOp.getMonitorTypeValueByName(name, "")
+          val mtMap = timeMap.getOrElseUpdate(mDate, mutable.Map.empty[MonitorTypeOp#Value, (Double, String)])
 
           val mtValue = try {
             ppm.toDouble
@@ -352,9 +369,9 @@ class GcAgent extends Actor {
         if (gcConfig.computedMtList.isDefined) {
           for (mtMap <- timeMap.values) {
             for (computedType <- gcConfig.computedMtList.get) {
-              val computedMt = MonitorType.getMonitorTypeValueByName(computedType._id, "", 1000)
+              val computedMt = monitorTypeOp.getMonitorTypeValueByName(computedType._id, "", 1000)
               val values: Seq[Double] = computedType.sum map { mtName =>
-                val mt = MonitorType.getMonitorTypeValueByName(mtName, "")
+                val mt = monitorTypeOp.getMonitorTypeValueByName(mtName, "")
                 if (mtMap.contains(mt))
                   mtMap(mt)._1
                 else
@@ -370,12 +387,10 @@ class GcAgent extends Actor {
 
       val updateModels =
         for {
-          monitorMap <- recordMap
-          monitor = monitorMap._1
-          timeMaps = monitorMap._2
+          (monitor, timeMaps) <- recordMap
           dateTime <- timeMaps.keys.toList.sorted
-          mtMaps = timeMaps(dateTime) if !mtMaps.isEmpty
-          doc = Record.toDocument(monitor, dateTime, mtMaps.toList, pdfReportId, sampleName)
+          mtMaps = timeMaps(dateTime) if mtMaps.nonEmpty
+          doc = recordOp.toDocument(monitor, dateTime, mtMaps.toList, pdfReportId, sampleName)
           updateList = doc.toList.map(kv => Updates.set(kv._1, kv._2)) if !updateList.isEmpty
         } yield {
           UpdateOneModel(
@@ -384,20 +399,22 @@ class GcAgent extends Actor {
         }
 
       if (updateModels.nonEmpty) {
-        val collection = MongoDB.database.getCollection(Record.MinCollection)
+        val collection = mongoDB.database.getCollection(RecordOp.MinCollection)
         val f2 = collection.bulkWrite(updateModels.toList, BulkWriteOptions().ordered(false)).toFuture()
         f2.onFailure(errorHandler)
         f2 onSuccess {
           case _ =>
             gcConfig.executeCount += 1
-            for (cleanCount <- SysConfig.getCleanCount()) {
+            for (cleanCount <- sysConfig.getCleanCount) {
               if (cleanCount != 0 && gcConfig.executeCount >= cleanCount) {
                 gcConfig.executeCount = gcConfig.executeCount % cleanCount
-                for(cleanNotify <- gcConfig.cleanNotifyConfig)
-                  CleanNotify.notify(cleanNotify)
+                for (cleanNotify <- gcConfig.cleanNotifyConfig) {
+                  context.system.scheduler.scheduleOnce(
+                    FiniteDuration(cleanNotify.delay, scala.concurrent.duration.MINUTES), self, NotifyClean(cleanNotify))
+                }
               }
             }
-            Exporter.exportRealtimeData(gcConfig)
+            exporter.exportRealtimeData(gcConfig)
         }
       }
     } //End of process report.txt
@@ -473,23 +490,23 @@ class GcAgent extends Actor {
     }
   }
 
-  def checkNoDataPeriod(gcConfig: GcConfig): Future[Unit] = {
+  private def checkNoDataPeriod(gcConfig: GcConfig): Future[Unit] = {
     import com.github.nscala_time.time.Imports._
 
-    for {dataPeriod <- SysConfig.getDataPeriod()
-         stopWarn <- SysConfig.getStopWarn
+    for {dataPeriod <- sysConfig.getDataPeriod
+         stopWarn <- sysConfig.getStopWarn
          } yield {
 
       if (!stopWarn && (gcConfig.latestDataTime + dataPeriod.minutes) < DateTime.now) {
-        val mv = Monitor.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
-        val monitor = Monitor.map(mv).dp_no
-        Alarm.log(Some(monitor), None, "沒有資料匯入!", dataPeriod)
-        Exporter.notifyAlarm(gcConfig, true)
+        val mv = monitorOp.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
+        val monitor = monitorOp.map(mv).dp_no
+        alarmOp.log(Some(monitor), None, "沒有資料匯入!", dataPeriod)
+        exporter.notifyAlarm(gcConfig, alarm = true)
       }
     }
   }
 
-  def readPlcStatus(gcConfig: GcConfig): Unit = {
+  private def readPlcStatus(gcConfig: GcConfig): Unit = {
     gcConfig.plcConfig foreach {
       plcConfig =>
         var connectorOpt: Option[S7Connector] = None
@@ -507,7 +524,7 @@ class GcAgent extends Actor {
             if (plcConfig.importMap.contains("selector")) {
               val entry = plcConfig.importMap("selector")
 
-              def notifyPLC(pos: Int) = {
+              def notifyPLC(pos: Int): Unit = {
                 if (plcConfig.exportMap.contains("selector")) {
                   val entry = plcConfig.exportMap("selector")
                   Logger.info(s"set selector ${pos} =>DB${entry.db}.${entry.offset}.${entry.bitOffset}")

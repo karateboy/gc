@@ -1,10 +1,17 @@
 package models
+import com.github.nscala_time.time.Imports
 import com.github.nscala_time.time.Imports._
+import controllers.Assets.BadRequest
+
 import scala.language.implicitConversions
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import play.api._
+import play.api.data.validation.ValidationError
+import play.api.mvc.Result
+
 import scala.collection.JavaConversions._
+import scala.concurrent.Future
 
 /**
  * @author user
@@ -12,16 +19,12 @@ import scala.collection.JavaConversions._
 
 object ModelHelper {
   import org.mongodb.scala.bson.BsonDateTime
-  implicit def toDateTime(time: BsonDateTime) = new DateTime(time.getValue)
-  implicit def toBsonDateTime(jdtime: DateTime) = new BsonDateTime(jdtime.getMillis)
+  implicit def toDateTime(time: BsonDateTime): Imports.DateTime = new DateTime(time.getValue)
+  implicit def toBsonDateTime(dt: DateTime): BsonDateTime = new BsonDateTime(dt.getMillis)
 
   def main(args: Array[String]) {
     val timestamp = DateTime.parse("2015-04-01")
     println(timestamp.toString())
-  }
-
-  def logException(ex: Throwable) = {
-    Logger.error(ex.getMessage, ex)
   }
 
   def errorHandler: PartialFunction[Throwable, Any] = {
@@ -37,6 +40,15 @@ object ModelHelper {
     case ex: Throwable =>
       Logger.error(prompt, ex)
       throw ex
+  }
+
+  def handleJsonValidateError(error: Seq[(JsPath, Seq[ValidationError])]): Result = {
+    Logger.error(JsError.toJson(error).toString(), new Exception("Json validate error"))
+    BadRequest(Json.obj("ok" -> false, "msg" -> JsError.toJson(error).toString()))
+  }
+
+  def handleJsonValidateErrorFuture(error: Seq[(JsPath, Seq[ValidationError])]): Future[Result] = {
+    Future.successful(handleJsonValidateError(error))
   }
 
   import scala.concurrent._
