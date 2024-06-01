@@ -16,7 +16,7 @@ import scala.concurrent.{Future, blocking}
 
 case class ExportEntry(db: Int, offset: Int, bitOffset: Int)
 
-case class SiemensPlcConfig(host: String, exportMap: Map[String, ExportEntry], importMap: Map[String, ExportEntry])
+case class SiemensPlcConfig(host: String, rack: Option[Int], slot:Option[Int], exportMap: Map[String, ExportEntry], importMap: Map[String, ExportEntry])
 
 case class AoEntry(idx: Int, min: Double, max: Double)
 
@@ -74,10 +74,11 @@ object GcAgent {
               pairs.toMap
             }
           }
-
+          val rack = config.getInt("rack")
+          val slot = config.getInt("slot")
           val exportMap = getMapping(config.getConfigList("exportMap"))
           val importMap = getMapping(config.getConfigList("importMap"))
-          SiemensPlcConfig(host, exportMap, importMap)
+          SiemensPlcConfig(host, rack, slot, exportMap, importMap)
         }
 
       val computedTypes: Option[mutable.Buffer[ComputedMeasureType]] =
