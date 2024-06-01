@@ -512,14 +512,7 @@ class GcAgent @Inject()(configuration: Configuration,
       plcConfig =>
         var connectorOpt: Option[S7Connector] = None
         try {
-          connectorOpt =
-            Some(S7ConnectorFactory
-              .buildTCPConnector()
-              .withHost(plcConfig.host)
-              .withRack(0)
-              .withSlot(1)
-              .build())
-
+          connectorOpt = Exporter.getPlcConnector(plcConfig)
           for (connector <- connectorOpt) {
             val serializer = S7SerializerFactory.buildSerializer(connector)
             if (plcConfig.importMap.contains("selector")) {
