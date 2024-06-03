@@ -4,10 +4,12 @@ import models.ModelHelper._
 import org.bson.codecs.configuration.CodecRegistry
 import org.mongodb.scala.MongoCollection
 import org.mongodb.scala.model._
+import org.mongodb.scala.result.InsertOneResult
 import play.api.libs.json._
 
 import javax.inject.Inject
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 case class MonitorType(_id: String, desp: String, unit: String, order: Int, prec: Int = 2,
                        std_law: Option[Double] = None,
@@ -79,14 +81,14 @@ class MonitorTypeOp @Inject()(mongoDB: MongoDB) extends Enumeration {
     } catch {
       case _: NoSuchElementException =>
         val mt = MonitorType(_id = _id, desp = _id, unit = unit, order = mtvList.size + start)
-        newMonitorType(mt)
+        waitReadyResult(newMonitorType(mt))
         val value = Value(mt._id)
         refreshMtv()
         value
     }
   }
 
-  private def newMonitorType(mt: MonitorType) =
+  private def newMonitorType(mt: MonitorType): Future[InsertOneResult] =
     collection.insertOne(mt).toFuture()
 
   import org.mongodb.scala.model.Filters._

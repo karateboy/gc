@@ -40,4 +40,5 @@ mappings in Universal ++=
 (baseDirectory.value / "export/" * "*" get) map
     (x => x -> ("export/" + x.getName))
 
+mappings in Universal ++= Seq((baseDirectory.value / "cleanup.bat", "cleanup.bat"))
 routesGenerator := InjectedRoutesGenerator
