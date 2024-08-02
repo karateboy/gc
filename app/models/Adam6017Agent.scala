@@ -28,7 +28,7 @@ object Adam6017Agent {
   private case object CollectData
 }
 
-class Adam6017Agent @Inject()(monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp, recordOp: RecordOp)
+class Adam6017Agent @Inject()(monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp, recordOp: RecordOp, exporter: Exporter)
                              (@Assisted("config") config: Adam6017Config, @Assisted("gcConfig") gcConfig: GcConfig) extends Actor {
   Logger.info(s"Adam6017Agent start for ${config.host}")
 
@@ -36,7 +36,7 @@ class Adam6017Agent @Inject()(monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp
 
   self ! ConnectHost
 
-  private def decodeAi(values: Seq[Double]) = {
+  private def decodeAi(values: Seq[Double]): Unit = {
     val dataPairList =
       for {
         channelCfg <- config.aiConfigs
@@ -52,11 +52,16 @@ class Adam6017Agent @Inject()(monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp
         (mt, (v, MonitorStatus.NormalStat))
       }
 
+    val now = DateTime.now
+    if (now.getSecondOfMinute <= 30) {
+      val dt = DateTime.now.withSecondOfMinute(0).withMillisOfSecond(0)
+      val monitor = monitorOp.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
+      val doc = recordOp.toDocument(monitor, dt, dataPairList.toList)
+      recordOp.upsertRecord(doc)(RecordOp.MinCollection)
+    }
 
-    val dt = DateTime.now.withSecondOfMinute(0).withMillisOfSecond(0)
-    val monitor = monitorOp.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
-    val doc = recordOp.toDocument(monitor, dt, dataPairList.toList)
-    recordOp.upsertRecord(doc)(RecordOp.MinCollection)
+    val dataList = dataPairList map { pair => MtRecord(pair._1.toString, pair._2._1, pair._2._2, "") }
+    exporter.exportMonitorTypeToPLC(gcConfig, dataList)
   }
 
   def receive: Receive = handler(None)
@@ -120,7 +125,7 @@ class Adam6017Agent @Inject()(monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp
             }
 
             import scala.concurrent.duration._
-            cancelable = context.system.scheduler.scheduleOnce(FiniteDuration(1, MINUTES), self, CollectData)
+            cancelable = context.system.scheduler.scheduleOnce(FiniteDuration(30, SECONDS), self, CollectData)
           } catch {
             case ex: Throwable =>
               Logger.error("Read reg failed", ex)

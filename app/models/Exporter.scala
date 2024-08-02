@@ -35,8 +35,8 @@ class Exporter @Inject()(monitorOp: MonitorOp,
   private val exportLocalModbus = configuration.getBoolean("exportLocalModbus").getOrElse(false)
   private val modbusPort = configuration.getInt("modbus_port").getOrElse(503)
 
-  import com.serotonin.modbus4j._
   import Exporter._
+  import com.serotonin.modbus4j._
 
   private var latestDateTime = new DateTime(0)
   var masterOpt: Option[ModbusMaster] = None
@@ -182,6 +182,34 @@ class Exporter @Inject()(monitorOp: MonitorOp,
         }
       }
     } onFailure errorHandler
+  }
+
+  def exportMonitorTypeToPLC(gcConfig: GcConfig, mtDataList: Seq[MtRecord]): Unit = {
+    var connectorOpt: Option[S7Connector] = None
+    for (plcConfig <- gcConfig.plcConfig) {
+      try {
+        connectorOpt = getPlcConnector(plcConfig)
+        for (connector <- connectorOpt) {
+          val serializer: S7Serializer = S7SerializerFactory.buildSerializer(connector)
+          for (mtData <- mtDataList) {
+            if (plcConfig.exportMap.contains(mtData.mtName)) {
+              val entry = plcConfig.exportMap(mtData.mtName)
+              Logger.info(s"${mtData.mtName} ${mtData.value}=>DB${entry.db}.${entry.offset}")
+              val mtDataBean = new MtDataBean()
+              mtDataBean.value = mtData.value.toFloat
+              serializer.store(mtDataBean, entry.db, entry.offset)
+            }
+          }
+        }
+      } catch {
+        case ex: Exception =>
+          Logger.error(ex.getMessage, ex)
+      } finally {
+        for (connector <- connectorOpt) {
+          connector.close()
+        }
+      }
+    }
   }
 
   private def exportDataToPLC(data: RecordList): Unit = {
