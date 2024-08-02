@@ -47,7 +47,11 @@ object GcAgent {
 
   var gcConfigList: Seq[GcConfig] = Seq.empty[GcConfig]
 
-  private def initGcConfigList(configuration: Configuration, monitorOp: MonitorOp, alarmOp: AlarmOp, actorSystem: ActorSystem): Unit = {
+  private def initGcConfigList(configuration: Configuration,
+                               monitorOp: MonitorOp,
+                               alarmOp: AlarmOp,
+                               actorSystem: ActorSystem,
+                               sysConfig: SysConfig): Unit = {
     val configList = configuration.getConfigList("gcConfigList").get.asScala
     for ((config, idx) <- configList.zipWithIndex) yield {
       val inputDir = config.getString("inputDir", None).get
@@ -148,11 +152,12 @@ object GcAgent {
 
       val cleanNotify: Option[CleanNotifyConfig] = CleanNotify.getConfig(config)
 
+      val executeCount = waitReadyResult(sysConfig.getExecuteCount)
       Logger.info(s"${getGcName(idx)} inputDir =$inputDir ")
       gcConfigList = gcConfigList :+
         GcConfig(idx, inputDir, selector, plcConfig, aoConfigs, haloKaConfig, adam6017ConfigOpt, computedTypes,
           cleanNotify,
-          com.github.nscala_time.time.Imports.DateTime.now(), 0)
+          com.github.nscala_time.time.Imports.DateTime.now(), executeCount)
     }
   }
 
@@ -161,6 +166,8 @@ object GcAgent {
   private case object ExportData
 
   private case class NotifyClean(config: CleanNotifyConfig)
+
+  private case class NotifyCleanReset(config: CleanNotifyConfig)
 
 }
 
@@ -180,10 +187,10 @@ class GcAgent @Inject()(configuration: Configuration,
   import GcAgent._
 
   Logger.info("GcAgent started.")
-  val gcAgent_check_period: Int = configuration.getInt("gcAgent_check_period").getOrElse(60)
-  val export_period: Int = configuration.getInt("export_period").getOrElse(60)
+  private val gcAgent_check_period: Int = configuration.getInt("gcAgent_check_period").getOrElse(60)
+  private val export_period: Int = configuration.getInt("export_period").getOrElse(60)
 
-  initGcConfigList(configuration, monitorOp, alarmOp, context.system)
+  initGcConfigList(configuration, monitorOp, alarmOp, context.system, sysConfig)
 
   for (mode <- sysConfig.getOperationMode) {
     for (gcConfig <- gcConfigList)
@@ -202,23 +209,24 @@ class GcAgent @Inject()(configuration: Configuration,
     }
   }
 
-  val MAX_RETRY_COUNT = 30
+  private val MAX_RETRY_COUNT = 60
 
   import java.io.File
-
-  var retryMap = Map.empty[String, Int]
 
   self ! ExportData
 
   var counter = 0
 
-  def receive: Receive = {
+  def receive: Receive = handler(Map.empty[String, Int])
+
+  def handler(retryMap: Map[String, Int]): Receive = {
     case ParseReport =>
       try {
         for (gcConfig <- gcConfigList) {
           Future {
             blocking {
-              processInputPath(gcConfig, parser)
+              val newRetryMap = processInputPath(gcConfig, parser, retryMap)
+              context.become(handler(newRetryMap))
             }
           }
 
@@ -254,7 +262,12 @@ class GcAgent @Inject()(configuration: Configuration,
       context.system.scheduler.scheduleOnce(scala.concurrent.duration.Duration(export_period, scala.concurrent.duration.SECONDS), self, ExportData)
 
     case NotifyClean(cleanNotifyConfig) =>
-      CleanNotify.notify(cleanNotifyConfig)
+      CleanNotify.notify(cleanNotifyConfig, value = true)
+      context.system.scheduler.scheduleOnce(
+        FiniteDuration(5, scala.concurrent.duration.SECONDS), self, NotifyCleanReset(cleanNotifyConfig))
+
+    case NotifyCleanReset(cleanNotifyConfig) =>
+      CleanNotify.notify(cleanNotifyConfig, value = false)
   }
 
   def parser(gcConfig: GcConfig, reportDir: File): Boolean = {
@@ -406,6 +419,7 @@ class GcAgent @Inject()(configuration: Configuration,
         f2 onSuccess {
           case _ =>
             gcConfig.executeCount += 1
+            sysConfig.setExecuteCount(gcConfig.executeCount)
             for (cleanCount <- sysConfig.getCleanCount) {
               if (cleanCount != 0 && gcConfig.executeCount >= cleanCount) {
                 gcConfig.executeCount = gcConfig.executeCount % cleanCount
@@ -452,7 +466,9 @@ class GcAgent @Inject()(configuration: Configuration,
     }
   }
 
-  private def processInputPath(gcConfig: GcConfig, parser: (GcConfig, File) => Boolean): List[Unit] = {
+  private def processInputPath(gcConfig: GcConfig,
+                               parser: (GcConfig, File) => Boolean,
+                               _retryMap:Map[String, Int]): Map[String, Int] = {
     import java.io.File
 
     def setArchive(f: File): Unit = {
@@ -464,10 +480,12 @@ class GcAgent @Inject()(configuration: Configuration,
       dfav.setArchive(true)
     }
 
+    var newRetryMap = _retryMap
+
     val dirs = listDirs(gcConfig.inputDir)
     for (dir <- dirs) yield {
       val absPath = dir.getAbsolutePath
-      if (!retryMap.contains(absPath))
+      if (!newRetryMap.contains(absPath))
         Logger.info(s"Processing $absPath")
 
       try {
@@ -477,18 +495,19 @@ class GcAgent @Inject()(configuration: Configuration,
         }
       } catch {
         case ex: Throwable =>
-          if (retryMap.contains(absPath)) {
-            if (retryMap(absPath) + 1 <= MAX_RETRY_COUNT) {
-              retryMap += (absPath -> (retryMap(absPath) + 1))
+          if (newRetryMap.contains(absPath)) {
+            if (newRetryMap(absPath) + 1 <= MAX_RETRY_COUNT) {
+              newRetryMap += (absPath -> (newRetryMap(absPath) + 1))
             } else {
               Logger.error(s"$absPath reach max retries. Give up!", ex)
-              retryMap -= absPath
+              newRetryMap -= absPath
               setArchive(dir)
             }
           } else
-            retryMap += (absPath -> 1)
+            newRetryMap += (absPath -> 1)
       }
     }
+    newRetryMap
   }
 
   private def checkNoDataPeriod(gcConfig: GcConfig): Future[Unit] = {

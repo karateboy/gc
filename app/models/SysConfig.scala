@@ -27,6 +27,7 @@ class SysConfig @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp) extends Enumer
   private val STOP_WARN = Value
   private val CLEAN_COUNT = Value
   private val LINE_TOKEN = Value
+  private val EXECUTE_COUNT = Value
 
   val LocalMode = 0
   val RemoteMode = 1
@@ -36,7 +37,9 @@ class SysConfig @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp) extends Enumer
     DATA_PERIOD -> Document(valueKey -> 30),
     OPERATION_MODE -> Document(valueKey -> 0),
     STOP_WARN -> Document(valueKey -> false),
-    CLEAN_COUNT -> Document(valueKey -> 0)
+    CLEAN_COUNT -> Document(valueKey -> 0),
+    LINE_TOKEN -> Document(valueKey -> ""),
+    EXECUTE_COUNT -> Document(valueKey -> 0)
   )
 
   def init(): Unit = {
@@ -204,5 +207,18 @@ class SysConfig @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp) extends Enumer
     f.failed.foreach(errorHandler)
     for (ret <- f)
       yield ret.asString().getValue
+  }
+
+  def getExecuteCount: Future[Int] = {
+    val f = get(EXECUTE_COUNT)
+    f.failed.foreach(errorHandler)
+    for (ret <- f)
+      yield ret.asInt32().getValue
+  }
+
+  def setExecuteCount(count: Int): Future[UpdateResult] = {
+    val f = upsert(EXECUTE_COUNT, Document(valueKey -> count))
+    f.failed.foreach(errorHandler)
+    f
   }
 }
