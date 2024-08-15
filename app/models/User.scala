@@ -31,8 +31,8 @@ class UserOp @javax.inject.Inject() (mongoDB: MongoDB) {
   implicit val userRead = Json.reads[User]
   implicit val userWrite = Json.writes[User]
   
-  def init(colNames: Seq[String]) {
-    if (!colNames.contains(COLNAME)) {
+  def init(): Unit = {
+    if (!mongoDB.colNames.contains(COLNAME)) {
       val f = mongoDB.database.createCollection(COLNAME).toFuture()
       f.onFailure(errorHandler)
     }
@@ -47,6 +47,8 @@ class UserOp @javax.inject.Inject() (mongoDB: MongoDB) {
     })
     f.onFailure(errorHandler)
   }
+
+  init()
 
   def newUser(user: User): Future[InsertOneResult] = {
     collection.insertOne(user).toFuture()
@@ -66,13 +68,10 @@ class UserOp @javax.inject.Inject() (mongoDB: MongoDB) {
     val f = collection.find(equal("_id", _id)).limit(1).toFuture()
     f.onFailure { errorHandler }
     for (ret <- f)
-      yield if (ret.length == 0)
-      None
-    else
-      Some(ret.head)
+      yield ret.headOption
   }
 
-  def getAllUsersFuture(): Future[Seq[User]] = {
+  def getAllUsersFuture: Future[Seq[User]] = {
     val f = collection.find().toFuture()
     f.onFailure { errorHandler }
     for (ret <- f) yield ret

@@ -77,7 +77,7 @@ class Application @Inject()(userOp: UserOp,
   }
 
   def getAllUsers: Action[AnyContent] = Security.Authenticated.async {
-    val userF = userOp.getAllUsersFuture()
+    val userF = userOp.getAllUsersFuture
     for (users <- userF) yield Ok(Json.toJson(users))
   }
 
