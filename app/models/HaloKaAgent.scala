@@ -2,24 +2,31 @@ package models
 
 import akka.actor.{Actor, Cancellable, Props}
 import com.github.nscala_time.time.Imports.Duration
+import com.google.inject.assistedinject.Assisted
 import org.joda.time.DateTime
 import org.mongodb.scala.result.UpdateResult
 import play.api.Logger
 
+import javax.inject.Inject
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.{FiniteDuration, MINUTES, SECONDS}
 import scala.concurrent.{Future, blocking}
 
 object HaloKaAgent {
-  def prof(config: HaloKaConfig, gcConfig: GcConfig) = Props(classOf[HaloKaAgent], config, gcConfig)
+  //def prof(config: HaloKaConfig, gcConfig: GcConfig) = Props(classOf[HaloKaAgent], config, gcConfig)
 
-  case object OpenCom
+  trait Factory {
+    def apply(@Assisted("config") config: HaloKaConfig, @Assisted("gcConfig") gcConfig: GcConfig): Actor
+  }
 
-  case object ReadData
+  private case object OpenCom
+
+  private case object ReadData
 }
 
-class HaloKaAgent(config: HaloKaConfig, gcConfig: GcConfig) extends Actor {
-  Logger.info(s"HaloKaAget com${config.com} speed:${config.speed} ${config.MonitorType}")
+class HaloKaAgent @Inject()(monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp, recordOp: RecordOp)
+                           (@Assisted("config") config: HaloKaConfig, @Assisted("gcConfig") gcConfig: GcConfig) extends Actor {
+  Logger.info(s"HaloKa Agent com${config.com} speed:${config.speed} ${config.MonitorType}")
   import HaloKaAgent._
 
   self ! OpenCom
@@ -76,11 +83,11 @@ class HaloKaAgent(config: HaloKaConfig, gcConfig: GcConfig) extends Actor {
   def insertRecord(mtValue: Double): Future[UpdateResult] = {
     import org.mongodb.scala.model._
 
-    val monitor = Monitor.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
-    val mt = MonitorType.getMonitorTypeValueByName(config.MonitorType, "ppb")
+    val monitor = monitorOp.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
+    val mt = monitorTypeOp.getMonitorTypeValueByName(config.MonitorType, "ppb")
     val dt = DateTime.now.withSecondOfMinute(0).withMillisOfSecond(0)
-    val doc = Record.toDocument(monitor, dt, List((mt, (mtValue, MonitorStatus.NormalStat))))
-    Record.upsertRecord(doc)(Record.MinCollection)
+    val doc = recordOp.toDocument(monitor, dt, List((mt, (mtValue, MonitorStatus.NormalStat))))
+    recordOp.upsertRecord(doc)(RecordOp.MinCollection)
   }
 
   override def postStop(): Unit = {

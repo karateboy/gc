@@ -87,11 +87,11 @@
                     >
                   </td>
                   <td>
-                    <Button
+                    <!-- <Button
                       type="info"
                       @click="downloadFormUrl(rows[index].excelArUrl)"
                       >Ar報告</Button
-                    >
+                    > -->
                     <Button
                       type="info"
                       @click="downloadFormUrl(rows[index].excelN2Url)"

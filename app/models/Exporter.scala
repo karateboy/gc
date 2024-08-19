@@ -7,31 +7,47 @@ import com.serotonin.modbus4j.code.DataType
 import com.serotonin.modbus4j.ip.IpParameters
 import com.serotonin.modbus4j.locator.BaseLocator
 import models.ModelHelper._
-import models.Record.MtRecord
-import play.api.Play.current
 import play.api._
 
-import java.nio.file.{Files, Paths, StandardOpenOption}
+import java.nio.file.{Files, Path, Paths, StandardOpenOption}
+import javax.inject.Inject
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 
 object Exporter {
-  val activeMonitorType = List(MonitorType.mtvList: _*)
-  val exportLocalModbus = Play.current.configuration.getBoolean("exportLocalModbus").getOrElse(false)
-  val modbusPort = Play.current.configuration.getInt("modbus_port").getOrElse(503)
+  def getPlcConnector(plcConfig: SiemensPlcConfig): Option[S7Connector] = {
+    Some(S7ConnectorFactory
+      .buildTCPConnector()
+      .withHost(plcConfig.host)
+      .withRack(plcConfig.rack.getOrElse(0))
+      .withSlot(plcConfig.slot.getOrElse(1))
+      .build())
+  }
+}
 
+@javax.inject.Singleton
+class Exporter @Inject()(monitorOp: MonitorOp,
+                         monitorTypeOp: MonitorTypeOp,
+                         recordOp: RecordOp,
+                         configuration: Configuration,
+                         environment: Environment) {
+  private val activeMonitorType = monitorTypeOp.mtvList
+  private val exportLocalModbus = configuration.getBoolean("exportLocalModbus").getOrElse(false)
+  private val modbusPort = configuration.getInt("modbus_port").getOrElse(503)
+
+  import Exporter._
   import com.serotonin.modbus4j._
 
-  var latestDateTime = new DateTime(0)
+  private var latestDateTime = new DateTime(0)
   var masterOpt: Option[ModbusMaster] = None
 
   def exportActiveMonitorType = {
-    val path = Paths.get(current.path.getAbsolutePath + "/export/activeMonitor.txt")
+    val path = Paths.get(environment.rootPath.getAbsolutePath + "/export/activeMonitor.txt")
     val monitorTypeStrList = activeMonitorType map {
-      MonitorType.map(_)._id
+      monitorTypeOp.map(_)._id
     }
     val ret = monitorTypeStrList.fold("")((a, b) => {
-      if (a.isEmpty())
+      if (a.isEmpty)
         b
       else
         a + "\r" + b
@@ -40,15 +56,11 @@ object Exporter {
   }
 
   // 0 is local
-  def exportLocalModeToPLC(gcConfig: GcConfig, mode: Int) = {
+  def exportLocalModeToPLC(gcConfig: GcConfig, mode: Int): Unit = {
     for (plcConfig <- gcConfig.plcConfig) {
       var connectorOpt: Option[S7Connector] = None
       try {
-        connectorOpt =
-          Some(S7ConnectorFactory
-            .buildTCPConnector()
-            .withHost(plcConfig.host)
-            .build())
+        connectorOpt = getPlcConnector(plcConfig)
         for (connector <- connectorOpt) {
           val serializer = S7SerializerFactory.buildSerializer(connector)
           // local is 0 remote is 1
@@ -68,14 +80,14 @@ object Exporter {
     }
   }
 
-  def exportRealtimeData(gcConfig: GcConfig) = {
-    val path = Paths.get(current.path.getAbsolutePath + "/export/realtime.txt")
+  def exportRealtimeData(gcConfig: GcConfig): Future[Path] = {
+    val path = Paths.get(environment.rootPath.getAbsolutePath + "/export/realtime.txt")
     var buffer = ""
     buffer += s"Selector,${gcConfig.selector.get}\n"
-    val monitors = Monitor.getMonitorsByGcName(gcConfig.gcName) map {
+    val monitors = monitorOp.getMonitorsByGcName(gcConfig.gcName) map {
       _._id
     }
-    val latestRecord = Record.getLatestFixedRecordListFuture(Record.MinCollection, monitors)(1)
+    val latestRecord = recordOp.getLatestFixedRecordListFuture(RecordOp.MinCollection, monitors)(1)
 
     for (records <- latestRecord if records.nonEmpty) yield {
       val data = records.head
@@ -108,10 +120,10 @@ object Exporter {
     }
   }
 
-  def writeModbusSlave(gcConfig: GcConfig, data: Record.RecordList) = {
+  private def writeModbusSlave(gcConfig: GcConfig, data: RecordList) = {
     import com.serotonin.modbus4j.ip.IpParameters
 
-    def connectHost() {
+    def connectHost(): Unit = {
       val ipParameters = new IpParameters()
       ipParameters.setHost("127.0.0.1");
       ipParameters.setPort(modbusPort);
@@ -125,7 +137,7 @@ object Exporter {
       masterOpt = Some(master)
     }
 
-    def writeReg(master: ModbusMaster) = {
+    def writeReg(master: ModbusMaster): Unit = {
       import com.serotonin.modbus4j.code.DataType
       import com.serotonin.modbus4j.locator.BaseLocator
       import com.serotonin.modbus4j.msg._
@@ -136,20 +148,21 @@ object Exporter {
         master.send(request)
       }
 
-      def writeLong(offset: Int, value: Long) = {
+      def writeLong(offset: Int, value: Long): Unit = {
         val locator = BaseLocator.holdingRegister(slaveID, offset, DataType.EIGHT_BYTE_INT_SIGNED);
         master.setValue(locator, value);
       }
 
-      def writeDouble(offset: Int, value: Double) = {
+      def writeDouble(offset: Int, value: Double): Unit = {
         val locator = BaseLocator.holdingRegister(slaveID, offset, DataType.EIGHT_BYTE_FLOAT);
         master.setValue(locator, value);
       }
 
+      val gcOffset = gcConfig.index * 52
       //Selector
-      writeShort(0, (gcConfig.selector.get.toShort).toShort)
+      writeShort(gcOffset, (gcConfig.selector.get.toShort).toShort)
       for ((mtData, idx) <- data.mtDataList.zipWithIndex) {
-        writeDouble(idx * 4 + 1, mtData.value)
+        writeDouble(gcOffset + idx * 4 + 1, mtData.value)
       }
 
     }
@@ -158,7 +171,7 @@ object Exporter {
       blocking {
         try {
           if (masterOpt.isEmpty)
-            connectHost
+            connectHost()
 
           masterOpt map {
             writeReg
@@ -171,8 +184,36 @@ object Exporter {
     } onFailure errorHandler
   }
 
-  def exportDataToPLC(data: Record.RecordList) = {
-    val selector: Monitor = Monitor.map(Monitor.withName(data.monitor))
+  def exportMonitorTypeToPLC(gcConfig: GcConfig, mtDataList: Seq[MtRecord]): Unit = {
+    var connectorOpt: Option[S7Connector] = None
+    for (plcConfig <- gcConfig.plcConfig) {
+      try {
+        connectorOpt = getPlcConnector(plcConfig)
+        for (connector <- connectorOpt) {
+          val serializer: S7Serializer = S7SerializerFactory.buildSerializer(connector)
+          for (mtData <- mtDataList) {
+            if (plcConfig.exportMap.contains(mtData.mtName)) {
+              val entry = plcConfig.exportMap(mtData.mtName)
+              Logger.info(s"${mtData.mtName} ${mtData.value}=>DB${entry.db}.${entry.offset}")
+              val mtDataBean = new MtDataBean()
+              mtDataBean.value = mtData.value.toFloat
+              serializer.store(mtDataBean, entry.db, entry.offset)
+            }
+          }
+        }
+      } catch {
+        case ex: Exception =>
+          Logger.error(ex.getMessage, ex)
+      } finally {
+        for (connector <- connectorOpt) {
+          connector.close()
+        }
+      }
+    }
+  }
+
+  private def exportDataToPLC(data: RecordList): Unit = {
+    val selector: Monitor = monitorOp.map(monitorOp.withName(data.monitor))
     val gcName = selector.gcName
 
     for {gcConfig <- GcAgent.gcConfigList.find(gcConfig => gcConfig.gcName == gcName)
@@ -181,11 +222,7 @@ object Exporter {
       Logger.info(s"${selector.dp_no} write to PLC ${plcConfig.host}")
       var connectorOpt: Option[S7Connector] = None
       try {
-        connectorOpt =
-          Some(S7ConnectorFactory
-            .buildTCPConnector()
-            .withHost(plcConfig.host)
-            .build())
+        connectorOpt = getPlcConnector(plcConfig)
         for (connector <- connectorOpt) {
           val serializer: S7Serializer = S7SerializerFactory.buildSerializer(connector)
 
@@ -219,8 +256,8 @@ object Exporter {
     }
   }
 
-  def exportDataToAO(data: Record.RecordList) = {
-    val selector: Monitor = Monitor.map(Monitor.withName(data.monitor))
+  private def exportDataToAO(data: RecordList): Unit = {
+    val selector: Monitor = monitorOp.map(monitorOp.withName(data.monitor))
     val gcName = selector.gcName
 
     for {gcConfig <- GcAgent.gcConfigList.find(gcConfig => gcConfig.gcName == gcName)
@@ -249,16 +286,16 @@ object Exporter {
                      offset = aoEntry.idx
                      } {
                   val locator = BaseLocator.holdingRegister(1, offset, DataType.TWO_BYTE_INT_UNSIGNED)
-                  if(mtData.value > aoEntry.max)
+                  if (mtData.value > aoEntry.max)
                     Logger.error(s"${mtData.mtName} ${mtData.value} is larger than AO max => D${aoEntry.idx} ${aoEntry.max}")
 
-                  if(mtData.value < aoEntry.min) {
+                  if (mtData.value < aoEntry.min) {
                     Logger.error(s"${mtData.mtName} ${mtData.value} is less than AO min => D${aoEntry.idx} ${aoEntry.min}")
                     master.setValue(locator, 0)
-                  }else if(mtData.value >= aoEntry.max){
+                  } else if (mtData.value >= aoEntry.max) {
                     Logger.error(s"${mtData.mtName} ${mtData.value} is exceed AO max => D${aoEntry.idx} ${aoEntry.max}")
                     master.setValue(locator, 4096 - 1)
-                  }else{
+                  } else {
                     val value: Int = ((mtData.value - aoEntry.min) / (aoEntry.max - aoEntry.min) * 4096).toInt
                     master.setValue(locator, value)
                   }
@@ -287,11 +324,7 @@ object Exporter {
     for (plcConfig <- gcConfig.plcConfig) {
       var connectorOpt: Option[S7Connector] = None
       try {
-        connectorOpt =
-          Some(S7ConnectorFactory
-            .buildTCPConnector()
-            .withHost(plcConfig.host)
-            .build())
+        connectorOpt = getPlcConnector(plcConfig)
         for (connector <- connectorOpt) {
           val serializer: S7Serializer = S7SerializerFactory.buildSerializer(connector)
           if (plcConfig.exportMap.contains("alarm")) {
@@ -353,16 +386,12 @@ object Exporter {
     for (plcConfig <- gcConfig.plcConfig) {
       var connectorOpt: Option[S7Connector] = None
       try {
-        connectorOpt =
-          Some(S7ConnectorFactory
-            .buildTCPConnector()
-            .withHost(plcConfig.host)
-            .build())
+        connectorOpt = getPlcConnector(plcConfig)
         for (connector <- connectorOpt) {
           val serializer: S7Serializer = S7SerializerFactory.buildSerializer(connector)
           if (plcConfig.exportMap.contains("selector")) {
             val entry = plcConfig.exportMap("selector")
-            Logger.info(s"set selector ${selector} =>DB${entry.db}.${entry.offset}.${entry.bitOffset}")
+            Logger.info(s"set selector $selector =>DB${entry.db}.${entry.offset}.${entry.bitOffset}")
             val mtDataBean = new MtDataBean()
             mtDataBean.value = selector.toFloat
             serializer.store(mtDataBean, entry.db, entry.offset)

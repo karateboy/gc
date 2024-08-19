@@ -1,13 +1,9 @@
 # Ignore Play! working directory #
 bin/
-/db
-.eclipse
-/logs/
 /modules
 /project/project
 /project/target
 /target
-/importEPA
 tmp/
 test-result
 server.pid
@@ -20,8 +16,7 @@ server.pid
 .cache-*
 /.settings
 /.sbtserver
-/conf/cdx.conf
 node_modules
-/gc_front/*.log
 /export/realtime.txt
 .idea
+/logs

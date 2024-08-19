@@ -1,90 +1,97 @@
 package models
 
-import play.api._
 import com.github.nscala_time.time.Imports._
 import models.ModelHelper._
-import models._
-import models.ObjectIdUtil._
-
-import scala.concurrent.ExecutionContext.Implicits.global
 import org.mongodb.scala._
 import org.mongodb.scala.bson._
 import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.Projections.include
+import org.mongodb.scala.result.{InsertOneResult, UpdateResult}
+import play.api._
+import ObjectIdUtil._
 
-case class Record(monitor: Monitor.Value, time: DateTime, value: Double, status: String)
+import javax.inject.Inject
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+
+case class Record(monitor: MonitorOp#Value, time: DateTime, value: Double, status: String)
 
 case class Record2(value: Double, status: String)
 
-//case class MTMap(mtMap: Map[MonitorType.Value, Record2])
+case class MtRecord(mtName: String, value: Double, status: String, text: String)
 
-object Record {
-  type MTMap = Map[MonitorType.Value, Record2]
+case class RecordList(monitor: String, time: Long, mtDataList: Seq[MtRecord], pdfReport: ObjectId)
 
-  import play.api.libs.json._
-  import play.api.libs.functional.syntax._
-  import org.mongodb.scala.model.Indexes._
-
-  implicit val writer = Json.writes[Record]
-
+object RecordOp {
   val HourCollection = "hour_data"
   val MinCollection = "min_data"
+}
 
-  def init(colNames: Seq[String]) {
-    import com.mongodb.client.model._
-    if (!colNames.contains(HourCollection)) {
-      val f = MongoDB.database.createCollection(HourCollection).toFuture()
-      f.onFailure(errorHandler)
-      f.onSuccess({
-        case _: Seq[_] =>
-          val indexOpt = new IndexOptions
-          indexOpt.unique(true)
-          val cf1 = MongoDB.database.getCollection(HourCollection).createIndex(ascending("time", "monitor"), indexOpt).toFuture()
-          val cf2 = MongoDB.database.getCollection(HourCollection).createIndex(ascending("monitor", "time"), indexOpt).toFuture()
-          cf1.onFailure(errorHandler)
-          cf2.onFailure(errorHandler)
-      })
-    }
+@javax.inject.Singleton
+class RecordOp @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp) {
+  private type MTMap = Map[MonitorTypeOp#Value, Record2]
 
-    if (!colNames.contains(MinCollection)) {
-      val f = MongoDB.database.createCollection(MinCollection).toFuture()
-      f.onFailure(errorHandler)
-      f.onSuccess({
-        case _: Seq[_] =>
-          val cf1 = MongoDB.database.getCollection(MinCollection).createIndex(ascending("time", "monitor")).toFuture()
-          val cf2 = MongoDB.database.getCollection(MinCollection).createIndex(ascending("monitor", "time")).toFuture()
-          cf1.onFailure(errorHandler)
-          cf2.onFailure(errorHandler)
-      })
-    }
+  import RecordOp._
+  import org.mongodb.scala.model.Indexes._
+  import play.api.libs.json._
+
+  implicit val writer: Writes[Record] = Json.writes[Record]
+
+  import com.mongodb.client.model._
+
+  if (!mongoDB.colNames.contains(HourCollection)) {
+    val f = mongoDB.database.createCollection(HourCollection).toFuture()
+    f.onFailure(errorHandler)
+    f.onSuccess({
+      case _ =>
+        val indexOpt = new IndexOptions
+        indexOpt.unique(true)
+        val cf1 = mongoDB.database.getCollection(HourCollection).createIndex(ascending("time", "monitor"), indexOpt).toFuture()
+        val cf2 = mongoDB.database.getCollection(HourCollection).createIndex(ascending("monitor", "time"), indexOpt).toFuture()
+        cf1.onFailure(errorHandler)
+        cf2.onFailure(errorHandler)
+    })
   }
 
-  def getDocKey(monitor: Monitor.Value, dt: DateTime) = {
+  if (!mongoDB.colNames.contains(MinCollection)) {
+    val f = mongoDB.database.createCollection(MinCollection).toFuture()
+    f.onFailure(errorHandler)
+    f.onSuccess({
+      case _ =>
+        val cf1 = mongoDB.database.getCollection(MinCollection).createIndex(ascending("time", "monitor")).toFuture()
+        val cf2 = mongoDB.database.getCollection(MinCollection).createIndex(ascending("monitor", "time")).toFuture()
+        cf1.onFailure(errorHandler)
+        cf2.onFailure(errorHandler)
+    })
+  }
+
+
+  private def getDocKey(monitor: MonitorOp#Value, dt: DateTime) = {
     import org.mongodb.scala.bson._
 
     val bdt: BsonDateTime = dt
     Document("time" -> bdt, "monitor" -> monitor.toString)
   }
 
-  def toDocument(monitor: Monitor.Value, dt: DateTime,
-                 dataList: List[(MonitorType.Value, (Double, String))], pdfReport: ObjectId, sampleName:Option[String]) = {
+  def toDocument(monitor: MonitorOp#Value, dt: DateTime,
+                 dataList: List[(MonitorTypeOp#Value, (Double, String))], pdfReport: ObjectId, sampleName: Option[String]): Document = {
     import org.mongodb.scala.bson._
     val bdt: BsonDateTime = dt
     var doc = Document("_id" -> getDocKey(monitor, dt), "time" -> bdt, "monitor" -> monitor.toString,
-      "pdfReport" -> pdfReport, "sampleName"->sampleName)
+      "pdfReport" -> pdfReport, "sampleName" -> sampleName)
     for {
       data <- dataList
       mt = data._1
       (v, s) = data._2
     } {
-      doc = doc ++ Document(MonitorType.BFName(mt) -> Document("v" -> v, "s" -> s))
+      doc = doc ++ Document(monitorTypeOp.BFName(mt) -> Document("v" -> v, "s" -> s))
     }
 
     doc
   }
 
-  def toDocument(monitor: Monitor.Value, dt: DateTime,
-                 dataList: List[(MonitorType.Value, (Double, String))]) = {
+  def toDocument(monitor: MonitorOp#Value, dt: DateTime,
+                 dataList: List[(MonitorTypeOp#Value, (Double, String))]): Document = {
     import org.mongodb.scala.bson._
     val bdt: BsonDateTime = dt
     var doc = Document("_id" -> getDocKey(monitor, dt), "time" -> bdt, "monitor" -> monitor.toString)
@@ -93,14 +100,14 @@ object Record {
       mt = data._1
       (v, s) = data._2
     } {
-      doc = doc ++ Document(MonitorType.BFName(mt) -> Document("v" -> v, "s" -> s))
+      doc = doc ++ Document(monitorTypeOp.BFName(mt) -> Document("v" -> v, "s" -> s))
     }
 
     doc
   }
 
-  def insertRecord(doc: Document)(colName: String) = {
-    val col = MongoDB.database.getCollection(colName)
+  def insertRecord(doc: Document)(colName: String): Future[InsertOneResult] = {
+    val col = mongoDB.database.getCollection(colName)
     val f = col.insertOne(doc).toFuture()
     f.onFailure({
       case ex: Exception => Logger.error(ex.getMessage, ex)
@@ -108,14 +115,12 @@ object Record {
     f
   }
 
-  def upsertRecord(doc: Document)(colName: String) = {
-    import org.mongodb.scala.model.UpdateOptions
-    import org.mongodb.scala.bson.BsonString
-    import org.mongodb.scala.bson._
+  def upsertRecord(doc: Document)(colName: String): Future[UpdateResult] = {
     import org.mongodb.scala.model.Filters._
+    import org.mongodb.scala.model.UpdateOptions
     import org.mongodb.scala.model.Updates._
 
-    val col = MongoDB.database.getCollection(colName)
+    val col = mongoDB.database.getCollection(colName)
 
     val updateList = doc.toList.map(kv => set(kv._1, kv._2))
 
@@ -124,14 +129,14 @@ object Record {
     f
   }
 
-  def updateRecordStatus(monitor: Monitor.Value, dt: Long, mt: MonitorType.Value, status: String)(colName: String) = {
+  private def updateRecordStatus(monitor: monitorOp.Value, dt: Long, mt: monitorTypeOp.Value, status: String)(colName: String) = {
     import org.mongodb.scala.bson._
     import org.mongodb.scala.model.Filters._
     import org.mongodb.scala.model.Updates._
 
-    val col = MongoDB.database.getCollection(colName)
+    val col = mongoDB.database.getCollection(colName)
     val bdt = new BsonDateTime(dt)
-    val fieldName = s"${MonitorType.BFName(mt)}.s"
+    val fieldName = s"${monitorTypeOp.BFName(mt)}.s"
 
     val f = col.updateOne(equal("_id", getDocKey(monitor, new DateTime(dt))), set(fieldName, status)).toFuture()
     f.onFailure({
@@ -140,17 +145,16 @@ object Record {
     f
   }
 
-  def getRecordMap(colName: String)(mtList: List[MonitorType.Value], monitor: Monitor.Value, startTime: DateTime, endTime: DateTime) = {
-    import org.mongodb.scala.bson._
+  def getRecordMap(colName: String)
+                  (mtList: List[MonitorTypeOp#Value], monitor: MonitorOp#Value, startTime: DateTime, endTime: DateTime):
+  Map[MonitorTypeOp#Value, Seq[Record]] = {
     import org.mongodb.scala.model.Filters._
     import org.mongodb.scala.model.Projections._
     import org.mongodb.scala.model.Sorts._
-    import scala.concurrent._
-    import scala.concurrent.duration._
 
-    val col = MongoDB.database.getCollection(colName)
+    val col = mongoDB.database.getCollection(colName)
     val projFields = "monitor" :: "time" :: mtList.map {
-      MonitorType.BFName(_)
+      monitorTypeOp.BFName
     }
     val proj = include(projFields: _*)
 
@@ -160,18 +164,18 @@ object Record {
     val pairs =
       for {
         mt <- mtList
-        mtBFName = MonitorType.BFName(mt)
+        mtBFName = monitorTypeOp.BFName(mt)
       } yield {
 
         val list =
           for {
             doc <- docs
-            monitor = Monitor.withName(doc("monitor").asString().getValue)
+            monitor = monitorOp.withName(doc("monitor").asString().getValue)
             time = doc("time").asDateTime()
             mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument()
             mtDoc = mtDocOpt.get.asDocument()
-            v = mtDoc.get("v") if v.isDouble()
-            s = mtDoc.get("s") if s.isString()
+            v = mtDoc.get("v") if v.isDouble
+            s = mtDoc.get("s") if s.isString
           } yield {
             Record(monitor, time, v.asDouble().doubleValue(), s.asString().getValue)
           }
@@ -183,22 +187,22 @@ object Record {
 
   import scala.concurrent._
 
-  def getMonitorRecordMapF(colName: String)(mtList: List[MonitorType.Value], monitors: Seq[Monitor.Value], startTime: DateTime, endTime: DateTime): Future[Map[DateTime, Map[Monitor.Value, MTMap]]] = {
-    import org.mongodb.scala.bson._
+  def getMonitorRecordMapF(colName: String)
+                          (mtList: List[MonitorTypeOp#Value], monitors: Seq[MonitorOp#Value], startTime: DateTime, endTime: DateTime):
+  Future[Map[DateTime, Map[MonitorOp#Value, MTMap]]] = {
     import org.mongodb.scala.model.Filters._
     import org.mongodb.scala.model.Projections._
     import org.mongodb.scala.model.Sorts._
-    import scala.concurrent.duration._
 
-    val col = MongoDB.database.getCollection(colName)
+    val col = mongoDB.database.getCollection(colName)
     val projFields = "monitor" :: "time" :: mtList.map {
-      MonitorType.BFName(_)
+      monitorTypeOp.BFName
     }
     val proj = include(projFields: _*)
-    val monitorNames = monitors.map(Monitor.map(_)._id)
-    val f = col.find(and(in("monitor", monitorNames: _*), gte("time", startTime.toDate()), lt("time", endTime.toDate()))).projection(proj).sort(ascending("time")).toFuture()
+    val monitorNames = monitors.map(monitorOp.map(_)._id)
+    val f = col.find(and(in("monitor", monitorNames: _*), gte("time", startTime.toDate), lt("time", endTime.toDate))).projection(proj).sort(ascending("time")).toFuture()
 
-    var timeMap = Map.empty[DateTime, Map[Monitor.Value, MTMap]]
+    var timeMap = Map.empty[DateTime, Map[MonitorOp#Value, MTMap]]
 
     for (docs <- f) yield {
       val ret =
@@ -206,119 +210,41 @@ object Record {
           doc <- docs
           time = new DateTime(doc("time").asDateTime().getValue)
         } yield {
-          var monitorRecordMap = timeMap.getOrElse(time, Map.empty[Monitor.Value, MTMap])
-          val monitor = Monitor.withName(doc("monitor").asString().getValue)
+          var monitorRecordMap = timeMap.getOrElse(time, Map.empty[MonitorOp#Value, MTMap])
+          val monitor = monitorOp.withName(doc("monitor").asString().getValue)
           val mtRecordPairs =
             for {
               mt <- mtList
-              mtBFName = MonitorType.BFName(mt)
-              mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument()
+              mtBFName = monitorTypeOp.BFName(mt)
+              mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument
               mtDoc = mtDocOpt.get.asDocument()
-              v = mtDoc.get("v") if v.isDouble()
-              s = mtDoc.get("s") if s.isString()
+              v = mtDoc.get("v") if v.isDouble
+              s = mtDoc.get("s") if s.isString
             } yield {
               mt -> Record2(v.asDouble().getValue, s.asString().getValue)
             }
           val mtMap = mtRecordPairs.toMap
-          monitorRecordMap = monitorRecordMap + (monitor -> mtMap)
+          monitorRecordMap = monitorRecordMap + (monitor.asInstanceOf[MonitorOp#Value] -> mtMap)
           timeMap = timeMap + (time -> monitorRecordMap)
         }
       timeMap
     }
   }
 
-  def resetAuditedRecord(colName: String)(mtList: List[MonitorType.Value], monitor: Monitor.Value, startTime: DateTime, endTime: DateTime) = {
-    import org.mongodb.scala.bson._
-    import org.mongodb.scala.model._
-    import org.mongodb.scala.model.Filters._
-    import org.mongodb.scala.model.Projections._
-    import org.mongodb.scala.model.Sorts._
-
-    val f = getAuditRecordMapFuture(colName)(mtList, monitor, startTime, endTime)
-    val map = waitReadyResult(f)
-    val f2 =
-      for {
-        time_map <- map
-        time = time_map._1
-        recordMap = time_map._2
-      } yield {
-        val itF =
-          for {
-            mt_record <- recordMap
-            mt = mt_record._1
-            record = mt_record._2 if MonitorStatus.isAudited(record.status)
-          } yield {
-            val newStatus = "0" + record.status.substring(1)
-            updateRecordStatus(monitor, time.getMillis, mt, newStatus)(colName)
-          }
-        itF.toSeq
-      }
-    import scala.concurrent._
-    val f3 = f2.flatMap { x => x }
-    Future.sequence(f2.flatMap { x => x })
-  }
-
-  def getAuditRecordMapFuture(colName: String)(mtList: List[MonitorType.Value], monitor: Monitor.Value, startTime: DateTime, endTime: DateTime) = {
-    import org.mongodb.scala.bson._
-    import org.mongodb.scala.model._
-    import org.mongodb.scala.model.Filters._
-    import org.mongodb.scala.model.Projections._
-    import org.mongodb.scala.model.Sorts._
-    import scala.concurrent._
-    import scala.concurrent.duration._
-
-    val col = MongoDB.database.getCollection(colName)
-    val projFields = "monitor" :: "time" :: mtList.map {
-      MonitorType.BFName(_)
-    }
-    val proj = include(projFields: _*)
-    val audited = or(mtList.map { mt => Filters.regex(MonitorType.BFName(mt) + ".s", "^[a-zA-Z]") }: _*)
-
-    val requirement = List(equal("monitor", monitor.toString), gte("time", startTime.toDate()), lt("time", endTime.toDate()), audited)
-
-    val f = col.find(and(requirement: _*)).projection(proj).sort(ascending("time")).toFuture()
-    for (docs <- f) yield {
-      val timePair =
-        for {
-          doc <- docs
-          time = doc("time").asDateTime()
-        } yield {
-          val mtPair =
-            for {
-              mt <- mtList
-              mtBFName = MonitorType.BFName(mt)
-              monitor = Monitor.withName(doc("monitor").asString().getValue)
-              mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument()
-              mtDoc = mtDocOpt.get.asDocument()
-              v = mtDoc.get("v") if v.isDouble()
-              s = mtDoc.get("s") if s.isString()
-            } yield {
-              mt -> Record(monitor, time, v.asDouble().doubleValue(), s.asString().getValue)
-            }
-          time.toDateTime() -> mtPair.toMap
-        }
-      timePair.toMap
-    }
-  }
-
-  case class MtRecord(mtName: String, value: Double, status: String, text: String)
-
-  case class RecordList(monitor: String, time: Long, mtDataList: Seq[MtRecord], pdfReport: ObjectId)
-
-  implicit val mtRecordWrite = Json.writes[MtRecord]
-  implicit val recordListWrite = Json.writes[RecordList]
+  implicit val mtRecordWrite: Writes[MtRecord] = Json.writes[MtRecord]
+  implicit val recordListWrite: Writes[RecordList] = Json.writes[RecordList]
 
   import org.mongodb.scala.bson.conversions.Bson
 
-  def getRecordListFuture2(colName: String)(filter: Bson)(mtList: List[MonitorType.Value]) = {
-    import org.mongodb.scala.model.Filters._
+  private def getRecordListFuture2(colName: String)(filter: Bson)
+                                  (mtList: List[MonitorTypeOp#Value]): Future[Seq[RecordList]] = {
     import org.mongodb.scala.model.Projections._
     import org.mongodb.scala.model.Sorts._
-    val mtFields = mtList map MonitorType.BFName
+    val mtFields = mtList map monitorTypeOp.BFName
     val projFields = "monitor" :: "time" :: "pdfReport" :: mtFields
     val proj = include(projFields: _*)
 
-    val col = MongoDB.database.getCollection(colName)
+    val col = mongoDB.database.getCollection(colName)
     val f = col.find(filter).projection(proj).sort(ascending("time")).toFuture()
 
     for {
@@ -327,190 +253,108 @@ object Record {
       for {
         doc <- docs
         time = doc("time").asDateTime()
-        monitor = Monitor.withName(doc("monitor").asString().getValue)
+        monitor = monitorOp.withName(doc("monitor").asString().getValue)
       } yield {
         val mtDataList =
           for {
             mt <- mtList
-            mtBFName = MonitorType.BFName(mt)
-            mtDesp = MonitorType.map(mt).desp
+            mtBFName = monitorTypeOp.BFName(mt)
+            mtDesp = monitorTypeOp.map(mt).desp
             mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument()
             mtDoc = mtDocOpt.get.asDocument()
-            v = mtDoc.get("v") if v.isDouble()
-            s = mtDoc.get("s") if s.isString()
+            v = mtDoc.get("v") if v.isDouble
+            s = mtDoc.get("s") if s.isString
           } yield {
-            MtRecord(mt.toString, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
+            MtRecord(mt.toString, v.asDouble().doubleValue(), s.asString().getValue, monitorTypeOp.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
           }
-        val pdfReport = doc.get("pdfReport").get.asObjectId().getValue
-        RecordList(Monitor.map(monitor).dp_no, time.getMillis, mtDataList, pdfReport)
+        val pdfReportOpt = doc.get("pdfReport").map {
+          _.asObjectId().getValue
+        }
+        RecordList(monitorOp.map(monitor).dp_no, time.getMillis, mtDataList, pdfReportOpt.getOrElse(new ObjectId()))
       }
     }
   }
 
-  def getRecordListFuture(monitor: Monitor.Value, startTime: DateTime, endTime: DateTime)(colName: String) = {
-    import org.mongodb.scala.bson._
+  def getRecordListFuture(monitor: MonitorOp#Value, startTime: DateTime, endTime: DateTime)
+                         (colName: String): Future[Seq[RecordList]] = {
     import org.mongodb.scala.model.Filters._
 
-    val mtList = MonitorType.activeMtvList
+    val mtList = monitorTypeOp.mtvList
     val filter = and(equal("monitor", monitor.toString),
       exists("pdfReport"),
-      gte("time", startTime.toDate()),
-      lt("time", endTime.toDate()))
+      gte("time", startTime.toDate),
+      lt("time", endTime.toDate))
     getRecordListFuture2(colName)(filter)(mtList)
   }
 
-  def getRecordListFuture(startTime: DateTime, endTime: DateTime)(colName: String) = {
-    import org.mongodb.scala.bson._
+  def getRecordListFuture(startTime: DateTime, endTime: DateTime)(colName: String): Future[Seq[RecordList]] = {
     import org.mongodb.scala.model.Filters._
 
-    val mtList = MonitorType.activeMtvList
-    val filter = and(gte("time", startTime.toDate()), lt("time", endTime.toDate()))
+    val mtList = monitorTypeOp.mtvList
+    val filter = and(gte("time", startTime.toDate), lt("time", endTime.toDate))
     getRecordListFuture2(colName)(filter)(mtList)
   }
 
-  def getLatestRecordMapFuture(colName: String) = {
+  def getLatestRecordListFuture(colName: String, monitors: Seq[String],
+                                rename: Boolean = false)(limit: Int): Future[Seq[RecordList]] = {
     import org.mongodb.scala.bson._
-    import org.mongodb.scala.model.Filters._
-    import org.mongodb.scala.model.Projections._
     import org.mongodb.scala.model.Sorts._
-    import scala.concurrent._
-    import scala.concurrent.duration._
-
-    val mtList = MonitorType.activeMtvList
-    val col = MongoDB.database.getCollection(colName)
-    val projFields = "monitor" :: "time" :: MonitorType.mtvList.map {
-      MonitorType.BFName(_)
-    }
-    val proj = include(projFields: _*)
-    val futureList =
-      for (m <- Monitor.mvList) yield {
-        val f = col.find(equal("monitor", Monitor.map(m)._id)).projection(proj).sort(descending("time")).limit(1).toFuture()
-        for {
-          docs <- f
-        } yield {
-          if (docs.isEmpty)
-            None
-          else {
-            val doc = docs.head
-            val time = doc("time").asDateTime().toDateTime()
-            val pair =
-              for {
-                mt <- MonitorType.mtvList
-                mtBFName = MonitorType.BFName(mt)
-                mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument()
-                mtDoc = mtDocOpt.get.asDocument()
-                v = mtDoc.get("v") if v.isDouble()
-                s = mtDoc.get("s") if s.isString()
-              } yield {
-                mt -> Record(m, time, v.asDouble().doubleValue(), s.asString().getValue)
-              }
-            Some(m -> (time, pair.toMap))
-          }
-        }
-      }
-    for (pairs <- Future.sequence(futureList)) yield {
-      pairs.flatMap(x => x).toMap
-    }
-  }
-
-  def getLatestRecordMap2Future(colName: String) = {
-    import org.mongodb.scala.bson._
-    import org.mongodb.scala.model.Filters._
-    import org.mongodb.scala.model.Projections._
-    import org.mongodb.scala.model.Sorts._
-
-    val col = MongoDB.database.getCollection(colName)
-    val projFields = "monitor" :: "time" :: MonitorType.mtvList.map {
-      MonitorType.BFName(_)
-    }
-    val targetTime = (DateTime.now() - 2.hour).withMinuteOfHour(0).withSecond(0).withMillisOfSecond(0)
-    val proj = include(projFields: _*)
-    val f = col.find(equal("time", targetTime.toDate())).projection(proj).toFuture()
-    val pairsF =
-      for {
-        docs <- f
-      } yield {
-        for {
-          doc <- docs
-          m = Monitor.withName(doc("monitor").asString().getValue)
-          time = doc("time").asDateTime().toDateTime()
-        } yield {
-          val pair =
-            for {
-              mt <- MonitorType.mtvList
-              mtBFName = MonitorType.BFName(mt)
-              mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument()
-              mtDoc = mtDocOpt.get.asDocument()
-              v = mtDoc.get("v") if v.isDouble()
-              s = mtDoc.get("s") if s.isString()
-            } yield {
-              mt -> Record(m, time, v.asDouble().doubleValue(), s.asString().getValue)
-            }
-          m -> (time, pair.toMap)
-        }
-      }
-
-    for (pairs <- pairsF) yield {
-      pairs.toMap
-    }
-  }
-
-  def getLatestRecordListFuture(colName: String, rename: Boolean = false)(limit: Int) = {
-    import org.mongodb.scala.bson._
     import org.mongodb.scala.model._
-    import org.mongodb.scala.model.Sorts._
 
-    val mtList = MonitorType.activeMtvList
-    val col = MongoDB.database.getCollection(colName)
-    val projFields = "monitor" :: "time" :: "pdfReport" :: MonitorType.mtvList.map {
-      MonitorType.BFName(_)
+    val mtList = monitorTypeOp.mtvList
+    val col = mongoDB.database.getCollection(colName)
+    val projFields = "monitor" :: "time" :: "pdfReport" :: monitorTypeOp.mtvList.map {
+      monitorTypeOp.BFName
     }
     val proj = Projections.include(projFields: _*)
-    val f = col.find(Filters.exists("pdfReport")).projection(proj).sort(descending("time")).limit(limit).toFuture()
+    val filters = Filters.and(Filters.exists("pdfReport"), Filters.in("_id.monitor", monitors: _*))
+    val f = col.find(filters).projection(proj).sort(descending("time")).limit(limit).toFuture()
     for {
       docs <- f
     } yield {
       for {
         doc <- docs
         time = doc("time").asDateTime()
-        monitor = Monitor.withName(doc("monitor").asString().getValue)
+        monitor = monitorOp.withName(doc("monitor").asString().getValue)
       } yield {
         val mtDataList =
           for {
             mt <- mtList
-            mtBFName = MonitorType.BFName(mt)
-            mtDesp = MonitorType.map(mt).desp
-            mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument()
+            mtBFName = monitorTypeOp.BFName(mt)
+            mtDesp = monitorTypeOp.map(mt).desp
+            mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument
             mtDoc = mtDocOpt.get.asDocument()
-            v = mtDoc.get("v") if v.isDouble()
-            s = mtDoc.get("s") if s.isString()
+            v = mtDoc.get("v") if v.isDouble
+            s = mtDoc.get("s") if s.isString
           } yield {
             if (rename)
-              MtRecord(mtDesp, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
+              MtRecord(mtDesp, v.asDouble().doubleValue(), s.asString().getValue, monitorTypeOp.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
             else
-              MtRecord(mt.toString, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
+              MtRecord(mt.toString, v.asDouble().doubleValue(), s.asString().getValue, monitorTypeOp.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
           }
         val pdfReport = if (doc.get("pdfReport").isEmpty)
-          new ObjectId()
+          None
         else
-          doc.get("pdfReport").get.asObjectId().getValue
-        RecordList(Monitor.map(monitor).dp_no, time.getMillis, mtDataList, pdfReport)
+          doc.get("pdfReport").map {
+            _.asObjectId().getValue
+          }
+        RecordList(monitorOp.map(monitor).dp_no, time.getMillis, mtDataList, pdfReport.getOrElse(new ObjectId()))
       }
     }
   }
 
-  def getLatestFixedRecordListFuture(colName: String, monitors:Seq[String])(limit: Int) = {
+  def getLatestFixedRecordListFuture(colName: String, monitors: Seq[String])(limit: Int): Future[Seq[RecordList]] = {
     import org.mongodb.scala.bson._
-    import org.mongodb.scala.model._
     import org.mongodb.scala.model.Sorts._
+    import org.mongodb.scala.model._
 
-    val mtList = MonitorType.activeMtvList
-    val col = MongoDB.database.getCollection(colName)
-    val projFields = "monitor" :: "time" :: "pdfReport" :: MonitorType.mtvList.map {
-      MonitorType.BFName(_)
+    val mtList = monitorTypeOp.mtvList
+    val col = mongoDB.database.getCollection(colName)
+    val projFields = "monitor" :: "time" :: "pdfReport" :: monitorTypeOp.mtvList.map {
+      monitorTypeOp.BFName
     }
     val proj = Projections.include(projFields: _*)
-    val f = col.find(Filters.in("monitor", monitors:_*)).projection(proj).sort(descending("time")).limit(limit).toFuture()
+    val f = col.find(Filters.and(Filters.in("monitor", monitors: _*), Filters.exists("pdfReport"))).projection(proj).sort(descending("time")).limit(limit).toFuture()
     for {
       docs <- f
     } yield {
@@ -522,65 +366,34 @@ object Record {
         val mtDataList =
           for {
             mt <- mtList
-            mtBFName = MonitorType.BFName(mt)
-            mtDesp = MonitorType.map(mt).desp
+            mtBFName = monitorTypeOp.BFName(mt)
+            mtDesp = monitorTypeOp.map(mt).desp
           } yield {
             val mtDocOpt = doc.get(mtBFName)
             if (mtDocOpt.isDefined) {
               val mtDoc = mtDocOpt.get.asDocument()
               val v = mtDoc.get("v")
               val s = mtDoc.get("s")
-                MtRecord(mt.toString, v.asDouble().doubleValue(), s.asString().getValue, MonitorType.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
+              MtRecord(mt.toString, v.asDouble().doubleValue(), s.asString().getValue, monitorTypeOp.formatWithUnit(mt, Some(v.asDouble().doubleValue())))
             } else {
-                MtRecord(mt.toString, 0, MonitorStatus.NormalStat, MonitorType.formatWithUnit(mt, Some(0)))
+              MtRecord(mt.toString, 0, MonitorStatus.NormalStat, monitorTypeOp.formatWithUnit(mt, Some(0)))
             }
           }
         val pdfReport = if (doc.get("pdfReport").isEmpty)
-          new ObjectId()
+          None
         else
-          doc.get("pdfReport").get.asObjectId().getValue
-        RecordList(monitor, time.getMillis, mtDataList, pdfReport)
-      }
-    }
-  }
-
-  def getLatestRecordTimeFuture(colName: String, monitorList: Seq[Monitor.Value]) = {
-    import org.mongodb.scala.bson._
-    import org.mongodb.scala.model._
-    import org.mongodb.scala.model.Projections._
-    import org.mongodb.scala.model.Sorts._
-    import scala.concurrent._
-    import scala.concurrent.duration._
-
-    val mtList = MonitorType.activeMtvList
-    val col = MongoDB.database.getCollection(colName)
-    val projFields = Seq("monitor", "time")
-    val proj = include(projFields: _*)
-    val futureList =
-      for (m <- monitorList) yield {
-        val filter = Filters.and(Filters.equal("monitor", Monitor.map(m)._id), Filters.ne("正十一烷", null))
-        val f = col.find(filter).projection(proj).sort(descending("time")).limit(1).toFuture()
-        for {
-          docs <- f
-        } yield {
-          if (docs.isEmpty) {
-            None
-          } else {
-            val doc = docs.head
-            val time = doc("time").asDateTime().toDateTime()
-            Some(m -> time)
+          doc.get("pdfReport").map {
+            _.asObjectId().getValue
           }
-        }
+        RecordList(monitor, time.getMillis, mtDataList, pdfReport.getOrElse(new ObjectId()))
       }
-    for (pairs <- Future.sequence(futureList)) yield {
-      pairs.flatMap(x => x).toMap
     }
   }
 
-  def getRecordWithPdfID(pdfId:ObjectId): Future[Map[Monitor.Value, (DateTime, Option[String], Map[MonitorType.Value, Record])]] = {
-    val col = MongoDB.database.getCollection(Record.MinCollection)
-    val projFields = "monitor" :: "time" :: "sampleName"::MonitorType.mtvList.map {
-      MonitorType.BFName(_)
+  def getRecordWithPdfID(pdfId: ObjectId): Future[Map[MonitorOp#Value, (DateTime, Option[String], Map[MonitorTypeOp#Value, Record])]] = {
+    val col = mongoDB.database.getCollection(MinCollection)
+    val projFields = "monitor" :: "time" :: "sampleName" :: monitorTypeOp.mtvList.map {
+      monitorTypeOp.BFName
     }
 
     val proj = include(projFields: _*)
@@ -591,22 +404,23 @@ object Record {
       } yield {
         for {
           doc <- docs
-          m = Monitor.withName(doc("monitor").asString().getValue)
+          m = monitorOp.withName(doc("monitor").asString().getValue)
           time = doc("time").asDateTime().toDateTime()
           sampleName = doc.get("sampleName").map(_.asString().getValue)
         } yield {
           val pair =
             for {
-              mt <- MonitorType.mtvList
-              mtBFName = MonitorType.BFName(mt)
-              mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument()
+              mt <- monitorTypeOp.mtvList
+              mtBFName = monitorTypeOp.BFName(mt)
+              mtDocOpt = doc.get(mtBFName) if mtDocOpt.isDefined && mtDocOpt.get.isDocument
               mtDoc = mtDocOpt.get.asDocument()
-              v = mtDoc.get("v") if v.isDouble()
-              s = mtDoc.get("s") if s.isString()
+              v = mtDoc.get("v") if v.isDouble
+              s = mtDoc.get("s") if s.isString
             } yield {
-              mt -> Record(m, time, v.asDouble().doubleValue(), s.asString().getValue)
+              mt.asInstanceOf[MonitorTypeOp#Value] ->
+                Record(m.asInstanceOf[MonitorOp#Value], time, v.asDouble().doubleValue(), s.asString().getValue)
             }
-          m -> (time, sampleName, pair.toMap)
+          m.asInstanceOf[MonitorOp#Value] -> (time, sampleName, pair.toMap)
         }
       }
 

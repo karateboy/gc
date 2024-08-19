@@ -4,8 +4,11 @@ import play.api._
 import akka.actor._
 import play.api.Play.current
 import play.api.libs.concurrent.Akka
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import akka.pattern.{ask, pipe}
+
+import javax.inject.Inject
 
 case object IssueCPcmd
 
@@ -13,10 +16,10 @@ case object ReadCurrentStreamNum
 
 case class SetStreamNum(v: Int)
 
-class ViciUeaSelector(gcName: String, config: Configuration) extends SelectorModel {
-  val max = config.getInt("max").get
-  val comPort = config.getInt("com").get
-  val worker = Akka.system.actorOf(Props(new UeaSelectorWorker(this)), name = s"selector_${gcName}")
+class ViciUeaSelector(monitorOp: MonitorOp, actorSystem: ActorSystem)(gcName: String, config: Configuration) extends SelectorModel {
+  val max: Int = config.getInt("max").get
+  val comPort: Int = config.getInt("com").get
+  val worker: ActorRef = actorSystem.actorOf(Props(new UeaSelectorWorker(monitorOp)(this)), name = s"selector_${gcName}")
 
   def getGcName = gcName
 
@@ -24,34 +27,33 @@ class ViciUeaSelector(gcName: String, config: Configuration) extends SelectorMod
 
   def getStreamNum(): Int = streamNum
 
-  def setStreamNum(v: Int) {
+  def setStreamNum(v: Int): Unit = {
     if(v <= max)
       worker ! SetStreamNum(v)
   }
 
   val canSetStream = true
 
-  def modifyStreamNum(v: Int) {
+  def modifyStreamNum(v: Int): Unit = {
     streamNum = v
   }
 
 }
 
-class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
-  val max = selector.max
+class UeaSelectorWorker @Inject()(monitorOp: MonitorOp)(selector: ViciUeaSelector) extends Actor {
+  val max: Int = selector.max
   for (id <- 1 to max) {
-    Monitor.getMonitorValueByName(selector.getGcName, id)
+    monitorOp.getMonitorValueByName(selector.getGcName, id)
   }
 
-  val comPort = selector.comPort
-  Logger.info(s"UEA is set to ${comPort}")
-  val serial = SerialComm.open(comPort)
+  private val comPort = selector.comPort
+  Logger.info(s"UEA is set to $comPort")
+  val serial: SerialComm = SerialComm.open(comPort)
 
-  var timer = context.system.scheduler.scheduleOnce(
-    scala.concurrent.duration.Duration(0, scala.concurrent.duration.MICROSECONDS),
-    self, IssueCPcmd)
+  var timer: Cancellable = context.system.scheduler.scheduleOnce(
+    scala.concurrent.duration.Duration(0, scala.concurrent.duration.MICROSECONDS), self, IssueCPcmd)
 
-  def receive = {
+  def receive: Receive = {
     case IssueCPcmd =>
       try {
         val readCmd = s"CP\r"
@@ -67,7 +69,7 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
     case ReadCurrentStreamNum =>
       try {
         val ret = serial.getLine2
-        if (!ret.isEmpty) {
+        if (ret.nonEmpty) {
           val cpNum = Integer.valueOf(ret.head.trim.substring(2), 10).toInt
           if (cpNum != selector.getStreamNum()) {
             Logger.info(s"Selector stream number change to $cpNum")
@@ -101,7 +103,7 @@ class UeaSelectorWorker(selector: ViciUeaSelector) extends Actor {
 
   }
 
-  override def postStop() {
+  override def postStop(): Unit = {
     serial.close
     timer.cancel()
   }
