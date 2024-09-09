@@ -2,7 +2,7 @@ package models
 
 import akka.actor._
 import com.github.s7connector.api.S7Connector
-import com.github.s7connector.api.factory.{S7ConnectorFactory, S7SerializerFactory}
+import com.github.s7connector.api.factory.S7SerializerFactory
 import models.ModelHelper._
 import org.mongodb.scala.model._
 import play.api._
@@ -16,7 +16,7 @@ import scala.concurrent.{Future, blocking}
 
 case class ExportEntry(db: Int, offset: Int, bitOffset: Int)
 
-case class SiemensPlcConfig(host: String, rack: Option[Int], slot:Option[Int], exportMap: Map[String, ExportEntry], importMap: Map[String, ExportEntry])
+case class SiemensPlcConfig(host: String, rack: Option[Int], slot: Option[Int], exportMap: Map[String, ExportEntry], importMap: Map[String, ExportEntry])
 
 case class AoEntry(idx: Int, min: Double, max: Double)
 
@@ -24,7 +24,7 @@ case class AoConfig(host: String, exportMap: Map[String, AoEntry])
 
 case class ComputedMeasureType(_id: String, sum: Seq[String])
 
-case class CleanNotifyConfig(host: String, slaveId: Option[Int], address: Int, delay:Int = 7)
+case class CleanNotifyConfig(host: String, slaveId: Option[Int], address: Int, delay: Int = 7)
 
 case class GcConfig(index: Int, inputDir: String, selector: Selector,
                     plcConfig: Option[SiemensPlcConfig],
@@ -78,6 +78,7 @@ object GcAgent {
               pairs.toMap
             }
           }
+
           val rack = config.getInt("rack")
           val slot = config.getInt("slot")
           val exportMap = getMapping(config.getConfigList("exportMap"))
@@ -223,12 +224,8 @@ class GcAgent @Inject()(configuration: Configuration,
     case ParseReport =>
       try {
         for (gcConfig <- gcConfigList) {
-          Future {
-            blocking {
-              val newRetryMap = processInputPath(gcConfig, parser, retryMap)
-              context.become(handler(newRetryMap))
-            }
-          }
+          val newRetryMap = processInputPath(gcConfig, parser, retryMap)
+          context.become(handler(newRetryMap))
 
           Future {
             blocking {
@@ -468,7 +465,7 @@ class GcAgent @Inject()(configuration: Configuration,
 
   private def processInputPath(gcConfig: GcConfig,
                                parser: (GcConfig, File) => Boolean,
-                               _retryMap:Map[String, Int]): Map[String, Int] = {
+                               _retryMap: Map[String, Int]): Map[String, Int] = {
     import java.io.File
 
     def setArchive(f: File): Unit = {
