@@ -98,7 +98,7 @@ class MonitorOp @Inject()(mongoDB: MongoDB) extends Enumeration {
     ret.toList
   }
 
-  def getMonitorList: List[Monitor] = map.values.toList.sortBy(_.gcName)
+  def getMonitorList: List[Monitor] = map.values.toList.sortBy(_._id)
 
   def refresh(): Unit = {
     Logger.info("Refresh MonitorOp")

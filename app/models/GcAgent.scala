@@ -286,8 +286,6 @@ class GcAgent @Inject()(configuration: Configuration,
 
     import com.github.nscala_time.time.Imports._
 
-    val monitor = monitorOp.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
-
     def insertRecord(): Unit = {
       val lines =
         Files.readAllLines(Paths.get(reportDir.getAbsolutePath + "/Report.txt"), StandardCharsets.UTF_16LE).asScala
@@ -296,6 +294,17 @@ class GcAgent @Inject()(configuration: Configuration,
         val tokens = line.split(":")
         tokens(1).trim()
       })
+
+      lines.find(line=>line.contains("Location"))
+        .foreach(line=> {
+          val tokens = line.split(":")
+          assert(tokens.length == 3)
+          val locs = tokens(2).trim.split("\\s+").map(_.trim)
+          val pos = locs(0).toInt
+          gcConfig.selector.set(pos)
+        })
+
+      val monitor = monitorOp.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
 
       val mDate = {
         val mDates =
@@ -320,20 +329,6 @@ class GcAgent @Inject()(configuration: Configuration,
           ret
         else
           ret ++ getRecordLines(remain)
-      }
-
-      def getPosHint(inputLines: Seq[String]): List[Int] = {
-        val head = inputLines.dropWhile(!_.startsWith("-------")).take(1)
-
-        def getPos(from: Int): List[Int] = {
-          val pos = head.indexOf('|', from)
-          if (pos == -1)
-            Nil
-          else
-            pos :: getPos(pos + 1)
-        }
-
-        getPos(0)
       }
 
       val recordMap = mutable.Map.empty[MonitorOp#Value, mutable.Map[DateTime, mutable.Map[MonitorTypeOp#Value, (Double, String)]]]
