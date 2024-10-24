@@ -53,7 +53,7 @@ class Realtime @Inject()(monitorOp: MonitorOp, recordOp: RecordOp, exporter: Exp
       var gcNameMonitorMap = Map.empty[String, Seq[Monitor]]
 
       for (gcNameMap <- sysConfig.getGcNameMap) yield {
-        for (monitor <- monitorOp.map.values.toList.sortBy(_.gcName)) {
+        for (monitor <- monitorOp.map.values.toList.sortBy(_._id)) {
           val gcMonitorList = gcNameMonitorMap.getOrElse(gcNameMap(monitor.gcName), Seq.empty[Monitor])
           gcNameMonitorMap = gcNameMonitorMap + (gcNameMap(monitor.gcName) -> gcMonitorList.:+(monitor))
         }
