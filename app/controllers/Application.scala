@@ -163,12 +163,12 @@ class Application @Inject()(userOp: UserOp,
       val monitorTypes = monitorTypeOp.mtvList map {
         monitorTypeOp.map
       }
-      Ok(Json.toJson(monitorTypes))
+      Ok(Json.toJson(monitorTypes.sortBy(mt=>mt.order)))
   }
 
   def monitorList: Action[AnyContent] = Security.Authenticated {
     implicit request =>
-      Ok(Json.toJson(monitorOp.getMonitorList))
+      Ok(Json.toJson(monitorOp.getMonitorList.sortBy(m => m.selector)))
   }
 
   private case class GcName(key: String, name: String)

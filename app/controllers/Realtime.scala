@@ -11,7 +11,11 @@ import play.api.mvc._
 import javax.inject.Inject
 import scala.concurrent._
 
-class Realtime @Inject()(monitorOp: MonitorOp, recordOp: RecordOp, exporter: Exporter, sysConfig: SysConfig) extends Controller {
+class Realtime @Inject()(monitorOp: MonitorOp,
+                         recordOp: RecordOp,
+                         exporter: Exporter,
+                         sysConfig: SysConfig,
+                         monitorTypeOp: MonitorTypeOp) extends Controller {
   def MonitorTypeStatusList(): Action[AnyContent] = Security.Authenticated.async {
       Future.successful(Ok(""))
   }
@@ -32,7 +36,11 @@ class Realtime @Inject()(monitorOp: MonitorOp, recordOp: RecordOp, exporter: Exp
             GcLatestStatus("-", DateTime.now().getMillis, Seq.empty[MtRecord], new ObjectId(), gcConfig.executeCount)
           } else {
             val recordList = records.head
-            GcLatestStatus(recordList.monitor, recordList.time, recordList.mtDataList, recordList.pdfReport, gcConfig.executeCount)
+            GcLatestStatus(recordList.monitor,
+              recordList.time,
+              recordList.mtDataList.sortBy(mtRecord=>
+                monitorTypeOp.map(monitorTypeOp.getMonitorTypeValueByName(mtRecord.mtName)).order),
+              recordList.pdfReport, gcConfig.executeCount)
           }
         Ok(Json.toJson(gcLatestStatus))
       }
@@ -53,7 +61,7 @@ class Realtime @Inject()(monitorOp: MonitorOp, recordOp: RecordOp, exporter: Exp
       var gcNameMonitorMap = Map.empty[String, Seq[Monitor]]
 
       for (gcNameMap <- sysConfig.getGcNameMap) yield {
-        for (monitor <- monitorOp.map.values.toList.sortBy(_._id)) {
+        for (monitor <- monitorOp.map.values.toList.sortBy(_.selector)) {
           val gcMonitorList = gcNameMonitorMap.getOrElse(gcNameMap(monitor.gcName), Seq.empty[Monitor])
           gcNameMonitorMap = gcNameMonitorMap + (gcNameMap(monitor.gcName) -> gcMonitorList.:+(monitor))
         }
