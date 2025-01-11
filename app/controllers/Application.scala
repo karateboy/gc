@@ -401,6 +401,26 @@ class Application @Inject()(userOp: UserOp,
       )
   }
 
+  def getAnalysisLogPath: Action[AnyContent] = Security.Authenticated.async {
+    for (ret <- sysConfig.getAnalysisLogPath) yield {
+      Ok(Json.toJson(ret))
+    }
+  }
+
+  def setAnalysisLogPath(): Action[JsValue] = Security.Authenticated.async(BodyParsers.parse.json) {
+    implicit request =>
+      implicit val reads: Reads[ParamStr] = Json.reads[ParamStr]
+      val ret = request.body.validate[ParamStr]
+
+      ret.fold(
+        error => handleJsonValidateErrorFuture(error),
+        param => {
+          for (_ <- sysConfig.setAnalysisLogPath(param.value)) yield
+            Ok(Json.obj("ok" -> true))
+        }
+      )
+  }
+
   def redirectRoot(ignore: String): Action[AnyContent] = Action {
     Redirect("/")
   }

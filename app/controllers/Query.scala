@@ -36,7 +36,8 @@ class Query @Inject()(recordOp: RecordOp,
                       monitorOp: MonitorOp,
                       monitorTypeOp: MonitorTypeOp,
                       alarmOp: AlarmOp,
-                      excelUtility: ExcelUtility) extends Controller {
+                      excelUtility: ExcelUtility,
+                      calibrationOp: CalibrationOp) extends Controller {
 
   import recordOp._
 
@@ -743,6 +744,60 @@ class Query @Inject()(recordOp: RecordOp,
           onClose = () => {
             Files.deleteIfExists(excelFile.toPath())
           })
+      }
+  }
+
+  def calibrationData(monitorStr: String, monitorTypeStr: String, startLong: Long, endLong: Long): Action[AnyContent] =
+    Security.Authenticated.async {
+    implicit request =>
+
+
+      val monitorTypeStrArray = java.net.URLDecoder.decode(monitorTypeStr, "UTF-8").split(',')
+      val monitorTypes = monitorTypeStrArray.map {
+        monitorTypeOp.withName
+      }
+      val (start, end) = (new DateTime(startLong), new DateTime(endLong))
+
+      implicit val cdWrite = Json.writes[CellData]
+      implicit val rdWrite = Json.writes[RowData]
+      implicit val dtWrite = Json.writes[DataTab]
+
+
+        val monitor = monitorOp.withName(monitorStr)
+        val f = calibrationOp.getCalibrationListFuture(monitor, start, end)
+
+
+      for (calibrations <- f) yield {
+        val rows = calibrations map {
+          cal =>
+            val mtCellData = monitorTypes.toSeq map { mt =>
+              cal.mtMap.get(mt.toString) match {
+                case Some(mtData) =>
+                  val css =
+                    if (mtData.status == MonitorStatus.OverNormalStat)
+                      "text-danger"
+                    else
+                      ""
+
+                  CellData(monitorTypeOp.format(mt, Some(mtData.value)), css)
+                case None =>
+                  CellData("-", "")
+              }
+            }
+
+            val cellData = Seq(CellData(cal._id.monitor, ""),
+              CellData(cal.sampleName.getOrElse(""), ""),
+              CellData(cal.fileName.getOrElse(""), ""),
+              CellData(cal.containerId.getOrElse(""), "")
+            ) ++ mtCellData
+            RowData(cal._id.time.getTime, cellData, new ObjectId())
+        }
+
+        val mtColumnNames = monitorTypes map {
+          monitorTypeOp.map(_).desp
+        }
+        val columnNames = Seq("GC/選擇器", "Sample Name", "FileName", "Container ID") ++ mtColumnNames
+        Ok(Json.toJson(DataTab(columnNames, rows)))
       }
   }
 

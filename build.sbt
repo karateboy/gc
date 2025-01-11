@@ -1,6 +1,6 @@
 name := """gc"""
 
-version := "2.0.7"
+version := "2.0.7-lsnk"
 
 lazy val root = (project in file("."))
   .enablePlugins(PlayScala, LauncherJarPlugin, JavaAppPackaging, WindowsPlugin)
@@ -14,7 +14,7 @@ libraryDependencies ++= Seq(
    "commons-io" % "commons-io" % "2.6"
 )
 
-libraryDependencies += "com.github.tototoshi" %% "scala-csv" % "1.3.6"
+libraryDependencies += "com.github.tototoshi" %% "scala-csv" % "2.0.0"
 
 // https://mvnrepository.com/artifact/org.apache.poi/poi-ooxml
 libraryDependencies += "org.apache.poi" % "poi-ooxml" % "5.0.0"

@@ -86,6 +86,15 @@ export default [
         component: () => import('@/view/historyTrend/historyTrend')
       },
       {
+        path: 'calibration_data',
+        name: 'calibration_data',
+        meta: {
+          icon: 'md-stats',
+          title: '校正資料'
+        },
+        component: () => import('@/view/historyData/calibrationData.vue')
+      },
+      {
         path: 'alarm',
         name: 'alarm',
         meta: {
@@ -120,7 +129,7 @@ export default [
         name: 'mtype_config',
         meta: {
           icon: 'md-laptop',
-          title: '測項設定'
+          title: '參數設定'
         },
         component: () => import('@/view/config/monitorTypeConfig')
       },

@@ -23,6 +23,8 @@ object SysConfig extends Enumeration {
   private val CLEAN_COUNT = Value
   private val LINE_TOKEN = Value
   private val EXECUTE_COUNT = Value
+  private val ANALYSIS_LOG_PATH = Value
+  private val LOG_SKIP = Value
 }
 
 @javax.inject.Singleton
@@ -43,7 +45,9 @@ class SysConfig @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp) {
     STOP_WARN -> Document(valueKey -> false),
     CLEAN_COUNT -> Document(valueKey -> 0),
     LINE_TOKEN -> Document(valueKey -> ""),
-    EXECUTE_COUNT -> Document(valueKey -> 0)
+    EXECUTE_COUNT -> Document(valueKey -> 0),
+    ANALYSIS_LOG_PATH-> Document(valueKey -> "C:/Temp/AnalysisLog.csv"),
+    LOG_SKIP -> Document(valueKey -> 0)
   )
 
   def init(): Unit = {
@@ -52,7 +56,6 @@ class SysConfig @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp) {
       val f = mongoDB.database.createCollection(ColName).toFuture()
       f.onFailure(errorHandler)
     }
-
   }
 
   init()
@@ -205,6 +208,33 @@ class SysConfig @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp) {
 
   def setExecuteCount(count: Int): Future[UpdateResult] = {
     val f = upsert(EXECUTE_COUNT, Document(valueKey -> count))
+    f.failed.foreach(errorHandler)
+    f
+  }
+
+  def getAnalysisLogPath: Future[String] = {
+    val f = get(ANALYSIS_LOG_PATH)
+    f.failed.foreach(errorHandler)
+    for (ret <- f)
+      yield ret.asString().getValue
+  }
+
+  def setAnalysisLogPath(path: String): Future[UpdateResult] = {
+    val f = upsert(ANALYSIS_LOG_PATH, Document(valueKey -> path))
+    setLogSkip(0)
+    f.failed.foreach(errorHandler)
+    f
+  }
+
+  def getLogSkip: Future[Int] = {
+    val f = get(LOG_SKIP)
+    f.failed.foreach(errorHandler)
+    for (ret <- f)
+      yield ret.asInt32().getValue
+  }
+
+  def setLogSkip(skip: Int): Future[UpdateResult] = {
+    val f = upsert(LOG_SKIP, Document(valueKey -> skip))
     f.failed.foreach(errorHandler)
     f
   }

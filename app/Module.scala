@@ -16,7 +16,7 @@ class Module(environment: Environment,
              configuration: Configuration) extends AbstractModule with AkkaGuiceSupport {
   override def configure(): Unit = {
     bindActor[GcAgent]("GC_MainAgent")
-
+    bindActor[AnalysisLogImporter]("AnalysisLogImporter")
     bindActorFactory[HaloKaAgent, HaloKaAgent.Factory]
     bindActorFactory[Adam6017Agent, Adam6017Agent.Factory]
   }

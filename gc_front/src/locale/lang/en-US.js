@@ -3,6 +3,7 @@ export default {
   realtime_data: 'Realtime Data',
   history_data: 'History Record',
   history_trend: 'History Trend',
+  calibration_data: 'Calibration Data',
   config: 'Configure',
   mtype_config: 'Configure measuring type',
   selector_switch: 'Switch selector',

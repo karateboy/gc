@@ -42,6 +42,7 @@
   <logger name="com.avaje.ebeaninternal.server.lib.BackgroundThread" level="OFF" />
   <logger name="com.gargoylesoftware.htmlunit.javascript" level="OFF" />
   <logger name="net.sf.marineapi.nmea.io" level="OFF" />
+  <logger name="models" level="INFO" />
 
   <root level="WARN">
     <appender-ref ref="ASYNCFILE" />

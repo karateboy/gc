@@ -14,7 +14,9 @@ import scala.concurrent.Future
 case class MonitorType(_id: String, desp: String, unit: String, order: Int, prec: Int = 2,
                        std_law: Option[Double] = None,
                        std_internal: Option[Double] = None,
-                       itemID: Option[Int] = None) {
+                       itemID: Option[Int] = None,
+                       cal_high: Option[Double] = None,
+                       cal_low: Option[Double] = None) {
   def getItemIdUpdates = {
 
     Updates.combine(

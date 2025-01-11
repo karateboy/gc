@@ -90,13 +90,29 @@
         </Form>
       </Card>
     </Row>
+    <Row class="margin-top-10">
+      <Card>
+        <p slot="title">
+          <Icon type="ios-keypad"></Icon>分析日誌路徑
+        </p>
+        <Form :model="formItem" :label-width="80">
+          <FormItem label="分析日誌路徑:" :label-width="200">
+            <Input v-model="formItem.logPath" placeholder="请输入分析日誌路徑..." width="300"></Input>
+          </FormItem>
+          <FormItem>
+            <Button type="primary" @click.prevent="setLogPath">更新</Button>&nbsp;
+          </FormItem>
+        </Form>
+      </Card>
+    </Row>
   </div>
 </template>
 
 <script>
 import axios from "axios";
 import canEditTable from "./components/canEditTable.vue";
-import { getMonitorTypes, setMonitorType } from "@/api/data";
+import {getMonitorTypes, setMonitorType} from "@/api/data";
+
 export default {
   name: "monitorTypeConfig",
   components: {
@@ -142,6 +158,16 @@ export default {
           editable: true
         },
         {
+          title: "校正低標",
+          key: "cal_low",
+          editable: true
+        },
+        {
+          title: "校正高標",
+          key: "cal_high",
+          editable: true
+        },
+        {
           title: "操作",
           align: "center",
           width: 200,
@@ -174,7 +200,8 @@ export default {
       formItem: {
         dataPeriod: 30,
         cleanCount: 0,
-        lineToken: ""
+        lineToken: "",
+        logPath: "",
       },
       stopWarn: false
     };
@@ -214,6 +241,8 @@ export default {
       arg.std_internal = parseFloat(arg.std_internal);
       arg.std_law = parseFloat(arg.std_law);
       arg.order = parseInt(arg.order);
+      arg.cal_low = parseFloat(arg.cal_low);
+      arg.cal_high = parseFloat(arg.cal_high);
 
       setMonitorType(arg)
         .then(resp => {
@@ -263,7 +292,7 @@ export default {
     },
     testLineToken() {
       axios
-        .post("/lineToken", { value: this.formItem.lineToken, test: true})
+        .post("/lineToken", { value: this.formItem.lineToken, test: true })
         .then(res => {
           const ret = res.data;
           if (ret.ok) this.$Message.success("成功");
@@ -290,6 +319,23 @@ export default {
         const ret = res.data;
         this.formItem.lineToken = ret;
       });
+    },
+    getLogPath(){
+      axios.get("/analysisLogPath").then(res => {
+        this.formItem.logPath = res.data;
+      });
+    },
+    setLogPath() {
+      axios
+        .post("/analysisLogPath", { value: this.formItem.logPath })
+        .then(res => {
+          const ret = res.data;
+          if (ret.ok) this.$Message.success("成功");
+          else this.$Message.success("失敗");
+        })
+        .catch(err => {
+          alert(err);
+        });
     },
     getGcList() {
       axios.get("/gc").then(res => {
@@ -332,6 +378,7 @@ export default {
     this.getStopWarn();
     this.getCleanCount();
     this.getLineTokens();
+    this.getLogPath();
   }
 };
 </script>

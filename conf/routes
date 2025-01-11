@@ -27,6 +27,7 @@ GET           /history_data                                                     
 GET           /history_data/excel                                                        controllers.Query.historyDataExcel(monitor:String, monitorTypes: String, start: Long, end: Long)
 GET           /pdfReport/:id                                                             controllers.Query.pdfReport(id:String)
 GET           /excelForm/:pdfId                                                          controllers.Query.excelForm(pdfId)
+GET           /calibration_data                                                          controllers.Query.calibrationData(monitor:String, monitorTypes: String, start: Long, end: Long)
 GET           /history_trend                                                             controllers.Query.historyTrendChart2(monitors: String, monitorTypes: String, start: Long, end: Long)
 GET           /realtime_data                                                             controllers.Realtime.latestValues(gcFilter)
 GET           /current_monitor                                                           controllers.Realtime.getCurrentMonitor
@@ -47,7 +48,8 @@ GET           /cleanCount                                                       
 POST          /cleanCount                                                                controllers.Application.setCleanCount
 GET           /lineToken                                                                 controllers.Application.getLineToken
 POST          /lineToken                                                                 controllers.Application.setLineToken
-
+GET           /analysisLogPath                                                           controllers.Application.getAnalysisLogPath
+POST          /analysisLogPath                                                           controllers.Application.setAnalysisLogPath
 # old api
 POST          /User                                                                      controllers.Application.newUser
 GET           /User                                                                      controllers.Application.getAllUsers
