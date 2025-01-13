@@ -8,18 +8,13 @@ import com.github.nscala_time.time.Imports._
 import org.mongodb.scala.model._
 import org.mongodb.scala.bson._
 import org.mongodb.scala.result.UpdateResult
+import play.api.Logger
 
 import java.util.Date
 import javax.inject.Inject
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
-
-@javax.inject.Singleton
-class SysConfig @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp) extends Enumeration {
-  val ColName = "sysConfig"
-  val collection = mongoDB.database.getCollection(ColName)
-
-  val valueKey = "value"
+object SysConfig extends Enumeration {
   private val ALARM_LAST_READ = Value
   private val DATA_PERIOD = Value
   private val OPERATION_MODE = Value
@@ -28,11 +23,20 @@ class SysConfig @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp) extends Enumer
   private val CLEAN_COUNT = Value
   private val LINE_TOKEN = Value
   private val EXECUTE_COUNT = Value
+}
+
+@javax.inject.Singleton
+class SysConfig @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp) {
+  import SysConfig._
+  val ColName = "sysConfig"
+  val collection = mongoDB.database.getCollection(ColName)
+
+  val valueKey = "value"
 
   val LocalMode = 0
   val RemoteMode = 1
 
-  private lazy val defaultConfig = Map(
+  private lazy val defaultConfig: Map[Value, Document] = Map(
     ALARM_LAST_READ -> Document(valueKey -> DateTime.parse("2019-10-1").toDate),
     DATA_PERIOD -> Document(valueKey -> 30),
     OPERATION_MODE -> Document(valueKey -> 0),
@@ -43,29 +47,12 @@ class SysConfig @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp) extends Enumer
   )
 
   def init(): Unit = {
+    Logger.info("SysConfig init")
     if (!mongoDB.colNames.contains(ColName)) {
       val f = mongoDB.database.createCollection(ColName).toFuture()
       f.onFailure(errorHandler)
     }
 
-    val idSet = values map {
-      _.toString()
-    }
-    //Clean up unused
-    val f1 = collection.deleteMany(Filters.not(Filters.in("_id", idSet.toList: _*))).toFuture()
-    f1.onFailure(errorHandler)
-    val updateModels =
-      for ((k, defaultDoc) <- defaultConfig) yield {
-        UpdateOneModel(
-          Filters.eq("_id", k.toString),
-          Updates.setOnInsert(valueKey, defaultDoc(valueKey)), UpdateOptions().upsert(true))
-      }
-
-    val f2 = collection.bulkWrite(updateModels.toList, BulkWriteOptions().ordered(false)).toFuture()
-
-    import scala.concurrent._
-    val f = Future.sequence(List(f1, f2))
-    waitReadyResult(f)
   }
 
   init()

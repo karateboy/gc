@@ -2,7 +2,7 @@ package models
 
 import akka.actor._
 import com.github.s7connector.api.S7Connector
-import com.github.s7connector.api.factory.{S7ConnectorFactory, S7SerializerFactory}
+import com.github.s7connector.api.factory.S7SerializerFactory
 import models.ModelHelper._
 import org.mongodb.scala.model._
 import play.api._
@@ -16,7 +16,7 @@ import scala.concurrent.{Future, blocking}
 
 case class ExportEntry(db: Int, offset: Int, bitOffset: Int)
 
-case class SiemensPlcConfig(host: String, rack: Option[Int], slot:Option[Int], exportMap: Map[String, ExportEntry], importMap: Map[String, ExportEntry])
+case class SiemensPlcConfig(host: String, rack: Option[Int], slot: Option[Int], exportMap: Map[String, ExportEntry], importMap: Map[String, ExportEntry])
 
 case class AoEntry(idx: Int, min: Double, max: Double)
 
@@ -24,7 +24,7 @@ case class AoConfig(host: String, exportMap: Map[String, AoEntry])
 
 case class ComputedMeasureType(_id: String, sum: Seq[String])
 
-case class CleanNotifyConfig(host: String, slaveId: Option[Int], address: Int, delay:Int = 7)
+case class CleanNotifyConfig(host: String, slaveId: Option[Int], address: Int, delay: Int = 7)
 
 case class GcConfig(index: Int, inputDir: String, selector: Selector,
                     plcConfig: Option[SiemensPlcConfig],
@@ -78,6 +78,7 @@ object GcAgent {
               pairs.toMap
             }
           }
+
           val rack = config.getInt("rack")
           val slot = config.getInt("slot")
           val exportMap = getMapping(config.getConfigList("exportMap"))
@@ -223,12 +224,8 @@ class GcAgent @Inject()(configuration: Configuration,
     case ParseReport =>
       try {
         for (gcConfig <- gcConfigList) {
-          Future {
-            blocking {
-              val newRetryMap = processInputPath(gcConfig, parser, retryMap)
-              context.become(handler(newRetryMap))
-            }
-          }
+          val newRetryMap = processInputPath(gcConfig, parser, retryMap)
+          context.become(handler(newRetryMap))
 
           Future {
             blocking {
@@ -289,8 +286,6 @@ class GcAgent @Inject()(configuration: Configuration,
 
     import com.github.nscala_time.time.Imports._
 
-    val monitor = monitorOp.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
-
     def insertRecord(): Unit = {
       Logger.info("insertRecord")
       val lines =
@@ -302,7 +297,7 @@ class GcAgent @Inject()(configuration: Configuration,
       })
 
       lines.find(line=>line.contains("Location"))
-        .map(line=> {
+        .foreach(line=> {
           val tokens = line.split(":")
           assert(tokens.length == 3)
           val locs = tokens(2).trim.split("\\s+").map(_.trim)
@@ -335,20 +330,6 @@ class GcAgent @Inject()(configuration: Configuration,
           ret
         else
           ret ++ getRecordLines(remain)
-      }
-
-      def getPosHint(inputLines: Seq[String]): List[Int] = {
-        val head = inputLines.dropWhile(!_.startsWith("-------")).take(1)
-
-        def getPos(from: Int): List[Int] = {
-          val pos = head.indexOf('|', from)
-          if (pos == -1)
-            Nil
-          else
-            pos :: getPos(pos + 1)
-        }
-
-        getPos(0)
       }
 
       val recordMap = mutable.Map.empty[MonitorOp#Value, mutable.Map[DateTime, mutable.Map[MonitorTypeOp#Value, (Double, String)]]]
@@ -480,7 +461,7 @@ class GcAgent @Inject()(configuration: Configuration,
 
   private def processInputPath(gcConfig: GcConfig,
                                parser: (GcConfig, File) => Boolean,
-                               _retryMap:Map[String, Int]): Map[String, Int] = {
+                               _retryMap: Map[String, Int]): Map[String, Int] = {
     import java.io.File
 
     def setArchive(f: File): Unit = {
