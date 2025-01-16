@@ -55,9 +55,10 @@ class HaloKaAgent @Inject()(monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp, 
               val startTime = DateTime.now
               while (ret.isEmpty) {
                 val elapsedTime = new Duration(startTime, DateTime.now)
-                if (elapsedTime.getStandardSeconds > 1) {
+                if (elapsedTime.getStandardSeconds > 3) {
                   throw new Exception("Read timeout!")
                 }
+                Thread.sleep(100)
                 ret = serial.getLine2
               }
               if (ret.nonEmpty) {
