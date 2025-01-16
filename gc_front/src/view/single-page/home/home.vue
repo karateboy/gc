@@ -48,41 +48,45 @@
         </Card>
       </Col>
     </Row>
-    <Divider dashed />
-    <Row>
-      <Table :columns="columns" :data="rows">
-        <template slot-scope="{ row }" slot="name">
-          <strong>{{ row.name }}</strong>
-        </template>
-        <template slot-scope="{ row, index }" slot="action">
-          <table>
-            <tbody>
-              <tr>
-                <td>
-                  <Button
-                    type="primary"
-                    @click="showPdfReport(index)"
-                    >PDF</Button
-                  >
-                </td>
-                <td>
-                  <Button
-                    type="info"
-                    @click="downloadFormUrl(rows[index].excelArUrl)"
-                    >Ar報告</Button
-                  >
-                  <Button
-                    type="info"
-                    @click="downloadFormUrl(rows[index].excelN2Url)"
-                    >N2報告</Button
-                  >
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </template>
-      </Table>
-    </Row>
+    <Divider dashed/>
+    <Table :columns="columns" :data="rows">
+      <template slot-scope="{ row }" slot="name">
+        <strong>{{ row.name }}</strong>
+      </template>
+      <template slot-scope="{ row, index }" slot="action">
+        <table>
+          <tbody>
+          <tr>
+            <td>
+              <Button
+                type="primary"
+                size="small"
+                @click="showPdfReport(index)"
+              >PDF
+              </Button
+              >
+            </td>
+            <td>
+              <Button
+                type="info"
+                size="small"
+                @click="downloadFormUrl(rows[index].excelArUrl)"
+              >Ar報告
+              </Button
+              >
+              <Button
+                type="info"
+                size="small"
+                @click="downloadFormUrl(rows[index].excelN2Url)"
+              >N2報告
+              </Button
+              >
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </template>
+    </Table>
   </div>
 </template>
 <style scoped>
@@ -109,7 +113,8 @@ import InforCard from '_c/info-card';
 import config from '@/config';
 import moment from 'moment';
 
-import { getGcList, getRealtimeData, getLast10Data } from '@/api/data';
+import {getGcList, getLast10Data, getRealtimeData} from '@/api/data';
+
 const baseUrl =
   process.env.NODE_ENV === 'development'
     ? config.baseUrl.dev

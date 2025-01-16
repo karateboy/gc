@@ -26,7 +26,7 @@ class Realtime @Inject()(monitorOp: MonitorOp,
     implicit request =>
       val gcConfig = GcAgent.gcConfigList.find(_.gcName == gcFilter).get
       val monitors = monitorOp.getMonitorByGcFilter(gcFilter)
-      val latestRecord = recordOp.getLatestRecordListFuture(RecordOp.MinCollection, monitors, rename = true)(1)
+      val latestRecord = recordOp.getLatestRecordFuture(RecordOp.MinCollection, monitors, rename = true)
       implicit val mtRecordWrite = Json.writes[MtRecord]
       implicit val gcLatestStatusWrite: OWrites[GcLatestStatus] = Json.writes[GcLatestStatus]
 
