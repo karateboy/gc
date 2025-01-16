@@ -34,7 +34,8 @@ case class GcConfig(index: Int, inputDir: String, selector: Selector,
                     computedMtList: Option[Seq[ComputedMeasureType]],
                     cleanNotifyConfig: Option[CleanNotifyConfig],
                     var latestDataTime: com.github.nscala_time.time.Imports.DateTime,
-                    var executeCount: Int) {
+                    var executeCount: Int,
+                    haloKaConfig1: Option[HaloKaConfig]) {
   val gcName: String = GcAgent.getGcName(index)
 }
 
@@ -135,6 +136,14 @@ object GcAgent {
           HaloKaConfig(com, speed, monitorType)
         }
 
+      val haloKaConfig1: Option[HaloKaConfig] =
+        for (config <- config.getConfig("haloKaConfig1")) yield {
+          val com = config.getInt("com").get
+          val speed = config.getInt("speed").get
+          val monitorType = config.getString("monitorType").get
+          HaloKaConfig(com, speed, monitorType)
+        }
+
       val adam6017ConfigOpt: Option[Adam6017Config] =
         for (config <- config.getConfig("Adam6017Config")) yield {
           val host = config.getString("host").get
@@ -158,7 +167,7 @@ object GcAgent {
       gcConfigList = gcConfigList :+
         GcConfig(idx, inputDir, selector, plcConfig, aoConfigs, haloKaConfig, adam6017ConfigOpt, computedTypes,
           cleanNotify,
-          com.github.nscala_time.time.Imports.DateTime.now(), executeCount)
+          com.github.nscala_time.time.Imports.DateTime.now(), executeCount, haloKaConfig1)
     }
   }
 
@@ -203,6 +212,10 @@ class GcAgent @Inject()(configuration: Configuration,
   for (gcConfig <- gcConfigList) {
     for (haloKaConfig <- gcConfig.haloKaConfig) {
       injectedChild(haloKaAgentFactory(haloKaConfig, gcConfig), name = s"haloKaAgent${gcConfig.index}")
+    }
+
+    for(haloKaConfig <- gcConfig.haloKaConfig1){
+      injectedChild(haloKaAgentFactory(haloKaConfig, gcConfig), name = s"haloKaAgent1${gcConfig.index}")
     }
 
     for (adam6017Config <- gcConfig.adam6017Config) {
