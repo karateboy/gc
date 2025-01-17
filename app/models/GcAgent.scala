@@ -39,7 +39,7 @@ case class GcConfig(index: Int, inputDir: String, selector: Selector,
   val gcName: String = GcAgent.getGcName(index)
 }
 
-case class HaloKaConfig(com: Int, speed: Int, MonitorType: String)
+case class HaloKaConfig(com: Int, speed: Int, MonitorType: String, continuous: Boolean = false)
 
 import scala.collection.JavaConverters._
 
@@ -133,7 +133,8 @@ object GcAgent {
           val com = config.getInt("com").get
           val speed = config.getInt("speed").get
           val monitorType = config.getString("monitorType").get
-          HaloKaConfig(com, speed, monitorType)
+          val continuous = config.getBoolean("continuous").getOrElse(false)
+          HaloKaConfig(com, speed, monitorType, continuous)
         }
 
       val haloKaConfig1: Option[HaloKaConfig] =

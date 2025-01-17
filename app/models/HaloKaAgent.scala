@@ -1,6 +1,6 @@
 package models
 
-import akka.actor.{Actor, Cancellable, Props}
+import akka.actor.{Actor, Cancellable}
 import com.github.nscala_time.time.Imports.Duration
 import com.google.inject.assistedinject.Assisted
 import org.joda.time.DateTime
@@ -26,18 +26,63 @@ object HaloKaAgent {
 
 class HaloKaAgent @Inject()(monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp, recordOp: RecordOp)
                            (@Assisted("config") config: HaloKaConfig, @Assisted("gcConfig") gcConfig: GcConfig) extends Actor {
-  Logger.info(s"HaloKa Agent com${config.com} speed:${config.speed} ${config.MonitorType}")
+  Logger.info(s"HaloKa Agent com${config.com} speed:${config.speed} ${config.MonitorType} ")
+
   import HaloKaAgent._
 
   self ! OpenCom
   var serialOpt: Option[SerialComm] = None
   var timer: Option[Cancellable] = None
 
+  private def askForData(): Unit = {
+    for (serial <- serialOpt) {
+      val readCmd = s"CONC\r"
+      serial.os.write(readCmd.getBytes())
+
+      var ret = serial.getLine2
+      val startTime = DateTime.now
+      while (ret.isEmpty) {
+        val elapsedTime = new Duration(startTime, DateTime.now)
+        if (elapsedTime.getStandardSeconds > 3) {
+          throw new Exception("Read timeout!")
+        }
+        Thread.sleep(100)
+        ret = serial.getLine2
+      }
+      if (ret.nonEmpty) {
+        try {
+          val value = ret.head.trim.toDouble
+          insertRecord(value)
+        } catch {
+          case ex: Throwable =>
+            Logger.info(ex.getMessage)
+        }
+      }
+    }
+  }
+
+  private def collectData(): Unit = {
+    for (serial <- serialOpt) {
+      val ret = serial.getLine2
+      if (ret.isEmpty) {
+        Logger.error("No data")
+      } else {
+        try {
+          val value = ret.last.trim.toDouble
+          insertRecord(value)
+        } catch {
+          case ex: Throwable =>
+            Logger.info(ex.getMessage)
+        }
+      }
+    }
+  }
+
   override def receive: Receive = {
     case OpenCom =>
       try {
         serialOpt = Some(SerialComm.open(config.com, config.speed))
-        timer = Some(context.system.scheduler.schedule(FiniteDuration(1, SECONDS), FiniteDuration(1, MINUTES), self, ReadData))
+        timer = Some(context.system.scheduler.schedule(FiniteDuration(10, SECONDS), FiniteDuration(1, MINUTES), self, ReadData))
       } catch {
         case ex: Throwable =>
           Logger.error("Fail to open com port try 1 min later.", ex)
@@ -47,32 +92,10 @@ class HaloKaAgent @Inject()(monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp, 
       Future {
         blocking {
           try {
-            for (serial <- serialOpt) {
-              val readCmd = s"CONC\r"
-              serial.os.write(readCmd.getBytes())
-
-              var ret = serial.getLine2
-              val startTime = DateTime.now
-              while (ret.isEmpty) {
-                val elapsedTime = new Duration(startTime, DateTime.now)
-                if (elapsedTime.getStandardSeconds > 3) {
-                  throw new Exception("Read timeout!")
-                }
-                Thread.sleep(100)
-                ret = serial.getLine2
-              }
-              if (ret.nonEmpty) {
-                try{
-                  val value = ret.head.trim.toDouble
-                  insertRecord(value)
-                }catch{
-                  case ex:Throwable=>
-                    Logger.info(ex.getMessage)
-                    self ! ReadData
-                }
-
-              }
-            }
+            if (config.continuous)
+              collectData()
+            else
+              askForData()
           } catch {
             case ex: Throwable =>
               Logger.error("failed to read data", ex)
@@ -82,7 +105,6 @@ class HaloKaAgent @Inject()(monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp, 
   }
 
   def insertRecord(mtValue: Double): Future[UpdateResult] = {
-    import org.mongodb.scala.model._
 
     val monitor = monitorOp.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
     val mt = monitorTypeOp.getMonitorTypeValueByName(config.MonitorType, "ppb")

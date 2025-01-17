@@ -10,7 +10,7 @@ import org.mongodb.scala.result.{InsertOneResult, UpdateResult}
 import play.api._
 
 import javax.inject.Inject
-import scala.collection.immutable
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -231,6 +231,7 @@ class RecordOp @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp, monitorTypeOp: 
     }
   }
 
+  import ObjectIdUtil._
   implicit val mtRecordWrite: Writes[MtRecord] = Json.writes[MtRecord]
   implicit val recordListWrite: Writes[RecordList] = Json.writes[RecordList]
 
@@ -358,7 +359,8 @@ class RecordOp @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp, monitorTypeOp: 
     val filters = Filters.and(Filters.exists("pdfReport"), Filters.in("_id.monitor", monitors: _*))
     val f = col.find(filters).projection(proj).sort(descending("time")).limit(1).toFuture()
     val f2 = col.find(Filters.in("_id.monitor", monitors: _*)).projection(proj).sort(descending("time")).limit(1).toFuture()
-    def getMtDataList(doc:Document): Seq[MtRecord] = {
+
+    def getMtDataList(doc: Document): Seq[MtRecord] = {
       for {
         mt <- mtList
         mtBFName = monitorTypeOp.BFName(mt)
@@ -387,12 +389,14 @@ class RecordOp @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp, monitorTypeOp: 
         val mtDataList = getMtDataList(doc)
         // Update mtDataList with the latest record
         val mtDataList2 = getMtDataList(docs2.head)
-        val updatedMtDataList = mtDataList.map{ mtRecord =>
-          val mtRecord2 = mtDataList2.find(_.mtName == mtRecord.mtName)
-          if(mtRecord2.isDefined){
-            mtRecord.copy(value = mtRecord2.get.value, status = mtRecord2.get.status, text = mtRecord2.get.text)
-          }else
-            mtRecord
+        val updateMtList = ListBuffer(mtDataList: _*)
+        for (mtRecord <- mtDataList2) {
+          if (updateMtList.exists(_.mtName == mtRecord.mtName)) {
+            val idx = updateMtList.indexWhere(_.mtName == mtRecord.mtName)
+            updateMtList.update(idx, mtRecord)
+          } else {
+            updateMtList += mtRecord
+          }
         }
 
         val pdfReport = if (doc.get("pdfReport").isEmpty)
@@ -401,7 +405,7 @@ class RecordOp @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp, monitorTypeOp: 
           doc.get("pdfReport").map {
             _.asObjectId().getValue
           }
-        RecordList(monitorOp.map(monitor).dp_no, time.getMillis, mtDataList, pdfReport.getOrElse(new ObjectId()))
+        RecordList(monitorOp.map(monitor).dp_no, time.getMillis, updateMtList, pdfReport.getOrElse(new ObjectId()))
       }
     }
   }
