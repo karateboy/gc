@@ -1,12 +1,10 @@
 package models
 
 import com.github.nscala_time.time.Imports._
-import controllers.Query
 import org.apache.poi.openxml4j.opc.OPCPackage
 import org.apache.poi.ss.usermodel.{BorderStyle, FillPatternType, IndexedColors}
 import org.apache.poi.xssf.usermodel.{XSSFCellStyle, XSSFColor, XSSFSheet, XSSFWorkbook}
-import play.api.{Configuration, Environment, Logger}
-import play.api.Play.current
+import play.api.Environment
 
 import java.io.{File, FileInputStream, FileOutputStream}
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
@@ -181,7 +179,6 @@ class ExcelUtility @Inject()(environment: Environment,
     finishExcel(reportFilePath, pkg, wb)
   }
 
-  import recordOp._
   def createHistoryData(recordList: Seq[RecordList], monitorTypes: Seq[MonitorTypeOp#Value]): File = {
     implicit val (reportFilePath, pkg, wb) = prepareTemplate("historyData.xlsx")
     val format = wb.createDataFormat();
@@ -282,7 +279,7 @@ class ExcelUtility @Inject()(environment: Environment,
         fillThcContent(22, 4, 9)
       }
 
-      def fillSheetWithAr(sheetN:Int): Unit = {
+      def fillSheetWithAr(sheetN: Int): Unit = {
         sheet = wb.getSheetAt(sheetN)
         sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
         sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
@@ -298,7 +295,7 @@ class ExcelUtility @Inject()(environment: Environment,
         fillThcContent(24, 4, 9)
       }
 
-      def fillSheetWithoutAr(sheetN:Int): Unit = {
+      def fillSheetWithoutAr(sheetN: Int): Unit = {
         sheet = wb.getSheetAt(sheetN)
         sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
         sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
@@ -312,7 +309,8 @@ class ExcelUtility @Inject()(environment: Environment,
         fillMtContent("N2", 22, 4, 9)
         fillThcContent(23, 4, 9)
       }
-      def fillSheetWithCh4(sheetN:Int): Unit = {
+
+      def fillSheetWithCh4(sheetN: Int): Unit = {
         sheet = wb.getSheetAt(sheetN)
         sheet.getRow(7).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
         sheet.getRow(8).getCell(9).setCellValue(dt.toString("YYYY/MM/dd"))
@@ -362,10 +360,18 @@ class ExcelUtility @Inject()(environment: Environment,
             case _: Throwable =>
               0
           }
-          if (mtMap(mt).value == 0 || mtMap(mt).value * 1000 < limit)
-            sheet.getRow(rowN).getCell(cellN).setCellValue(s"<$limit")
-          else
-            sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value * 1000)
+
+          if (mtName == "H2O") {
+            if (mtMap(mt).value == 0 || mtMap(mt).value < limit)
+              sheet.getRow(rowN).getCell(cellN).setCellValue(s"<$limit")
+            else
+              sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value)
+          } else {
+            if (mtMap(mt).value == 0 || mtMap(mt).value * 1000 < limit)
+              sheet.getRow(rowN).getCell(cellN).setCellValue(s"<$limit")
+            else
+              sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value * 1000)
+          }
         }
       }
 
@@ -390,7 +396,7 @@ class ExcelUtility @Inject()(environment: Environment,
         }
       }
 
-      def fillSheetByMt(sheetN: Int, startRow: Int, mtSeq: Seq[String]) = {
+      def fillSheetByMt(sheetN: Int, startRow: Int, mtSeq: Seq[String]): Unit = {
         sheet = wb.getSheetAt(sheetN)
         sheet.getRow(6).getCell(4).setCellValue(dt.toString("YYYY/MM/dd"))
         //for (sampleName <- sampleNameOpt)
@@ -429,10 +435,17 @@ class ExcelUtility @Inject()(environment: Environment,
             case _: Throwable =>
               0
           }
-          if (mtMap(mt).value == 0 || mtMap(mt).value * 1000 < limit)
-            sheet.getRow(rowN).getCell(cellN).setCellValue(s"<$limit")
-          else
-            sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value * 1000)
+          if(mtName == "H2O"){
+            if (mtMap(mt).value == 0 || mtMap(mt).value < limit)
+              sheet.getRow(rowN).getCell(cellN).setCellValue(s"<$limit")
+            else
+              sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value)
+          }else{
+            if (mtMap(mt).value == 0 || mtMap(mt).value * 1000 < limit)
+              sheet.getRow(rowN).getCell(cellN).setCellValue(s"<$limit")
+            else
+              sheet.getRow(rowN).getCell(cellN).setCellValue(mtMap(mt).value * 1000)
+          }
         }
       }
 
