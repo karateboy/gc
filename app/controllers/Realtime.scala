@@ -15,7 +15,8 @@ class Realtime @Inject()(monitorOp: MonitorOp,
                          recordOp: RecordOp,
                          exporter: Exporter,
                          sysConfig: SysConfig,
-                         monitorTypeOp: MonitorTypeOp) extends Controller {
+                         monitorTypeOp: MonitorTypeOp,
+                         calibrationOp: CalibrationOp) extends Controller {
   def MonitorTypeStatusList(): Action[AnyContent] = Security.Authenticated.async {
       Future.successful(Ok(""))
   }
@@ -98,6 +99,18 @@ class Realtime @Inject()(monitorOp: MonitorOp,
           Thread.sleep(1000)
         }
         Ok("")
+      }
+  }
+
+  def getLatestCalibration(): Action[AnyContent] = Security.Authenticated.async {
+    implicit request =>
+      import models.Calibration._
+      val f = calibrationOp.getLatestCalibrationFuture()
+      f.map {
+        case Some(calibration) =>
+          Ok(Json.toJson(Seq(calibration)))
+        case None =>
+          Ok(Json.toJson(Seq.empty[Calibration]))
       }
   }
 }

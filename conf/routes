@@ -33,6 +33,8 @@ GET           /realtime_data                                                    
 GET           /current_monitor                                                           controllers.Realtime.getCurrentMonitor
 POST          /current_monitor                                                           controllers.Realtime.setCurrentMonitor(monitorId:String)
 GET           /gc_monitor                                                                controllers.Realtime.getGcMonitors
+GET           /latest_calibration                                                        controllers.Realtime.getLatestCalibration
+
 GET           /last10_data                                                               controllers.Query.last10Data(gcFilter)
 GET           /alarm                                                                     controllers.Query.alarmData(start: Long, end: Long)
 GET           /testAlarm                                                                 controllers.Application.testAlarm
@@ -50,6 +52,9 @@ GET           /lineToken                                                        
 POST          /lineToken                                                                 controllers.Application.setLineToken
 GET           /analysisLogPath                                                           controllers.Application.getAnalysisLogPath
 POST          /analysisLogPath                                                           controllers.Application.setAnalysisLogPath
+GET           /coa                                                                       controllers.Application.getCOA
+POST          /coa                                                                       controllers.Application.setCOA
+
 # old api
 POST          /User                                                                      controllers.Application.newUser
 GET           /User                                                                      controllers.Application.getAllUsers

@@ -9,6 +9,7 @@ import org.mongodb.scala.model._
 import org.mongodb.scala.bson._
 import org.mongodb.scala.result.UpdateResult
 import play.api.Logger
+import play.api.libs.json.Json
 
 import java.util.Date
 import javax.inject.Inject
@@ -25,6 +26,7 @@ object SysConfig extends Enumeration {
   private val EXECUTE_COUNT = Value
   private val ANALYSIS_LOG_PATH = Value
   private val LOG_SKIP = Value
+  private val CALIBRATION_TARGET = Value
 }
 
 @javax.inject.Singleton
@@ -47,7 +49,8 @@ class SysConfig @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp) {
     LINE_TOKEN -> Document(valueKey -> ""),
     EXECUTE_COUNT -> Document(valueKey -> 0),
     ANALYSIS_LOG_PATH-> Document(valueKey -> "C:/Temp/AnalysisLog.csv"),
-    LOG_SKIP -> Document(valueKey -> 0)
+    LOG_SKIP -> Document(valueKey -> 0),
+    CALIBRATION_TARGET -> Document(valueKey -> Json.toJson(CalibrationTarget.defaultCalibrationTarget).toString())
   )
 
   def init(): Unit = {
@@ -235,6 +238,19 @@ class SysConfig @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp) {
 
   def setLogSkip(skip: Int): Future[UpdateResult] = {
     val f = upsert(LOG_SKIP, Document(valueKey -> skip))
+    f.failed.foreach(errorHandler)
+    f
+  }
+
+  def getCalibrationTarget(): Future[CalibrationTarget] = {
+    val f = get(CALIBRATION_TARGET)
+    f.failed.foreach(errorHandler)
+    for (ret <- f)
+      yield Json.parse(ret.asString().getValue).as[CalibrationTarget]
+  }
+
+  def setCalibrationTarget(target: CalibrationTarget): Future[UpdateResult] = {
+    val f = upsert(CALIBRATION_TARGET, Document(valueKey -> Json.toJson(target).toString()))
     f.failed.foreach(errorHandler)
     f
   }

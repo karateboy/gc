@@ -424,4 +424,26 @@ class Application @Inject()(userOp: UserOp,
   def redirectRoot(ignore: String): Action[AnyContent] = Action {
     Redirect("/")
   }
+
+  import models.CalibrationTarget._
+  def getCOA: Action[AnyContent] = Security.Authenticated.async {
+    for {
+      coa <- sysConfig.getCalibrationTarget()
+    } yield {
+      Ok(Json.toJson(coa))
+    }
+  }
+
+  def setCOA(): Action[JsValue] = Security.Authenticated.async(BodyParsers.parse.json){
+    implicit request =>
+
+      val ret = request.body.validate[CalibrationTarget]
+      ret.fold(
+        error => handleJsonValidateErrorFuture(error),
+        param => {
+          for (_ <- sysConfig.setCalibrationTarget(param)) yield
+            Ok(Json.obj("ok" -> true))
+        }
+      )
+  }
 }

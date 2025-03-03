@@ -5,8 +5,9 @@ import models.ModelHelper._
 import org.bson.codecs.configuration.CodecRegistry
 import org.mongodb.scala._
 import org.mongodb.scala.model.Filters.equal
-import org.mongodb.scala.result.{InsertOneResult, UpdateResult}
+import org.mongodb.scala.result.{InsertManyResult, InsertOneResult, UpdateResult}
 import play.api._
+import play.api.libs.json.{Json, OWrites}
 
 import java.util.Date
 import javax.inject.Inject
@@ -21,6 +22,12 @@ case class Calibration(_id: CalibrationId, mtDataList: Seq[MtRecord],
   def mtMap: Map[String, MtRecord] = mtDataList.map { mtRecord =>
     mtRecord.mtName -> mtRecord
   }.toMap
+}
+
+object Calibration {
+  implicit val mtRecordWrite: OWrites[MtRecord] = Json.writes[MtRecord]
+  implicit val calibrationIdWrite: OWrites[CalibrationId] = Json.writes[CalibrationId]
+  implicit val calibrationWrite: OWrites[Calibration] = Json.writes[Calibration]
 }
 
 @javax.inject.Singleton
@@ -87,7 +94,19 @@ class CalibrationOp @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp, monitorTyp
     f
   }
 
-  def upsertMany(docs: Seq[Calibration]) = {
+  def getLatestCalibrationFuture(): Future[Option[Calibration]] = {
+    import org.mongodb.scala.model.Sorts._
+    import org.mongodb.scala.model.Filters._
+
+    val filter = exists("_id")
+    val f = collection.find(filter).sort(descending("_id.time")).first().toFuture()
+    f.onFailure({
+      case ex: Exception => Logger.error(ex.getMessage, ex)
+    })
+    f.map(Option(_))
+  }
+
+  def upsertMany(docs: Seq[Calibration]): Future[InsertManyResult] = {
     val f = collection.deleteMany(Filters.in("_id", docs.map(_.copy(_id = docs.head._id)._id): _*)).toFuture()
     f.failed.foreach(errorHandler)
     val ret = {

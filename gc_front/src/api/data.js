@@ -171,3 +171,25 @@ export const getTreeSelectData = () => {
     method: 'get'
   })
 }
+
+export const getLatestCalibration = () => {
+  return axios.request({
+    url: 'latest_calibration',
+    method: 'get'
+  })
+}
+
+export const setCalibrationTarget = (targets) => {
+  return axios.request({
+    url: 'coa',
+    method: 'post',
+    data: targets
+  })
+}
+
+export const getCalibrationTarget = () => {
+  return axios.request({
+    url: 'coa',
+    method: 'get'
+  })
+}

@@ -141,6 +141,15 @@ export default [
           title: '選樣器通道設定'
         },
         component: () => import('@/view/config/monitorConfig')
+      },
+      {
+        path: 'coa',
+        name: 'coa',
+        meta: {
+          icon: 'md-laptop',
+          title: '校正目標設定'
+        },
+        component: () => import('@/view/config/coa')
       }
     ]
   },

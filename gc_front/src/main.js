@@ -85,6 +85,7 @@ Vue.use(iView, {
 Vue.use(TreeTable)
 Vue.use(VOrgTree)
 let host = process.env.NODE_ENV === 'development' ? 'localhost:9000' : `${location.host}`;
+/*
 Vue.use(VueNativeSock, `ws://${host}/GcWebSocket`,
   {
     store,
@@ -92,7 +93,7 @@ Vue.use(VueNativeSock, `ws://${host}/GcWebSocket`,
     reconnection: true, // (Boolean) whether to reconnect automatically (false)
     reconnectionAttempts: 5, // (Number) number of reconnection attempts before giving up (Infinity),
     reconnectionDelay: 3000 // (Number) how long to initially wait before attempting a new (1000)
-  })
+  })*/
 /**
  * @description 注册admin内置插件
  */
