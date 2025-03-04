@@ -58,7 +58,7 @@
               <Input v-model.number="target.low"/>
             </Col>
             <Col span="6">
-              <Input v-model.number="target.target"/>
+              <Input v-model.number="target.target" @on-change="updateRange(target)"/>
             </Col>
             <Col span="6">
               <Input v-model.number="target.high"/>
@@ -96,7 +96,6 @@ export default {
   async mounted() {
     let res = await getCalibrationTarget();
     if (res.status === 200) {
-      console.log(res.data);
       this.calibrationTarget = res.data.targets;
     }
 
@@ -171,14 +170,11 @@ export default {
   },
   methods: {
     evaluateCalibration() {
-
       for (let mtData of this.latestCalibration.mtDataList) {
         let target = this.calibrationTarget.find(ct => ct.mtName === mtData.mtName);
         if (!target)
           continue;
 
-        console.info('mtData:', mtData);
-        console.info('target:', target);
         if ((target.high !== undefined && mtData.value > target.high) ||
           (target.low !== undefined && mtData.value < target.low)) {
           mtData.cellClassName = {
@@ -211,9 +207,13 @@ export default {
           this.$Message.error('更新失敗');
         }
       });
-
       this.evaluateCalibration();
-
+    },
+    updateRange(target) {
+      if(typeof(target.target) === 'number'){
+        target.low = target.target * 0.8;
+        target.high = target.target * 1.2;
+      }
     }
   }
 };

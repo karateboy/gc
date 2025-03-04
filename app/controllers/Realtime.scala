@@ -18,33 +18,37 @@ class Realtime @Inject()(monitorOp: MonitorOp,
                          monitorTypeOp: MonitorTypeOp,
                          calibrationOp: CalibrationOp) extends Controller {
   def MonitorTypeStatusList(): Action[AnyContent] = Security.Authenticated.async {
-      Future.successful(Ok(""))
+    Future.successful(Ok(""))
   }
 
   case class GcLatestStatus(monitor: String, time: Long, mtDataList: Seq[MtRecord], pdfReport: ObjectId, executeCount: Int)
-  import models.ObjectIdUtil._
+
+  import ObjectIdUtil._
   def latestValues(gcFilter: String): Action[AnyContent] = Security.Authenticated.async {
     implicit request =>
-      val gcConfig = GcAgent.gcConfigList.find(_.gcName == gcFilter).get
+      val gcConfigOpt = GcAgent.gcConfigList.find(_.gcName == gcFilter)
       val monitors = monitorOp.getMonitorByGcFilter(gcFilter)
       val latestRecord = recordOp.getLatestRecordListFuture(RecordOp.MinCollection, monitors, rename = true)(1)
       implicit val mtRecordWrite = Json.writes[MtRecord]
       implicit val gcLatestStatusWrite: OWrites[GcLatestStatus] = Json.writes[GcLatestStatus]
 
-      for (records <- latestRecord) yield {
-        val gcLatestStatus =
-          if (records.isEmpty) {
-            GcLatestStatus("-", DateTime.now().getMillis, Seq.empty[MtRecord], new ObjectId(), gcConfig.executeCount)
-          } else {
-            val recordList = records.head
-            GcLatestStatus(recordList.monitor,
-              recordList.time,
-              recordList.mtDataList.sortBy(mtRecord=>
-                monitorTypeOp.map(monitorTypeOp.getMonitorTypeValueByName(mtRecord.mtName)).order),
-              recordList.pdfReport, gcConfig.executeCount)
-          }
-        Ok(Json.toJson(gcLatestStatus))
-      }
+      if (gcConfigOpt.isEmpty)
+        Future.successful(Ok(Json.toJson(GcLatestStatus("-", DateTime.now().getMillis, Seq.empty[MtRecord], new ObjectId(), 0))))
+      else
+        for (records <- latestRecord) yield {
+          val gcLatestStatus =
+            if (records.isEmpty) {
+              GcLatestStatus("-", DateTime.now().getMillis, Seq.empty[MtRecord], new ObjectId(), gcConfigOpt.get.executeCount)
+            } else {
+              val recordList = records.head
+              GcLatestStatus(recordList.monitor,
+                recordList.time,
+                recordList.mtDataList.sortBy(mtRecord =>
+                  monitorTypeOp.map(monitorTypeOp.getMonitorTypeValueByName(mtRecord.mtName)).order),
+                recordList.pdfReport, gcConfigOpt.get.executeCount)
+            }
+          Ok(Json.toJson(gcLatestStatus))
+        }
   }
 
   case class CellData(v: String, cellClassName: String)
@@ -58,16 +62,17 @@ class Realtime @Inject()(monitorOp: MonitorOp,
   implicit val dtWrite: OWrites[DataTab] = Json.writes[DataTab]
 
   import monitorOp._
-  def getGcMonitors: Action[AnyContent] = Security.Authenticated.async {
-      var gcNameMonitorMap = Map.empty[String, Seq[Monitor]]
 
-      for (gcNameMap <- sysConfig.getGcNameMap) yield {
-        for (monitor <- monitorOp.map.values.toList.sortBy(_.selector)) {
-          val gcMonitorList = gcNameMonitorMap.getOrElse(gcNameMap(monitor.gcName), Seq.empty[Monitor])
-          gcNameMonitorMap = gcNameMonitorMap + (gcNameMap(monitor.gcName) -> gcMonitorList.:+(monitor))
-        }
-        Ok(Json.toJson(gcNameMonitorMap))
+  def getGcMonitors: Action[AnyContent] = Security.Authenticated.async {
+    var gcNameMonitorMap = Map.empty[String, Seq[Monitor]]
+
+    for (gcNameMap <- sysConfig.getGcNameMap) yield {
+      for (monitor <- monitorOp.map.values.toList.sortBy(_.selector)) {
+        val gcMonitorList = gcNameMonitorMap.getOrElse(gcNameMap(monitor.gcName), Seq.empty[Monitor])
+        gcNameMonitorMap = gcNameMonitorMap + (gcNameMap(monitor.gcName) -> gcMonitorList.:+(monitor))
       }
+      Ok(Json.toJson(gcNameMonitorMap))
+    }
 
   }
 
@@ -77,7 +82,7 @@ class Realtime @Inject()(monitorOp: MonitorOp,
         for (gcConfig <- GcAgent.gcConfigList) yield {
           monitorOp.withName(monitorOp.monitorId(gcConfig.gcName, gcConfig.selector.get))
         }
-      val monitorCase =monitors map {
+      val monitorCase = monitors map {
         monitorOp.map
       }
       Ok(Json.toJson(monitorCase))
@@ -105,7 +110,7 @@ class Realtime @Inject()(monitorOp: MonitorOp,
   def getLatestCalibration(): Action[AnyContent] = Security.Authenticated.async {
     implicit request =>
       import models.Calibration._
-      val f = calibrationOp.getLatestCalibrationFuture()
+      val f = calibrationOp.getLatestCalibrationFuture
       f.map {
         case Some(calibration) =>
           Ok(Json.toJson(Seq(calibration)))

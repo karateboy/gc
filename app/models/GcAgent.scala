@@ -192,7 +192,8 @@ class GcAgent @Inject()(configuration: Configuration,
                         pdfReportOp: PdfReportOp,
                         exporter: Exporter,
                         haloKaAgentFactory: HaloKaAgent.Factory,
-                        adam6017AgentFactory: Adam6017Agent.Factory) extends Actor with InjectedActorSupport {
+                        adam6017AgentFactory: Adam6017Agent.Factory,
+                        calibrationOp: CalibrationOp) extends Actor with InjectedActorSupport {
 
   import GcAgent._
 
@@ -214,7 +215,7 @@ class GcAgent @Inject()(configuration: Configuration,
       injectedChild(haloKaAgentFactory(haloKaConfig, gcConfig), name = s"haloKaAgent${gcConfig.index}")
     }
 
-    for(haloKaConfig <- gcConfig.haloKaConfig1){
+    for (haloKaConfig <- gcConfig.haloKaConfig1) {
       injectedChild(haloKaAgentFactory(haloKaConfig, gcConfig), name = s"haloKaAgent1${gcConfig.index}")
     }
 
@@ -308,8 +309,8 @@ class GcAgent @Inject()(configuration: Configuration,
         tokens(1).trim()
       })
 
-      lines.find(line=>line.contains("Location"))
-        .foreach(line=> {
+      lines.find(line => line.contains("Location"))
+        .foreach(line => {
           val tokens = line.split(":")
           assert(tokens.length == 3)
           val locs = tokens(2).trim.split("\\s+").map(_.trim)
@@ -410,8 +411,18 @@ class GcAgent @Inject()(configuration: Configuration,
           dateTime <- timeMaps.keys.toList.sorted
           mtMaps = timeMaps(dateTime) if mtMaps.nonEmpty
           doc = recordOp.toDocument(monitor, dateTime, mtMaps.toList, pdfReportId, sampleName)
-          updateList = doc.toList.map(kv => Updates.set(kv._1, kv._2)) if !updateList.isEmpty
+          updateList = doc.toList.map(kv => Updates.set(kv._1, kv._2)) if updateList.nonEmpty
         } yield {
+          if (sampleName.contains("SPAN")) {
+            val cal = Calibration(_id = CalibrationId(monitor.toString, mDate.toDate),
+              mtDataList = mtMaps.map(kv => MtRecord(kv._1.toString, kv._2._1, kv._2._2, "")).toList,
+              sampleName = sampleName,
+              fileName = Some(reportDir.getAbsolutePath),
+              containerId = Some("SPAN"),
+              fromNewGc = Some(true))
+            calibrationOp.upsert(cal)
+          }
+
           UpdateOneModel(
             Filters.eq("_id", doc("_id")),
             Updates.combine(updateList: _*), UpdateOptions().upsert(true))

@@ -18,7 +18,8 @@ case class CalibrationId(monitor: String, time: Date)
 
 case class Calibration(_id: CalibrationId, mtDataList: Seq[MtRecord],
                        sampleName: Option[String], fileName: Option[String],
-                       containerId: Option[String]) {
+                       containerId: Option[String],
+                       fromNewGc: Option[Boolean] = None) {
   def mtMap: Map[String, MtRecord] = mtDataList.map { mtRecord =>
     mtRecord.mtName -> mtRecord
   }.toMap
@@ -94,7 +95,7 @@ class CalibrationOp @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp, monitorTyp
     f
   }
 
-  def getLatestCalibrationFuture(): Future[Option[Calibration]] = {
+  def getLatestCalibrationFuture: Future[Option[Calibration]] = {
     import org.mongodb.scala.model.Sorts._
     import org.mongodb.scala.model.Filters._
 
@@ -104,6 +105,21 @@ class CalibrationOp @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp, monitorTyp
       case ex: Exception => Logger.error(ex.getMessage, ex)
     })
     f.map(Option(_))
+  }
+
+  def getLastCalibrationFuture(count:Int): Future[Seq[Calibration]] = {
+    import org.mongodb.scala.model.Sorts._
+    import org.mongodb.scala.model.Filters._
+
+    val filter = exists("_id")
+    val f = collection.find(filter).sort(descending("_id.time")).limit(count).toFuture()
+
+    f onFailure {
+      case ex: Exception => Logger.error(ex.getMessage, ex)
+    }
+
+    for(ret<-f) yield
+      ret
   }
 
   def upsertMany(docs: Seq[Calibration]): Future[InsertManyResult] = {

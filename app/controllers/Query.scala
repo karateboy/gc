@@ -1,18 +1,18 @@
 package controllers
 
+import com.github.nscala_time.time
 import com.github.nscala_time.time.Imports._
 import controllers.Highchart._
 import models.ModelHelper._
+import models.ObjectIdUtil._
 import models._
 import play.api._
 import play.api.libs.json.Json
 import play.api.mvc._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import java.nio.file.Files
 import javax.inject.Inject
-import ObjectIdUtil._
-import com.github.nscala_time.time
+import scala.concurrent.ExecutionContext.Implicits.global
 
 case class Stat(
                  avg: Option[Double],
@@ -800,6 +800,52 @@ class Query @Inject()(recordOp: RecordOp,
         Ok(Json.toJson(DataTab(columnNames, rows)))
       }
   }
+
+  def getLast10CalibrationData: Action[AnyContent] =
+    Security.Authenticated.async {
+      implicit request =>
+        implicit val cdWrite = Json.writes[CellData]
+        implicit val rdWrite = Json.writes[RowData]
+        implicit val dtWrite = Json.writes[DataTab]
+
+        val f = calibrationOp.getLastCalibrationFuture(10)
+
+        for (calibrations <- f) yield {
+          val monitorTypes = Set.empty[String] ++ calibrations.flatMap(_.mtMap.keys)
+          val mtList = monitorTypes.toList.sorted
+          val rows = calibrations map {
+            cal =>
+              val mtCellData = mtList map { mt =>
+                cal.mtMap.get(mt) match {
+                  case Some(mtData) =>
+                    val css =
+                      if (mtData.status == MonitorStatus.OverNormalStat)
+                        "text-danger"
+                      else
+                        ""
+
+                    CellData(monitorTypeOp.format(monitorTypeOp.withName(mt), Some(mtData.value)), css)
+                  case None =>
+                    CellData("-", "")
+                }
+              }
+
+              val cellData = Seq(
+                CellData(cal.sampleName.getOrElse(""), ""),
+                CellData(cal.fileName.getOrElse(""), ""),
+                CellData(cal.containerId.getOrElse(""), ""),
+                CellData(cal.fromNewGc.getOrElse(false).toString, "")
+              ) ++ mtCellData
+              RowData(cal._id.time.getTime, cellData, new ObjectId())
+          }
+
+          val mtColumnNames = mtList map { mtName=>
+            monitorTypeOp.map(monitorTypeOp.withName(mtName)).desp
+          }
+          val columnNames = Seq("Sample Name", "FileName", "Container ID", "from New GC") ++ mtColumnNames
+          Ok(Json.toJson(DataTab(columnNames, rows)))
+        }
+    }
 
   def last10Data(gcFilter: String) = Security.Authenticated.async {
     implicit request =>

@@ -62,6 +62,14 @@ export const getCalibrationData = ({ monitor, monitorTypes, start, end }) => {
   })
 }
 
+export const getLast10CalibrationData = () => {
+  return axios.request({
+    url: 'last10_calibration_data',
+    method: 'get',
+    params: {}
+  })
+}
+
 export const getAlarm = ({ start, end }) => {
   return axios.request({
     url: 'alarm',

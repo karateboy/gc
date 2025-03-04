@@ -4,7 +4,7 @@ export default {
   realtime_data: '即時資料',
   history_data: '歷史資料查詢',
   history_trend: '歷史趨勢圖',
-  calibration_data: '校正資料查詢',
+  calibration_data: '近10筆校正',
   config: '設定',
   mtype_config: '參數設定',
   selector_switch: '切換選樣器',
