@@ -55,6 +55,7 @@ export default {
   name: 'calibrationData',
   mounted() {
     this.query();
+    this.timer = setTimeout(this.query, 30000);
   },
   computed: {
   },
@@ -64,6 +65,7 @@ export default {
       display: false,
       columns: [],
       rows: [],
+      timer: undefined,
     };
   },
   methods: {
@@ -116,6 +118,9 @@ export default {
       let url = this.rows[idx].pdfUrl;
       window.open(url);
     },
+  },
+  destroyed() {
+    clearTimeout(this.timer);
   },
 };
 </script>

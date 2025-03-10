@@ -211,8 +211,8 @@ export default {
     },
     updateRange(target) {
       if(typeof(target.target) === 'number'){
-        target.low = target.target * 0.8;
-        target.high = target.target * 1.2;
+        target.low = parseFloat((target.target * 0.8).toFixed(3));
+        target.high = parseFloat((target.target * 1.2).toFixed(3));
       }
     }
   }
