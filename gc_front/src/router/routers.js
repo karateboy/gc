@@ -95,6 +95,15 @@ export default [
         component: () => import('@/view/historyData/calibrationData.vue')
       },
       {
+        path: 'old_calibration_data',
+        name: 'old_calibration_data',
+        meta: {
+          icon: 'md-stats',
+          title: '校正資料'
+        },
+        component: () => import('@/view/historyData/oldCalibrationData.vue')
+      },
+      {
         path: 'alarm',
         name: 'alarm',
         meta: {
@@ -116,15 +125,6 @@ export default [
     component: Main,
     children: [
       {
-        path: 'selector_switch',
-        name: 'selector_switch',
-        meta: {
-          icon: 'md-speedometer',
-          title: '設定選樣器'
-        },
-        component: () => import('@/view/selector/selector')
-      },
-      {
         path: 'mtype_config',
         name: 'mtype_config',
         meta: {
@@ -132,15 +132,6 @@ export default [
           title: '參數設定'
         },
         component: () => import('@/view/config/monitorTypeConfig')
-      },
-      {
-        path: 'channel_config',
-        name: 'channel_config',
-        meta: {
-          icon: 'md-laptop',
-          title: '選樣器通道設定'
-        },
-        component: () => import('@/view/config/monitorConfig')
       },
       {
         path: 'coa',

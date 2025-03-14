@@ -801,14 +801,14 @@ class Query @Inject()(recordOp: RecordOp,
       }
   }
 
-  def getLast10CalibrationData: Action[AnyContent] =
+  def getLast10CalibrationData(newGC:String): Action[AnyContent] =
     Security.Authenticated.async {
       implicit request =>
         implicit val cdWrite = Json.writes[CellData]
         implicit val rdWrite = Json.writes[RowData]
         implicit val dtWrite = Json.writes[DataTab]
 
-        val f = calibrationOp.getLastCalibrationFuture(10)
+        val f = calibrationOp.getLastCalibrationFuture(10, newGC.toBoolean)
 
         for (calibrations <- f) yield {
           val monitorTypes = Set.empty[String] ++ calibrations.flatMap(_.mtMap.keys)
@@ -833,8 +833,7 @@ class Query @Inject()(recordOp: RecordOp,
               val cellData = Seq(
                 CellData(cal.sampleName.getOrElse(""), ""),
                 CellData(cal.fileName.getOrElse(""), ""),
-                CellData(cal.containerId.getOrElse(""), ""),
-                CellData(cal.fromNewGc.getOrElse(false).toString, "")
+                CellData(cal.containerId.getOrElse(""), "")
               ) ++ mtCellData
               RowData(cal._id.time.getTime, cellData, new ObjectId())
           }
@@ -842,7 +841,7 @@ class Query @Inject()(recordOp: RecordOp,
           val mtColumnNames = mtList map { mtName=>
             monitorTypeOp.map(monitorTypeOp.withName(mtName)).desp
           }
-          val columnNames = Seq("Sample Name", "FileName", "Container ID", "from New GC") ++ mtColumnNames
+          val columnNames = Seq("Sample Name", "FileName", "Container ID") ++ mtColumnNames
           Ok(Json.toJson(DataTab(columnNames, rows)))
         }
     }

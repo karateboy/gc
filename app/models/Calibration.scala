@@ -96,8 +96,8 @@ class CalibrationOp @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp, monitorTyp
   }
 
   def getLatestCalibrationFuture: Future[Option[Calibration]] = {
-    import org.mongodb.scala.model.Sorts._
     import org.mongodb.scala.model.Filters._
+    import org.mongodb.scala.model.Sorts._
 
     val filter = exists("_id")
     val f = collection.find(filter).sort(descending("_id.time")).first().toFuture()
@@ -107,18 +107,22 @@ class CalibrationOp @Inject()(mongoDB: MongoDB, monitorOp: MonitorOp, monitorTyp
     f.map(Option(_))
   }
 
-  def getLastCalibrationFuture(count:Int): Future[Seq[Calibration]] = {
-    import org.mongodb.scala.model.Sorts._
+  def getLastCalibrationFuture(count: Int, newGC: Boolean): Future[Seq[Calibration]] = {
     import org.mongodb.scala.model.Filters._
+    import org.mongodb.scala.model.Sorts._
 
-    val filter = exists("_id")
+    val filter = if (newGC)
+      equal("fromNewGc", true)
+    else
+      notEqual("fromNewGc", true)
+
     val f = collection.find(filter).sort(descending("_id.time")).limit(count).toFuture()
 
     f onFailure {
       case ex: Exception => Logger.error(ex.getMessage, ex)
     }
 
-    for(ret<-f) yield
+    for (ret <- f) yield
       ret
   }
 

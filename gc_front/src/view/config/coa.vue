@@ -105,9 +105,11 @@ export default {
       this.evaluateCalibration();
       console.info(this.latestCalibration);
     }
+    this.timer = setTimeout(this.getLatestCalibration, 10000);
   },
   data() {
     return {
+      timer: undefined,
       latestCalibration: {
         containerId: "",
         fileName: "",
@@ -215,6 +217,9 @@ export default {
         target.high = parseFloat((target.target * 1.2).toFixed(3));
       }
     }
-  }
+  },
+  destroyed() {
+    clearTimeout(this.timer);
+  },
 };
 </script>

@@ -70,6 +70,14 @@ export const getLast10CalibrationData = () => {
   })
 }
 
+export const getLast10OldGcCalibrationData = () => {
+  return axios.request({
+    url: 'last10_old_calibration_data',
+    method: 'get',
+    params: {}
+  })
+}
+
 export const getAlarm = ({ start, end }) => {
   return axios.request({
     url: 'alarm',
