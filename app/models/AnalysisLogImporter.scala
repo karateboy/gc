@@ -34,48 +34,55 @@ class AnalysisLogImporter @Inject()(calibrationOp: CalibrationOp, sysConfig: Sys
           if (!file.exists())
             throw new Exception(s"Analysis log file $logPath not found")
 
+          val reader = CSVReader.open(file)
+          try{
+            val recordMapList = reader.allWithHeaders()
+            logger.info(s"Import ${recordMapList.length} records skip $skip")
+            if (recordMapList.length > skip) {
+              val newSkip = recordMapList.length
+              val calibrations = recordMapList.zipWithIndex.drop(skip) flatMap { pair =>
+                try {
+                  val (recordMap, _) = pair
+                  val date = LocalDate.parse(recordMap("Sample Date"), DateTimeFormat.forPattern("MM/dd/yyyy"))
+                  val timeFmt = DateTimeFormat.forPattern("HH:mm:ss")
+                  val time = LocalTime.parse(recordMap("Sample Time"), timeFmt)
+                  val dateTime = date.toDateTime(time)
+                  val mtList = Seq("H2", "ArO2", "N2", "CO", "CH4", "CO2", "H20")
+                  val mtDataList = recordMap flatMap { pair =>
+                    val (key, value) = pair
+                    if (mtList.contains(key)) {
+                      val mt = monitorTypeOp.getMonitorTypeValueByName(key)
+                      val mtCase = monitorTypeOp.map(mt)
+                      val status = if(mtCase.cal_high.isDefined && value.toDouble > mtCase.cal_high.get)
+                        MonitorStatus.OverNormalStat
+                      else if(mtCase.cal_low.isDefined && value.toDouble < mtCase.cal_low.get)
+                        MonitorStatus.OverNormalStat
+                      else
+                        MonitorStatus.NormalStat
 
-          val recordMapList = CSVReader.open(file).allWithHeaders()
-          logger.info(s"Import ${recordMapList.length} records skip $skip")
-          if (recordMapList.length > skip) {
-            val newSkip = recordMapList.length
-            val calibrations = recordMapList.zipWithIndex.drop(skip) flatMap { pair =>
-              try {
-                val (recordMap, _) = pair
-                val date = LocalDate.parse(recordMap("Sample Date"), DateTimeFormat.forPattern("MM/dd/yyyy"))
-                val timeFmt = DateTimeFormat.forPattern("HH:mm:ss")
-                val time = LocalTime.parse(recordMap("Sample Time"), timeFmt)
-                val dateTime = date.toDateTime(time)
-                val mtList = Seq("H2", "ArO2", "N2", "CO", "CH4", "CO2", "H20")
-                val mtDataList = recordMap flatMap { pair =>
-                  val (key, value) = pair
-                  if (mtList.contains(key)) {
-                    val mt = monitorTypeOp.getMonitorTypeValueByName(key)
-                    val mtCase = monitorTypeOp.map(mt)
-                    val status = if(mtCase.cal_high.isDefined && value.toDouble > mtCase.cal_high.get)
-                      MonitorStatus.OverNormalStat
-                    else if(mtCase.cal_low.isDefined && value.toDouble < mtCase.cal_low.get)
-                      MonitorStatus.OverNormalStat
-                    else
-                      MonitorStatus.NormalStat
-
-                    Some(MtRecord(mt.toString, value.toDouble, status, ""))
-                  } else
+                      Some(MtRecord(mt.toString, value.toDouble, status, ""))
+                    } else
+                      None
+                  }
+                  Some(Calibration(CalibrationId(calibrationMonitor._id, dateTime.toDate),
+                    mtDataList = mtDataList.toList,
+                    sampleName = recordMap.get("Sample Name"),
+                    fileName = recordMap.get("Filename"),
+                    containerId = recordMap.get("Container ID")))
+                } catch {
+                  case ex: Exception =>
+                    logger.error(s"Failed to parse record LL${pair._2}", ex)
                     None
                 }
-                Some(Calibration(CalibrationId(calibrationMonitor._id, dateTime.toDate),
-                  mtDataList = mtDataList.toList,
-                  sampleName = recordMap.get("Sample Name"),
-                  fileName = recordMap.get("Filename"),
-                  containerId = recordMap.get("Container ID")))
-              } catch {
-                case ex: Exception =>
-                  logger.error(s"Failed to parse record LL${pair._2}", ex)
-                  None
               }
+              calibrationOp.upsertMany(calibrations)
+              sysConfig.setLogSkip(newSkip)
             }
-            calibrationOp.upsertMany(calibrations)
-            sysConfig.setLogSkip(newSkip)
+          }catch {
+            case ex: Exception =>
+              logger.error("Failed to import analysis log", ex)
+          } finally {
+            reader.close()
           }
         }
       }

@@ -812,7 +812,7 @@ class Query @Inject()(recordOp: RecordOp,
 
         for (calibrations <- f) yield {
           val monitorTypes = Set.empty[String] ++ calibrations.flatMap(_.mtMap.keys)
-          val mtList = monitorTypes.toList.sorted
+          val mtList = monitorTypes.toList.sortBy(mt=> monitorTypeOp.map(monitorTypeOp.withName(mt)).order)
           val rows = calibrations map {
             cal =>
               val mtCellData = mtList map { mt =>
