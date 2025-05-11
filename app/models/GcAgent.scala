@@ -405,6 +405,8 @@ class GcAgent @Inject()(configuration: Configuration,
 
       insertComputedTypes()
 
+      val calibrations = waitReadyResult(calibrationOp.getLastCalibrationFuture(1, newGC = false))
+
       val updateModels =
         for {
           (monitor, timeMaps) <- recordMap
@@ -423,9 +425,22 @@ class GcAgent @Inject()(configuration: Configuration,
             calibrationOp.upsert(cal)
           }
 
+          val updateListWithWater =
+            if (calibrations.nonEmpty) {
+              val cal = calibrations.head
+              val calTime = new DateTime(cal._id.time)
+              if (calTime <= mDate && calTime >= mDate.minusMinutes(10)) {
+                updateList :+ Updates.set("H2O", cal.mtDataList
+                  .find(_.mtName == "H2O")
+                  .map(_.value))
+              } else
+                updateList
+            } else
+              updateList
+
           UpdateOneModel(
             Filters.eq("_id", doc("_id")),
-            Updates.combine(updateList: _*), UpdateOptions().upsert(true))
+            Updates.combine(updateListWithWater: _*), UpdateOptions().upsert(true))
         }
 
       if (updateModels.nonEmpty) {
