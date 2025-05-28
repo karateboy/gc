@@ -67,6 +67,7 @@ class HaloKaAgent @Inject()(monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp, 
       if (ret.isEmpty) {
         Logger.error("No data")
       } else {
+        Logger.debug(s"Received data: ${ret.mkString(", ")}")
         try {
           val value = ret.last.trim.toDouble
           insertRecord(value)
@@ -82,7 +83,11 @@ class HaloKaAgent @Inject()(monitorOp: MonitorOp, monitorTypeOp: MonitorTypeOp, 
     case OpenCom =>
       try {
         serialOpt = Some(SerialComm.open(config.com, config.speed))
-        timer = Some(context.system.scheduler.schedule(FiniteDuration(10, SECONDS), FiniteDuration(1, MINUTES), self, ReadData))
+        timer = if (config.continuous)
+          Some(context.system.scheduler.schedule(FiniteDuration(10, SECONDS), FiniteDuration(config.freq, SECONDS), self, ReadData))
+        else
+          Some(context.system.scheduler.schedule(FiniteDuration(10, SECONDS), FiniteDuration(1, MINUTES), self, ReadData))
+
       } catch {
         case ex: Throwable =>
           Logger.error("Fail to open com port try 1 min later.", ex)

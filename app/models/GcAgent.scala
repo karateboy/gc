@@ -39,7 +39,7 @@ case class GcConfig(index: Int, inputDir: String, selector: Selector,
   val gcName: String = GcAgent.getGcName(index)
 }
 
-case class HaloKaConfig(com: Int, speed: Int, MonitorType: String, continuous: Boolean = false)
+case class HaloKaConfig(com: Int, speed: Int, MonitorType: String, continuous: Boolean = false, freq: Int = 5)
 
 import scala.collection.JavaConverters._
 
@@ -128,22 +128,24 @@ object GcAgent {
           }
         }
 
+      def getHaloKaConfig(config: Configuration): HaloKaConfig = {
+        val com = config.getInt("com").get
+        val speed = config.getInt("speed").get
+        val monitorType = config.getString("monitorType").get
+        val continuous = config.getBoolean("continuous").getOrElse(false)
+        val freq = config.getInt("freq").getOrElse(5)
+        HaloKaConfig(com, speed, monitorType, continuous, freq)
+      }
+
       val haloKaConfig: Option[HaloKaConfig] =
-        for (config <- config.getConfig("haloKaConfig")) yield {
-          val com = config.getInt("com").get
-          val speed = config.getInt("speed").get
-          val monitorType = config.getString("monitorType").get
-          val continuous = config.getBoolean("continuous").getOrElse(false)
-          HaloKaConfig(com, speed, monitorType, continuous)
-        }
+        for (config <- config.getConfig("haloKaConfig")) yield
+          getHaloKaConfig(config)
 
       val haloKaConfig1: Option[HaloKaConfig] =
-        for (config <- config.getConfig("haloKaConfig1")) yield {
-          val com = config.getInt("com").get
-          val speed = config.getInt("speed").get
-          val monitorType = config.getString("monitorType").get
-          HaloKaConfig(com, speed, monitorType)
-        }
+        for (config <- config.getConfig("haloKaConfig1")) yield
+          // This is for the second HaloKa device, if configured
+          getHaloKaConfig(config)
+
 
       val adam6017ConfigOpt: Option[Adam6017Config] =
         for (config <- config.getConfig("Adam6017Config")) yield {
@@ -215,7 +217,7 @@ class GcAgent @Inject()(configuration: Configuration,
       injectedChild(haloKaAgentFactory(haloKaConfig, gcConfig), name = s"haloKaAgent${gcConfig.index}")
     }
 
-    for(haloKaConfig <- gcConfig.haloKaConfig1){
+    for (haloKaConfig <- gcConfig.haloKaConfig1) {
       injectedChild(haloKaAgentFactory(haloKaConfig, gcConfig), name = s"haloKaAgent1${gcConfig.index}")
     }
 
@@ -310,8 +312,8 @@ class GcAgent @Inject()(configuration: Configuration,
         tokens(1).trim()
       })
 
-      lines.find(line=>line.contains("Location"))
-        .foreach(line=> {
+      lines.find(line => line.contains("Location"))
+        .foreach(line => {
           val tokens = line.split(":")
           assert(tokens.length == 3)
           val locs = tokens(2).trim.split("\\s+").map(_.trim)
