@@ -1,6 +1,6 @@
 name := """gc"""
 
-version := "2.0.8"
+version := "2.0.9"
 
 lazy val root = (project in file("."))
   .enablePlugins(PlayScala, LauncherJarPlugin, JavaAppPackaging, WindowsPlugin)
@@ -20,7 +20,7 @@ libraryDependencies += "com.github.tototoshi" %% "scala-csv" % "1.3.6"
 libraryDependencies += "org.apache.poi" % "poi-ooxml" % "5.0.0"
 
 // https://mvnrepository.com/artifact/io.github.java-native/jssc
-libraryDependencies += "io.github.java-native" % "jssc" % "2.9.4"
+libraryDependencies += "io.github.java-native" % "jssc" % "2.10.2"
 
 
 // https://mvnrepository.com/artifact/com.github.nscala-time/nscala-time
