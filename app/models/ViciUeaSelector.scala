@@ -1,16 +1,13 @@
 package models
 
-import play.api._
 import akka.actor._
-import play.api.Play.current
-import play.api.libs.concurrent.Akka
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import akka.pattern.{ask, pipe}
+import play.api._
 
 import javax.inject.Inject
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.{FiniteDuration, MINUTES, SECONDS}
 
-case object IssueCPcmd
+case object IssueCP
 
 case object ReadCurrentStreamNum
 
@@ -21,14 +18,14 @@ class ViciUeaSelector(monitorOp: MonitorOp, actorSystem: ActorSystem)(gcName: St
   val comPort: Int = config.getInt("com").get
   val worker: ActorRef = actorSystem.actorOf(Props(new UeaSelectorWorker(monitorOp)(this)), name = s"selector_${gcName}")
 
-  def getGcName = gcName
+  def getGcName: String = gcName
 
   @volatile var streamNum = 1
 
   def getStreamNum(): Int = streamNum
 
   def setStreamNum(v: Int): Unit = {
-    if(v <= max)
+    if (v <= max)
       worker ! SetStreamNum(v)
   }
 
@@ -50,21 +47,20 @@ class UeaSelectorWorker @Inject()(monitorOp: MonitorOp)(selector: ViciUeaSelecto
   Logger.info(s"UEA is set to $comPort")
   val serial: SerialComm = SerialComm.open(comPort)
 
-  var timer: Cancellable = context.system.scheduler.scheduleOnce(
-    scala.concurrent.duration.Duration(0, scala.concurrent.duration.MICROSECONDS), self, IssueCPcmd)
+  self ! IssueCP
+
+  private var timerOption: Option[Cancellable] = None
 
   def receive: Receive = {
-    case IssueCPcmd =>
+    case IssueCP =>
       try {
         val readCmd = s"CP\r"
         serial.os.write(readCmd.getBytes)
+        timerOption = Some(context.system.scheduler.scheduleOnce(FiniteDuration(2, SECONDS), self, ReadCurrentStreamNum))
       } catch {
         case ex: Throwable =>
           Logger.error("write CP cmd failed", ex)
       }
-      timer = context.system.scheduler.scheduleOnce(
-        scala.concurrent.duration.Duration(500, scala.concurrent.duration.MICROSECONDS),
-        self, ReadCurrentStreamNum)
 
     case ReadCurrentStreamNum =>
       try {
@@ -80,22 +76,19 @@ class UeaSelectorWorker @Inject()(monitorOp: MonitorOp)(selector: ViciUeaSelecto
         case ex: Throwable =>
           Logger.error("read stream failed", ex)
       }
-      timer = context.system.scheduler.scheduleOnce(
-        scala.concurrent.duration.Duration(500, scala.concurrent.duration.MICROSECONDS),
-        self, IssueCPcmd)
+      timerOption = Some(context.system.scheduler.scheduleOnce(FiniteDuration(1, MINUTES), self, IssueCP))
 
     case SetStreamNum(v) =>
       try {
-        import java.util.Locale
         val setCmd = s"GO%02d\r".format(v)
         serial.os.write(setCmd.getBytes)
         selector.modifyStreamNum(v)
 
         // Read current position after 2 seconds
-        timer.cancel()
-        timer = context.system.scheduler.scheduleOnce(
-          scala.concurrent.duration.Duration(2, scala.concurrent.duration.SECONDS),
-          self, IssueCPcmd)
+        for (timer <- timerOption)
+          timer.cancel()
+
+        timerOption = Some(context.system.scheduler.scheduleOnce(FiniteDuration(2, SECONDS), self, IssueCP))
       } catch {
         case ex: Throwable =>
           Logger.error("write GO cmd failed", ex)
@@ -104,7 +97,9 @@ class UeaSelectorWorker @Inject()(monitorOp: MonitorOp)(selector: ViciUeaSelecto
   }
 
   override def postStop(): Unit = {
+    Logger.info("UEA selector worker stopped")
     serial.close
-    timer.cancel()
+    for (timer <- timerOption)
+      timer.cancel()
   }
 }
