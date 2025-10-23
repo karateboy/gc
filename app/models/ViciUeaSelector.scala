@@ -32,6 +32,7 @@ class ViciUeaSelector(monitorOp: MonitorOp, actorSystem: ActorSystem)(gcName: St
   val canSetStream = true
 
   def modifyStreamNum(v: Int): Unit = {
+    Logger.info(s"Selector change to $v")
     streamNum = v
   }
 

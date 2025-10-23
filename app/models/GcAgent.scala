@@ -310,11 +310,16 @@ class GcAgent @Inject()(configuration: Configuration,
 
       lines.find(line=>line.contains("Location"))
         .foreach(line=> {
-          val tokens = line.split(":")
-          assert(tokens.length == 3)
-          val locs = tokens(2).trim.split("\\s+").map(_.trim)
-          val pos = locs(0).toInt
-          gcConfig.selector.set(pos)
+          try{
+            val tokens = line.split(":")
+            assert(tokens.length == 3)
+            val locs = tokens(2).trim.split("\\s+").map(_.trim)
+            val pos = locs(0).toInt
+            gcConfig.selector.set(pos)
+          }catch{
+            case _:Throwable=>
+              Logger.info(s"ignore Location=> $line")
+          }
         })
 
       val monitor = monitorOp.getMonitorValueByName(gcConfig.gcName, gcConfig.selector.get)
