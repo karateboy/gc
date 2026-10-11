@@ -874,6 +874,19 @@ class Query @Inject()(recordOp: RecordOp,
     }
   }
 
+  def zipCoa(pdfId: String): Action[AnyContent] = Security.Authenticated.async {
+    val f = recordOp.getRecordWithPdfID(new ObjectId(pdfId))
+    for (map <- f) yield {
+      val coaZip = excelUtility.createCoA(map)
+
+      Ok.sendFile(coaZip.toFile, fileName = _ =>
+        "coa.zip",
+        onClose = () => {
+          Files.deleteIfExists(coaZip)
+        })
+    }
+  }
+
   case class CellData(v: String, cellClassName: String)
 
   case class RowData(date: Long, cellData: Seq[CellData], pdfReport: ObjectId)

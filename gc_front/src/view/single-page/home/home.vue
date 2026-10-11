@@ -70,17 +70,8 @@
               <Button
                 type="info"
                 size="small"
-                @click="downloadFormUrl(rows[index].excelArUrl)"
-              >Ar報告
-              </Button
-              >
-              <Button
-                type="info"
-                size="small"
-                @click="downloadFormUrl(rows[index].excelN2Url)"
-              >N2報告
-              </Button
-              >
+                @click="downloadFormUrl(rows[index].coaUrl)">CoA Zip
+              </Button>
             </td>
           </tr>
           </tbody>
@@ -113,7 +104,7 @@ import InforCard from '_c/info-card';
 import config from '@/config';
 import moment from 'moment';
 
-import {getGcList, getLast10Data, getRealtimeData} from '@/api/data';
+import { getGcList, getLast10Data, getRealtimeData } from '@/api/data';
 
 const baseUrl =
   process.env.NODE_ENV === 'development'
@@ -240,6 +231,7 @@ export default {
 
           rowData.excelArUrl = `${baseUrl}excelFormAr/${row.pdfReport}`;
           rowData.excelN2Url = `${baseUrl}excelFormN2/${row.pdfReport}`;
+          rowData.coaUrl = `${baseUrl}coaZip/${row.pdfReport}`;
 
           for (let c = 0; c < row.cellData.length; c++) {
             let key = `col${c}`;

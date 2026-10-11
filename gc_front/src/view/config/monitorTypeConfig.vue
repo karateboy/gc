@@ -263,7 +263,7 @@ export default {
     },
     testLineToken() {
       axios
-        .post("/lineToken", { value: this.formItem.lineToken, test: true})
+        .post("/lineToken", { value: this.formItem.lineToken, test: true })
         .then(res => {
           const ret = res.data;
           if (ret.ok) this.$Message.success("成功");

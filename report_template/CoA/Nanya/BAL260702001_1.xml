@@ -1,0 +1,71 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<NTC_COA>
+  <Header>
+    <BasicInfoField FieldName="Purno" FieldValue="N/A" />
+    <BasicInfoField FieldName="COAnumber" FieldValue="BAL260702001_1" />
+    <BasicInfoField FieldName="Materialtype" FieldValue="Bulk Gas" />
+    <BasicInfoField FieldName="MaterialName" FieldValue="He" />
+    <BasicInfoField FieldName="MaterialNumber" FieldValue="CHEINP64" />
+    <BasicInfoField FieldName="Supplier" FieldValue="ALFE_Taichung_Taiwan" />
+    <BasicInfoField FieldName="Agency" FieldValue="ALFE" />
+    <BasicInfoField FieldName="DataSource" FieldValue="ALFE" />
+    <BasicInfoField FieldName="Company_UID" FieldValue="22522453" />
+    <BasicInfoField FieldName="LotNumber" FieldValue="RN-2302;20260702" />
+    <BasicInfoField FieldName="FAB" FieldValue="E" />
+    <BasicInfoField FieldName="LotQuantity" FieldValue="1" />
+    <BasicInfoField FieldName="QuantityUn" FieldValue="Trailer" />
+    <BasicInfoField FieldName="ManufacturingSite" FieldValue="ALFE_Taichung_Taiwan" />
+    <BasicInfoField FieldName="Productiondate " FieldValue="2026-06-18" />
+    <BasicInfoField FieldName="ExpiredDate" FieldValue="2028-06-18" />
+    <BasicInfoField FieldName="Expect_FABInDate" FieldValue="2026-07-02" />
+    <BasicInfoField FieldName="Author" FieldValue="ALFE-EMCT-QC" />
+    <BasicInfoField FieldName="Author_Email" FieldValue="howard.su@airliquide.com;alvin.chen@airliquide.com;misaki.tsai@airliquide.com;jos.wu@airliquide.com" />
+    <BasicInfoField FieldName="DataInDate" FieldValue="2026-07-01" />
+    <BasicInfoField FieldName="Remark" FieldValue="RN-2302" />
+  </Header>
+  <Content>
+      <InspectionItem ItemName="Purity">
+        <ResultItem ResultName="Unit" Value="%" />
+        <ResultItem ResultName="Specification" Value="99.999" />
+        <ResultItem ResultName="DetectionLimit" Value="N/A" />
+        <ResultItem ResultName="Inspection" Value="99.999" />
+      </InspectionItem>
+      <InspectionItem ItemName="H2">
+        <ResultItem ResultName="Unit" Value="ppmv" />
+        <ResultItem ResultName="Specification" Value="1" />
+        <ResultItem ResultName="DetectionLimit" Value="0.01" />
+        <ResultItem ResultName="Inspection" Value="0.058" />
+      </InspectionItem>
+      <InspectionItem ItemName="N2">
+        <ResultItem ResultName="Unit" Value="ppmv" />
+        <ResultItem ResultName="Specification" Value="4" />
+        <ResultItem ResultName="DetectionLimit" Value="0.01" />
+        <ResultItem ResultName="Inspection" Value="0.323" />
+      </InspectionItem>
+      <InspectionItem ItemName="CO+CO2">
+        <ResultItem ResultName="Unit" Value="ppmv" />
+        <ResultItem ResultName="Specification" Value="0.6" />
+        <ResultItem ResultName="DetectionLimit" Value="0.01" />
+        <ResultItem ResultName="Inspection" Value="0.020" />
+      </InspectionItem>
+      <InspectionItem ItemName="Total Hydrocarbons CH4">
+        <ResultItem ResultName="Unit" Value="ppmv" />
+        <ResultItem ResultName="Specification" Value="0.3" />
+        <ResultItem ResultName="DetectionLimit" Value="0.02" />
+        <ResultItem ResultName="Inspection" Value="0.020" />
+      </InspectionItem>
+      <InspectionItem ItemName="O2">
+        <ResultItem ResultName="Unit" Value="ppmv" />
+        <ResultItem ResultName="Specification" Value="1" />
+        <ResultItem ResultName="DetectionLimit" Value="0.01" />
+        <ResultItem ResultName="Inspection" Value="0.094" />
+      </InspectionItem>
+      <InspectionItem ItemName="H2O">
+        <ResultItem ResultName="Unit" Value="ppmv" />
+        <ResultItem ResultName="Specification" Value="1" />
+        <ResultItem ResultName="DetectionLimit" Value="0.01" />
+        <ResultItem ResultName="Inspection" Value="0.163" />
+      </InspectionItem>
+  </Content>
+  <Remark />
+</NTC_COA>

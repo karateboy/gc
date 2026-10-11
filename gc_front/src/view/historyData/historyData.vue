@@ -87,16 +87,11 @@
                     >
                   </td>
                   <td>
-                    <!-- <Button
-                      type="info"
-                      @click="downloadFormUrl(rows[index].excelArUrl)"
-                      >Ar報告</Button
-                    > -->
                     <Button
                       type="info"
-                      @click="downloadFormUrl(rows[index].excelN2Url)"
-                      >N2報告</Button
-                    >
+                      size="small"
+                      @click="downloadFormUrl(rows[index].coaUrl)">CoA Zip
+                    </Button>
                   </td>
                 </tr>
                 <tr></tr>
@@ -276,6 +271,7 @@ export default {
               }
               rowData.excelArUrl = `${baseUrl}excelFormAr/${row.pdfReport}`;
               rowData.excelN2Url = `${baseUrl}excelFormN2/${row.pdfReport}`;
+              rowData.coaUrl = `${baseUrl}coaZip/${row.pdfReport}`;
             }
             this.rows.push(rowData);
           }
