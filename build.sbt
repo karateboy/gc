@@ -1,3 +1,5 @@
+import com.typesafe.sbt.packager.MappingsHelper.directory
+
 name := """gc"""
 
 version := "2.0.10-yt"
@@ -31,10 +33,7 @@ libraryDependencies += "org.mongodb.scala" %% "mongo-scala-driver" % "4.2.0"
 
 libraryDependencies += "com.github.s7connector" % "s7connector" % "2.1"
 
-
-mappings in Universal ++=
-(baseDirectory.value / "report_template" * "*" get) map
-    (x => x -> ("report_template/" + x.getName))
+mappings in Universal ++= directory("report_template")
 
 mappings in Universal ++=
 (baseDirectory.value / "export/" * "*" get) map
