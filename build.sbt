@@ -2,7 +2,7 @@ import com.typesafe.sbt.packager.MappingsHelper.directory
 
 name := """gc"""
 
-version := "2.0.10-yt"
+version := "2.0.11-yt"
 
 lazy val root = (project in file("."))
   .enablePlugins(PlayScala, LauncherJarPlugin, JavaAppPackaging, WindowsPlugin)
