@@ -603,7 +603,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          mtMap(mt).value/1000
         else
           0d
       }
@@ -653,7 +653,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          mtMap(mt).value/1000
         else
           0d
       }
@@ -680,6 +680,9 @@ class ExcelUtility @Inject()(environment: Environment,
       }
 
       sheet.getRow(8).getCell(6).setCellValue(s"分析日期(Date of Analysis): ${dt.toString("YYYY/MM/dd")}")
+      for(name<-sampleNameOpt)
+        sheet.getRow(13).getCell(9).setCellValue(name)
+
       fillMtContent(getValue("N2"), 18, 4, 9)
       fillMtContent(getValue("CO"), 19, 4, 9)
       fillMtContent(getValue("CO2"), 20, 4, 9)
