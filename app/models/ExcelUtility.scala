@@ -5,76 +5,18 @@ import org.apache.poi.openxml4j.opc.OPCPackage
 import org.apache.poi.ss.usermodel.{BorderStyle, FillPatternType, IndexedColors}
 import org.apache.poi.xssf.usermodel.{XSSFCellStyle, XSSFColor, XSSFSheet, XSSFWorkbook}
 import play.api.Environment
-
-import java.io.{File, FileInputStream, FileOutputStream, FileWriter, IOException}
-import java.nio.charset.StandardCharsets
+import controllers.Highchart._
+import java.io.{File, FileInputStream, FileOutputStream, IOException}
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
-import java.util.Comparator
 import java.util.zip.{ZipEntry, ZipOutputStream}
 import javax.inject.Inject
 import scala.collection.JavaConverters.asScalaIteratorConverter
-import scala.xml.XML
 
 @javax.inject.Singleton
 class ExcelUtility @Inject()(environment: Environment,
                              monitorTypeOp: MonitorTypeOp,
                              recordOp: RecordOp) {
   val docRoot = "/report_template/"
-
-  private def prepareTemplate(templateFile: String) = {
-    val templatePath = Paths.get(environment.rootPath.getAbsolutePath + docRoot + templateFile)
-    val reportFilePath = Files.createTempFile("temp", ".xlsx");
-
-    Files.copy(templatePath, reportFilePath, StandardCopyOption.REPLACE_EXISTING)
-
-    //Open Excel
-    val pkg = OPCPackage.open(new FileInputStream(reportFilePath.toAbsolutePath.toString))
-    val wb = new XSSFWorkbook(pkg);
-
-    (reportFilePath, pkg, wb)
-  }
-
-  private def finishExcel(reportFilePath: Path, pkg: OPCPackage, wb: XSSFWorkbook) = {
-    val out = new FileOutputStream(reportFilePath.toAbsolutePath.toString);
-    wb.write(out);
-    out.close();
-    pkg.close();
-
-    new File(reportFilePath.toAbsolutePath.toString)
-  }
-
-  private def createStyle(mt: monitorTypeOp.Value)(implicit wb: XSSFWorkbook) = {
-    val prec = monitorTypeOp.map(mt).prec
-    val format_str = "0." + "0" * prec
-    val style = wb.createCellStyle();
-    val format = wb.createDataFormat();
-    // Create a new font and alter it.
-    val font = wb.createFont();
-    font.setFontHeightInPoints(10);
-    font.setFontName("標楷體");
-
-    style.setFont(font)
-    style.setDataFormat(format.getFormat(format_str))
-    style.setBorderBottom(BorderStyle.THIN);
-    style.setBottomBorderColor(IndexedColors.BLACK.getIndex());
-    style.setBorderLeft(BorderStyle.THIN);
-    style.setLeftBorderColor(IndexedColors.BLACK.getIndex());
-    style.setBorderRight(BorderStyle.THIN);
-    style.setRightBorderColor(IndexedColors.BLACK.getIndex());
-    style.setBorderTop(BorderStyle.THIN);
-    style.setTopBorderColor(IndexedColors.BLACK.getIndex());
-    style
-  }
-
-  private def createColorStyle(fgColors: Array[XSSFColor], mt: monitorTypeOp.Value)(implicit wb: XSSFWorkbook): Array[XSSFCellStyle] = {
-    fgColors.map {
-      color =>
-        val style = createStyle(mt)
-        style.setFillForegroundColor(color)
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND)
-        style
-    }
-  }
 
   def getStyle(tag: String, normalStyle: XSSFCellStyle, abnormalStyles: Array[XSSFCellStyle]) = {
     import MonitorStatus._
@@ -96,8 +38,6 @@ class ExcelUtility @Inject()(environment: Environment,
         abnormalStyles(4)
     }
   }
-
-  import controllers.Highchart._
 
   def exportChartData(chart: HighchartData, monitorTypes: Array[MonitorTypeOp#Value]): File = {
     val precArray = monitorTypes.map { mt => monitorTypeOp.map(mt).prec }
@@ -182,6 +122,28 @@ class ExcelUtility @Inject()(environment: Environment,
     }
 
     finishExcel(reportFilePath, pkg, wb)
+  }
+
+  private def prepareTemplate(templateFile: String) = {
+    val templatePath = Paths.get(environment.rootPath.getAbsolutePath + docRoot + templateFile)
+    val reportFilePath = Files.createTempFile("temp", ".xlsx");
+
+    Files.copy(templatePath, reportFilePath, StandardCopyOption.REPLACE_EXISTING)
+
+    //Open Excel
+    val pkg = OPCPackage.open(new FileInputStream(reportFilePath.toAbsolutePath.toString))
+    val wb = new XSSFWorkbook(pkg);
+
+    (reportFilePath, pkg, wb)
+  }
+
+  private def finishExcel(reportFilePath: Path, pkg: OPCPackage, wb: XSSFWorkbook) = {
+    val out = new FileOutputStream(reportFilePath.toAbsolutePath.toString);
+    wb.write(out);
+    out.close();
+    pkg.close();
+
+    new File(reportFilePath.toAbsolutePath.toString)
   }
 
   def createHistoryData(recordList: Seq[RecordList], monitorTypes: Seq[MonitorTypeOp#Value]): File = {
@@ -496,6 +458,47 @@ class ExcelUtility @Inject()(environment: Environment,
     finishExcel(reportFilePath, pkg, wb)
   }
 
+  def createCoA(map: Map[MonitorOp#Value, (DateTime, Option[String], Map[MonitorTypeOp#Value, Record])]): Path = {
+    val coaTemplatePath = Paths.get(environment.rootPath.getAbsolutePath).resolve("report_template").resolve("Coa")
+    val tempFolder = copyToTempDir(coaTemplatePath, "coa")
+    org.apache.poi.openxml4j.util.ZipSecureFile.setMinInflateRatio(0)
+    handleQM061(tempFolder, map)
+    handleQM081(tempFolder, map)
+    handleMTB1(tempFolder, map)
+    handleMTB2(tempFolder, map)
+    handleNaya1(tempFolder, map)
+    handleNaya2(tempFolder, map)
+    handleTSMCF7(tempFolder, map)
+    handleTSMCF8(tempFolder, map)
+    handleTSMCF12(tempFolder, map)
+    handleTSMCF15(tempFolder, map)
+    handleTSMCF15_1(tempFolder, map)
+    handleTSMCF18(tempFolder, map)
+    handleTSMCF18_1(tempFolder, map)
+    handleTSMCF18_2(tempFolder, map)
+    handleTSMCF20(tempFolder, map)
+    handleTSMCF20_1(tempFolder, map)
+    handleTSMCFB30(tempFolder, map)
+    // eCoA
+    eCoa879(tempFolder, map)
+    eCoa070_0080(tempFolder, map)
+    eCoa070_AP06(tempFolder, map)
+    eCoa070_AP6B(tempFolder, map)
+    eCoa070_F7(tempFolder, map)
+    eCoa070_12P3(tempFolder, map)
+    eCoa070_12P8(tempFolder, map)
+    eCoa070_15P1(tempFolder, map)
+    eCoa070_18P4(tempFolder, map)
+    eCoa070_18P5(tempFolder, map)
+    eCoa070_18P6(tempFolder, map)
+    eCoa070_F20P2(tempFolder, map)
+
+    val zipTempFile = Files.createTempFile("coa", ".zip")
+    zipFolder(tempFolder, zipTempFile)
+    zipTempFile
+
+  }
+
   /**
    * 建立暫存資料夾，並將目標資料夾的所有內容複製進去。
    *
@@ -557,7 +560,6 @@ class ExcelUtility @Inject()(environment: Environment,
     }
   }
 
-
   // 1. 壓縮資料夾的方法
   def zipFolder(sourceDir: Path, zipFilePath: Path): Unit = {
     val outputStream = Files.newOutputStream(zipFilePath)
@@ -590,7 +592,6 @@ class ExcelUtility @Inject()(environment: Environment,
     }
   }
 
-
   private def handleQM061(folder: Path, map: Map[MonitorOp#Value, (DateTime, Option[String], Map[MonitorTypeOp#Value, Record])]): Unit = {
     val file = folder.resolve("CoA format").resolve("W-QM-061_F04.xlsx")
     //Open Excel
@@ -603,7 +604,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value/1000
+          mtMap(mt).value / 1000
         else
           0d
       }
@@ -653,7 +654,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value/1000
+          mtMap(mt).value / 1000
         else
           0d
       }
@@ -680,7 +681,7 @@ class ExcelUtility @Inject()(environment: Environment,
       }
 
       sheet.getRow(8).getCell(6).setCellValue(s"分析日期(Date of Analysis): ${dt.toString("YYYY/MM/dd")}")
-      for(name<-sampleNameOpt)
+      for (name <- sampleNameOpt)
         sheet.getRow(13).getCell(9).setCellValue(name)
 
       fillMtContent(getValue("N2"), 18, 4, 9)
@@ -688,7 +689,7 @@ class ExcelUtility @Inject()(environment: Environment,
       fillMtContent(getValue("CO2"), 20, 4, 9)
       fillMtContent(getValue("CH4"), 21, 4, 9)
       fillMtContent(getValue("H2O"), 22, 4, 9)
-      fillMtContent(getValue("Ar") + getValue("O2") , 23, 4, 9)
+      fillMtContent(getValue("Ar") + getValue("O2"), 23, 4, 9)
     }
     finishExcel(file, pkg, wb)
   }
@@ -739,7 +740,7 @@ class ExcelUtility @Inject()(environment: Environment,
       fillMtContent(getValue("Ar"), 25, 4, 8)
       fillMtContent(getValue("CO"), 26, 4, 8)
       fillMtContent(getValue("CO2"), 27, 4, 8)
-      fillMtContent(getValue("CH4")+getValue("C2H6")+getValue("C3H8")+getValue("C4H10"), 28, 4, 8)
+      fillMtContent(getValue("CH4") + getValue("C2H6") + getValue("C3H8") + getValue("C4H10"), 28, 4, 8)
       fillMtContent(getValue("O2"), 29, 4, 8)
       fillMtContent(getValue("H2O"), 30, 4, 8)
     }
@@ -768,32 +769,25 @@ class ExcelUtility @Inject()(environment: Environment,
                         rowN: Int,
                         cellN: Int,
                         limitN: Int): Unit = {
-        var limitStr: String = ""
+        val limit = 10
 
-        val limit = try {
-          limitStr = sheet.getRow(rowN).getCell(limitN).getStringCellValue
-          limitStr.take(3).toDouble
-        } catch {
-          case _: Throwable =>
-            0
-        }
 
         if (value == 0 || value < limit)
-          sheet.getRow(rowN).getCell(cellN).setCellValue(limitStr)
+          sheet.getRow(rowN).getCell(cellN).setCellValue(limit)
         else
           sheet.getRow(rowN).getCell(cellN).setCellValue(value)
 
       }
 
       sheet.getRow(2).getCell(3).setCellValue(dt.toDate)
-      fillMtContent(getValue("H2O"), 8, 9, 10)
-      fillMtContent(getValue("CO2"), 9, 9, 10)
-      fillMtContent(getValue("CH4")+getValue("C2H6")+getValue("C3H8")+getValue("C4H10"), 10, 9, 10)
-      fillMtContent(getValue("N2"), 11, 9, 10)
-      fillMtContent(getValue("O2"), 12, 9, 10)
-      fillMtContent(getValue("H2"), 13, 9, 10)
-      fillMtContent(getValue("Ar"), 14, 9, 10)
-      fillMtContent(getValue("CO"), 15, 9, 10)
+      fillMtContent(getValue("H2O"), 8, 12, 10)
+      fillMtContent(getValue("CO2"), 9, 12, 10)
+      fillMtContent(getValue("CH4") + getValue("C2H6") + getValue("C3H8") + getValue("C4H10"), 10, 12, 10)
+      fillMtContent(getValue("N2"), 11, 12, 10)
+      fillMtContent(getValue("O2"), 12, 12, 10)
+      fillMtContent(getValue("H2"), 13, 12, 10)
+      fillMtContent(getValue("Ar"), 14, 12, 10)
+      fillMtContent(getValue("CO"), 15, 12, 10)
 
     }
     finishExcel(file, pkg, wb)
@@ -825,7 +819,7 @@ class ExcelUtility @Inject()(environment: Environment,
 
         val limit = try {
           limitStr = sheet.getRow(rowN).getCell(limitN).getStringCellValue
-          limitStr.take(3).toDouble
+          limitStr.reverse.drop(3).reverse.toDouble
         } catch {
           case _: Throwable =>
             0
@@ -843,7 +837,7 @@ class ExcelUtility @Inject()(environment: Environment,
       fillMtContent(getValue("H2"), 23, 4, 8)
       fillMtContent(getValue("N2"), 24, 4, 8)
       fillMtContent(getValue("CO") + getValue("CO2"), 25, 4, 8)
-      fillMtContent(getValue("CH4")+getValue("C2H6")+getValue("C3H8")+getValue("C4H10"), 26, 4, 8)
+      fillMtContent(getValue("CH4") + getValue("C2H6") + getValue("C3H8") + getValue("C4H10"), 26, 4, 8)
       fillMtContent(getValue("O2"), 27, 4, 8)
       fillMtContent(getValue("H2O"), 28, 4, 8)
       sheet.setForceFormulaRecalculation(true)
@@ -852,10 +846,13 @@ class ExcelUtility @Inject()(environment: Environment,
   }
 
   private def handleNaya2(folder: Path, map: Map[MonitorOp#Value, (DateTime, Option[String], Map[MonitorTypeOp#Value, Record])]): Unit = {
+    import scala.xml._
+    import scala.xml.transform._
     val file = folder.resolve("Nanya").resolve("BAL260702001_1.xml")
 
     for (entry <- map) {
       val (dt, sampleNameOpt, mtMap) = entry._2
+
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
@@ -864,86 +861,71 @@ class ExcelUtility @Inject()(environment: Environment,
           0d
       }
 
-      val xml = {
-        s"""
-        <?xml version="1.0" encoding="UTF-8"?>
-          <NTC_COA>
-            <Header>
-              <BasicInfoField FieldName="Purno" FieldValue="N/A" />
-              <BasicInfoField FieldName="COAnumber" FieldValue="BAL260702001_1" />
-              <BasicInfoField FieldName="Materialtype" FieldValue="Bulk Gas" />
-              <BasicInfoField FieldName="MaterialName" FieldValue="He" />
-              <BasicInfoField FieldName="MaterialNumber" FieldValue="CHEINP64" />
-              <BasicInfoField FieldName="Supplier" FieldValue="ALFE_Taichung_Taiwan" />
-              <BasicInfoField FieldName="Agency" FieldValue="ALFE" />
-              <BasicInfoField FieldName="DataSource" FieldValue="ALFE" />
-              <BasicInfoField FieldName="Company_UID" FieldValue="22522453" />
-              <BasicInfoField FieldName="LotNumber" FieldValue="RN-2302;20260702" />
-              <BasicInfoField FieldName="FAB" FieldValue="E" />
-              <BasicInfoField FieldName="LotQuantity" FieldValue="1" />
-              <BasicInfoField FieldName="QuantityUn" FieldValue="Trailer" />
-              <BasicInfoField FieldName="ManufacturingSite" FieldValue="ALFE_Taichung_Taiwan" />
-              <BasicInfoField FieldName="Productiondate " FieldValue="${dt.toString("YYYY-MM-dd")}" />
-              <BasicInfoField FieldName="ExpiredDate" FieldValue="2028-06-18" />
-              <BasicInfoField FieldName="Expect_FABInDate" FieldValue="2026-07-02" />
-              <BasicInfoField FieldName="Author" FieldValue="ALFE-EMCT-QC" />
-              <BasicInfoField FieldName="Author_Email" FieldValue="howard.su@airliquide.com;alvin.chen@airliquide.com;misaki.tsai@airliquide.com;jos.wu@airliquide.com" />
-              <BasicInfoField FieldName="DataInDate" FieldValue="2026-07-01" />
-              <BasicInfoField FieldName="Remark" FieldValue="RN-2302" />
-            </Header>
-            <Content>
-              <InspectionItem ItemName="Purity">
-                <ResultItem ResultName="Unit" Value="%" />
-                <ResultItem ResultName="Specification" Value="99.999" />
-                <ResultItem ResultName="DetectionLimit" Value="N/A" />
-                <ResultItem ResultName="Inspection" Value="99.999" />
-              </InspectionItem>
-              <InspectionItem ItemName="H2">
-                <ResultItem ResultName="Unit" Value="ppmv" />
-                <ResultItem ResultName="Specification" Value="1" />
-                <ResultItem ResultName="DetectionLimit" Value="0.01" />
-                <ResultItem ResultName="Inspection" Value="${getValue("H2")}" />
-              </InspectionItem>
-              <InspectionItem ItemName="N2">
-                <ResultItem ResultName="Unit" Value="ppmv" />
-                <ResultItem ResultName="Specification" Value="4" />
-                <ResultItem ResultName="DetectionLimit" Value="0.01" />
-                <ResultItem ResultName="Inspection" Value="${getValue("N2")}" />
-              </InspectionItem>
-              <InspectionItem ItemName="CO+CO2">
-                <ResultItem ResultName="Unit" Value="ppmv" />
-                <ResultItem ResultName="Specification" Value="0.6" />
-                <ResultItem ResultName="DetectionLimit" Value="0.01" />
-                <ResultItem ResultName="Inspection" Value="${getValue("CO") + getValue("CO2")}" />
-              </InspectionItem>
-              <InspectionItem ItemName="Total Hydrocarbons CH4">
-                <ResultItem ResultName="Unit" Value="ppmv" />
-                <ResultItem ResultName="Specification" Value="0.3" />
-                <ResultItem ResultName="DetectionLimit" Value="0.02" />
-                <ResultItem ResultName="Inspection" Value="${getValue("CH4")}" />
-              </InspectionItem>
-              <InspectionItem ItemName="O2">
-                <ResultItem ResultName="Unit" Value="ppmv" />
-                <ResultItem ResultName="Specification" Value="1" />
-                <ResultItem ResultName="DetectionLimit" Value="0.01" />
-                <ResultItem ResultName="Inspection" Value="${getValue("O2")}" />
-              </InspectionItem>
-              <InspectionItem ItemName="H2O">
-                <ResultItem ResultName="Unit" Value="ppmv" />
-                <ResultItem ResultName="Specification" Value="1" />
-                <ResultItem ResultName="DetectionLimit" Value="0.01" />
-                <ResultItem ResultName="Inspection" Value="${getValue("H2O")}" />
-              </InspectionItem>
-            </Content>
-            <Remark />
-          </NTC_COA>
-        """
-      }
+      // 1. 設定 Header 日期新值
+      val newProductionDate = dt.toString("YYYY-MM-dd")
+      val newExpiredDate = dt.plusDays(730).toString("YYYY-MM-dd")
 
-
+      // 2. 定義所有需要更新的氣體與對應的 Inspection 新數值
+      // 💡 未來如果有新增氣體項目，直接在這邊加一行即可
+      val gasUpdates: Map[String, String] = Map(
+        "H2" -> f"${getValue("H2") / 1000}%.3f",
+        "N2" -> f"${getValue("N2") / 1000}%.3f",
+        "CO+CO2" -> f"${(getValue("CO") + getValue("CO2")) / 1000}%.3f",
+        "Total Hydrocarbons CH4" -> f"${getValue("CH4") / 1000}%.3f",
+        "O2" -> f"${getValue("O2") / 1000}%.3f",
+        "H2O" -> f"${getValue("H2O") / 1000}%.3f"
+      )
 
       try {
-        Files.write(file, xml.getBytes(StandardCharsets.UTF_8))
+        val xml2 = XML.loadFile(file.toFile)
+        // 3. 定義批量修改規則
+        val updateCoaRule = new RewriteRule {
+          override def transform(n: Node): Seq[Node] = n match {
+
+            // 邏輯 1：修改 Header 的日期欄位
+            case elem: Elem if elem.label == "BasicInfoField" =>
+              val fieldName = (elem \ "@FieldName").text
+              fieldName match {
+                case "Productiondate " => elem % Attribute(None, "FieldValue", Text(newProductionDate), Null)
+                case "ExpiredDate" => elem % Attribute(None, "FieldValue", Text(newExpiredDate), Null)
+                case _ => elem
+              }
+
+              // 邏輯 2：匹配所有的 InspectionItem
+            case elem: Elem if elem.label == "InspectionItem" =>
+              val itemName = (elem \ "@ItemName").text
+
+              // 檢查這個氣體項目是否有在我們的更新對照表 (Map) 中
+              gasUpdates.get(itemName) match {
+                case Some(newInspectionValue) =>
+                  // 如果有在對照表內，遍歷並修改底下的 ResultItem
+                  val updatedChildren = elem.child.map {
+                    case child: Elem if child.label == "ResultItem" && (child \ "@ResultName").text == "Inspection" =>
+                      child % Attribute(None, "Value", Text(newInspectionValue), Null)
+                    case other => other
+                  }
+                  elem.copy(child = updatedChildren)
+
+                case None =>
+                  // 如果對照表內沒有這個氣體（例如 Purity），則保持原樣不變
+                  elem
+              }
+
+              // 其他節點保持原樣
+            case other => other
+          }
+        }
+
+        // 4. 執行轉換
+        val transformer = new RuleTransformer(updateCoaRule)
+        val updatedXml = transformer(xml2)
+
+        XML.save(
+          filename = file.toAbsolutePath.toString,
+          node = updatedXml,
+          enc = "UTF-8",
+          xmlDecl = true // 自動加上 <?xml version="1.0" encoding="UTF-8"?>
+        )
       } finally {
 
       }
@@ -1049,7 +1031,7 @@ class ExcelUtility @Inject()(environment: Environment,
       fillMtContent(getValue("CO"), 25, 4, 8)
       fillMtContent(getValue("CO2"), 26, 4, 8)
       fillMtContent(getValue("CH4"), 27, 4, 8)
-      fillMtContent(getValue("CH4")+getValue("C2H6")+getValue("C3H8")+getValue("C4H10"), 28, 4, 8)
+      fillMtContent(getValue("CH4") + getValue("C2H6") + getValue("C3H8") + getValue("C4H10"), 28, 4, 8)
       fillMtContent(getValue("O2"), 29, 4, 8)
       fillMtContent(getValue("H2O"), 30, 4, 8)
       sheet.setForceFormulaRecalculation(true)
@@ -1102,7 +1084,7 @@ class ExcelUtility @Inject()(environment: Environment,
       fillMtContent(getValue("N2"), 24, 4, 8)
       fillMtContent(getValue("CO"), 25, 4, 8)
       fillMtContent(getValue("CO2"), 26, 4, 8)
-      fillMtContent(getValue("CH4")+getValue("C2H6")+getValue("C3H8")+getValue("C4H10"), 27, 4, 8)
+      fillMtContent(getValue("CH4") + getValue("C2H6") + getValue("C3H8") + getValue("C4H10"), 27, 4, 8)
       fillMtContent(getValue("O2"), 28, 4, 8)
       fillMtContent(getValue("H2O"), 29, 4, 8)
       sheet.setForceFormulaRecalculation(true)
@@ -1155,7 +1137,7 @@ class ExcelUtility @Inject()(environment: Environment,
       fillMtContent(getValue("N2"), 24, 4, 8)
       fillMtContent(getValue("CO"), 25, 4, 8)
       fillMtContent(getValue("CO2"), 26, 4, 8)
-      fillMtContent(getValue("CH4")+getValue("C2H6")+getValue("C3H8")+getValue("C4H10"), 27, 4, 8)
+      fillMtContent(getValue("CH4") + getValue("C2H6") + getValue("C3H8") + getValue("C4H10"), 27, 4, 8)
       fillMtContent(getValue("O2"), 28, 4, 8)
       fillMtContent(getValue("H2O"), 29, 4, 8)
       sheet.setForceFormulaRecalculation(true)
@@ -1208,7 +1190,7 @@ class ExcelUtility @Inject()(environment: Environment,
       fillMtContent(getValue("N2"), 24, 4, 8)
       fillMtContent(getValue("CO"), 25, 4, 8)
       fillMtContent(getValue("CO2"), 26, 4, 8)
-      fillMtContent(getValue("CH4")+getValue("C2H6")+getValue("C3H8")+getValue("C4H10"), 27, 4, 8)
+      fillMtContent(getValue("CH4") + getValue("C2H6") + getValue("C3H8") + getValue("C4H10"), 27, 4, 8)
       fillMtContent(getValue("O2"), 28, 4, 8)
       fillMtContent(getValue("H2O"), 29, 4, 8)
       sheet.setForceFormulaRecalculation(true)
@@ -1261,7 +1243,7 @@ class ExcelUtility @Inject()(environment: Environment,
       fillMtContent(getValue("N2"), 24, 4, 8)
       fillMtContent(getValue("CO"), 25, 4, 8)
       fillMtContent(getValue("CO2"), 26, 4, 8)
-      fillMtContent(getValue("CH4")+getValue("C2H6")+getValue("C3H8")+getValue("C4H10"), 27, 4, 8)
+      fillMtContent(getValue("CH4") + getValue("C2H6") + getValue("C3H8") + getValue("C4H10"), 27, 4, 8)
       fillMtContent(getValue("O2"), 28, 4, 8)
       fillMtContent(getValue("H2O"), 29, 4, 8)
       sheet.setForceFormulaRecalculation(true)
@@ -1314,7 +1296,7 @@ class ExcelUtility @Inject()(environment: Environment,
       fillMtContent(getValue("N2"), 24, 4, 8)
       fillMtContent(getValue("CO"), 25, 4, 8)
       fillMtContent(getValue("CO2"), 26, 4, 8)
-      fillMtContent(getValue("CH4")+getValue("C2H6")+getValue("C3H8")+getValue("C4H10"), 27, 4, 8)
+      fillMtContent(getValue("CH4") + getValue("C2H6") + getValue("C3H8") + getValue("C4H10"), 27, 4, 8)
       fillMtContent(getValue("O2"), 28, 4, 8)
       fillMtContent(getValue("H2O"), 29, 4, 8)
       sheet.setForceFormulaRecalculation(true)
@@ -1367,7 +1349,7 @@ class ExcelUtility @Inject()(environment: Environment,
       fillMtContent(getValue("N2"), 24, 4, 8)
       fillMtContent(getValue("CO"), 25, 4, 8)
       fillMtContent(getValue("CO2"), 26, 4, 8)
-      fillMtContent(getValue("CH4")+getValue("C2H6")+getValue("C3H8")+getValue("C4H10"), 27, 4, 8)
+      fillMtContent(getValue("CH4") + getValue("C2H6") + getValue("C3H8") + getValue("C4H10"), 27, 4, 8)
       fillMtContent(getValue("O2"), 28, 4, 8)
       fillMtContent(getValue("H2O"), 29, 4, 8)
       sheet.setForceFormulaRecalculation(true)
@@ -1420,7 +1402,7 @@ class ExcelUtility @Inject()(environment: Environment,
       fillMtContent(getValue("N2"), 24, 4, 8)
       fillMtContent(getValue("CO"), 25, 4, 8)
       fillMtContent(getValue("CO2"), 26, 4, 8)
-      fillMtContent(getValue("CH4")+getValue("C2H6")+getValue("C3H8")+getValue("C4H10"), 27, 4, 8)
+      fillMtContent(getValue("CH4") + getValue("C2H6") + getValue("C3H8") + getValue("C4H10"), 27, 4, 8)
       fillMtContent(getValue("O2"), 28, 4, 8)
       fillMtContent(getValue("H2O"), 29, 4, 8)
       sheet.setForceFormulaRecalculation(true)
@@ -1473,7 +1455,7 @@ class ExcelUtility @Inject()(environment: Environment,
       fillMtContent(getValue("N2"), 24, 4, 8)
       fillMtContent(getValue("CO"), 25, 4, 8)
       fillMtContent(getValue("CO2"), 26, 4, 8)
-      fillMtContent(getValue("CH4")+getValue("C2H6")+getValue("C3H8")+getValue("C4H10"), 27, 4, 8)
+      fillMtContent(getValue("CH4") + getValue("C2H6") + getValue("C3H8") + getValue("C4H10"), 27, 4, 8)
       fillMtContent(getValue("O2"), 28, 4, 8)
       fillMtContent(getValue("H2O"), 29, 4, 8)
       sheet.setForceFormulaRecalculation(true)
@@ -1527,7 +1509,7 @@ class ExcelUtility @Inject()(environment: Environment,
       fillMtContent(getValue("CO"), 25, 4, 8)
       fillMtContent(getValue("CO2"), 26, 4, 8)
       fillMtContent(getValue("CH4"), 27, 4, 8)
-      fillMtContent(getValue("CH4")+getValue("C2H6")+getValue("C3H8")+getValue("C4H10"), 28, 4, 8)
+      fillMtContent(getValue("CH4") + getValue("C2H6") + getValue("C3H8") + getValue("C4H10"), 28, 4, 8)
       fillMtContent(getValue("O2"), 29, 4, 8)
       fillMtContent(getValue("H2O"), 30, 4, 8)
       sheet.setForceFormulaRecalculation(true)
@@ -1548,7 +1530,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          Math.max(mtMap(mt).value, 10)
         else
           0d
       }
@@ -1580,7 +1562,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          Math.max(mtMap(mt).value, 10)
         else
           0d
       }
@@ -1612,7 +1594,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          Math.max(mtMap(mt).value, 10)
         else
           0d
       }
@@ -1644,7 +1626,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          Math.max(mtMap(mt).value, 10)
         else
           0d
       }
@@ -1676,7 +1658,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          Math.max(mtMap(mt).value, 10)
         else
           0d
       }
@@ -1708,7 +1690,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          Math.max(mtMap(mt).value, 10)
         else
           0d
       }
@@ -1740,7 +1722,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          Math.max(mtMap(mt).value, 10)
         else
           0d
       }
@@ -1772,7 +1754,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          Math.max(mtMap(mt).value, 10)
         else
           0d
       }
@@ -1804,7 +1786,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          Math.max(mtMap(mt).value, 10)
         else
           0d
       }
@@ -1836,7 +1818,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          Math.max(mtMap(mt).value, 10)
         else
           0d
       }
@@ -1868,7 +1850,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          Math.max(mtMap(mt).value, 10)
         else
           0d
       }
@@ -1900,7 +1882,7 @@ class ExcelUtility @Inject()(environment: Environment,
       def getValue(mtName: String): Double = {
         val mt = monitorTypeOp.getMonitorTypeValueByName(mtName)
         if (mtMap.contains(mt))
-          mtMap(mt).value
+          Math.max(mtMap(mt).value, 10)
         else
           0d
       }
@@ -1918,45 +1900,38 @@ class ExcelUtility @Inject()(environment: Environment,
     }
     finishExcel(file, pkg, wb)
   }
-  def createCoA(map: Map[MonitorOp#Value, (DateTime, Option[String], Map[MonitorTypeOp#Value, Record])]): Path = {
-    val coaTemplatePath = Paths.get(environment.rootPath.getAbsolutePath).resolve("report_template").resolve("Coa")
-    val tempFolder = copyToTempDir(coaTemplatePath, "coa")
-    org.apache.poi.openxml4j.util.ZipSecureFile.setMinInflateRatio(0)
-    handleQM061(tempFolder, map)
-    handleQM081(tempFolder, map)
-    handleMTB1(tempFolder, map)
-    handleMTB2(tempFolder, map)
-    handleNaya1(tempFolder, map)
-    handleNaya2(tempFolder, map)
-    handleTSMCF7(tempFolder, map)
-    handleTSMCF8(tempFolder, map)
-    handleTSMCF12(tempFolder, map)
-    handleTSMCF15(tempFolder, map)
-    handleTSMCF15_1(tempFolder, map)
-    handleTSMCF18(tempFolder, map)
-    handleTSMCF18_1(tempFolder, map)
-    handleTSMCF18_2(tempFolder, map)
-    handleTSMCF20(tempFolder, map)
-    handleTSMCF20_1(tempFolder, map)
-    handleTSMCFB30(tempFolder, map)
-    // eCoA
-    eCoa879(tempFolder, map)
-    eCoa070_0080(tempFolder, map)
-    eCoa070_AP06(tempFolder, map)
-    eCoa070_AP6B(tempFolder, map)
-    eCoa070_F7(tempFolder, map)
-    eCoa070_12P3(tempFolder, map)
-    eCoa070_12P8(tempFolder, map)
-    eCoa070_15P1(tempFolder, map)
-    eCoa070_18P4(tempFolder, map)
-    eCoa070_18P5(tempFolder, map)
-    eCoa070_18P6(tempFolder, map)
-    eCoa070_F20P2(tempFolder, map)
 
-    val zipTempFile = Files.createTempFile("coa", ".zip")
-    zipFolder(tempFolder, zipTempFile)
-    zipTempFile
+  private def createColorStyle(fgColors: Array[XSSFColor], mt: monitorTypeOp.Value)(implicit wb: XSSFWorkbook): Array[XSSFCellStyle] = {
+    fgColors.map {
+      color =>
+        val style = createStyle(mt)
+        style.setFillForegroundColor(color)
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND)
+        style
+    }
+  }
 
+  private def createStyle(mt: monitorTypeOp.Value)(implicit wb: XSSFWorkbook) = {
+    val prec = monitorTypeOp.map(mt).prec
+    val format_str = "0." + "0" * prec
+    val style = wb.createCellStyle();
+    val format = wb.createDataFormat();
+    // Create a new font and alter it.
+    val font = wb.createFont();
+    font.setFontHeightInPoints(10);
+    font.setFontName("標楷體");
+
+    style.setFont(font)
+    style.setDataFormat(format.getFormat(format_str))
+    style.setBorderBottom(BorderStyle.THIN);
+    style.setBottomBorderColor(IndexedColors.BLACK.getIndex());
+    style.setBorderLeft(BorderStyle.THIN);
+    style.setLeftBorderColor(IndexedColors.BLACK.getIndex());
+    style.setBorderRight(BorderStyle.THIN);
+    style.setRightBorderColor(IndexedColors.BLACK.getIndex());
+    style.setBorderTop(BorderStyle.THIN);
+    style.setTopBorderColor(IndexedColors.BLACK.getIndex());
+    style
   }
 
 }
